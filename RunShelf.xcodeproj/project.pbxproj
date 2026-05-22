@@ -21,6 +21,7 @@
 		3DB7C2F2ACFE4490117FC286 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */; };
 		471D3BCC49DE948E3E03FB78 /* NewTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D61D190282B957123EB404C /* NewTaskSheet.swift */; };
 		4C3B25028ED84FC7E0BBAEC6 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
+		4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */; };
 		4C51249D068DCACD265644C9 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C54C102515E0E12C2498BF /* CronSchedule.swift */; };
 		4E91FD5380752063D1946197 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */ = {isa = PBXBuildFile; fileRef = C17DE32A8BDE27EEC8D39BB8 /* com.aix4u.runshelf.scheduler.plist */; };
 		574BCDF91EAD6C4F1F67ECFF /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C295C901C0444A4DF9768E50 /* TaskModels.swift */; };
@@ -32,6 +33,7 @@
 		6EF0326A9AA552CA172A91E6 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 45BACA9087858ABEEFA6394C /* Cocoa.framework */; };
 		75A3425663B837DBAE31E1A0 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9E1372C2E4FB3B73E906F5 /* StatusBadge.swift */; };
 		7C5BAFC88CD5939332F8E30C /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
+		7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */; };
 		7FE2E75D771240E63D659373 /* SchedulerServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */; };
 		85D867EFC1E4E209BF1B2F8A /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */; };
 		85D90E7CB7695CA389FFA994 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */; };
@@ -44,6 +46,7 @@
 		C4DAD539AF178493B5FCFC8C /* RunShelfApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */; };
 		C846E25E095780C0B235E946 /* TaskSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E827E905BC9D0A98F5A1452 /* TaskSidebarView.swift */; };
 		C855DD283DF7F9749A3F0224 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */; };
+		CAA597EBE7C71ED7A0F1F39E /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2313E9329AFABE63D17BA434 /* LogView.swift */; };
 		CCC9A1CFB6FCB999A317551C /* RunShelfSchedulerMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E279B833B3E11B6180811103 /* RunShelfSchedulerMain.swift */; };
 		D36C51B16C86814E41528E06 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1699BD6308DDC11488C4BD /* ContentView.swift */; };
 		E7B4121D39D3E7B573309C9A /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A115BE875312135B7BDE3D /* TaskTemplate.swift */; };
@@ -92,11 +95,14 @@
 		043EFA46EB17EA287D69428B /* TaskInspectorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskInspectorView.swift; sourceTree = "<group>"; };
 		1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
 		1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerServiceController.swift; sourceTree = "<group>"; };
+		2313E9329AFABE63D17BA434 /* LogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		2B67D3B78860C69DBAD290E1 /* RunShelfScheduler */ = {isa = PBXFileReference; includeInIndex = 0; path = RunShelfScheduler; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D61D190282B957123EB404C /* NewTaskSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskSheet.swift; sourceTree = "<group>"; };
+		318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleEditorViews.swift; sourceTree = "<group>"; };
 		369A783F9960DE36C62AE1D3 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		45BACA9087858ABEEFA6394C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskHeaderView.swift; sourceTree = "<group>"; };
 		51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5A1699BD6308DDC11488C4BD /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfApp.swift; sourceTree = "<group>"; };
@@ -154,6 +160,9 @@
 				24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */,
 				043EFA46EB17EA287D69428B /* TaskInspectorView.swift */,
 				7E827E905BC9D0A98F5A1452 /* TaskSidebarView.swift */,
+				2313E9329AFABE63D17BA434 /* LogView.swift */,
+				318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */,
+				4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */,
 			);
 			name = Views;
 			path = Views;
@@ -186,6 +195,13 @@
 			);
 			name = Storage;
 			path = Storage;
+			sourceTree = "<group>";
+		};
+		11C25D861DA281DF9FC06F09 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		16129295AFC320AA98BFD2B9 /* RunShelf */ = {
@@ -226,6 +242,7 @@
 			isa = PBXGroup;
 			children = (
 				16129295AFC320AA98BFD2B9 /* RunShelf */,
+				11C25D861DA281DF9FC06F09 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -426,6 +443,7 @@
 			mainGroup = 353B94E61C3C72374D9C72C2;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 11C25D861DA281DF9FC06F09 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -477,6 +495,9 @@
 				F7CF61906FDDE3DA9443A559 /* ShellScriptEditor.swift in Sources */,
 				6DD1DDDE234079E0FD2877B6 /* ShellSyntaxHighlighter.swift in Sources */,
 				C4DAD539AF178493B5FCFC8C /* RunShelfApp.swift in Sources */,
+				CAA597EBE7C71ED7A0F1F39E /* LogView.swift in Sources */,
+				7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */,
+				4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

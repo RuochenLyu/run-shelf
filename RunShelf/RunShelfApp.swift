@@ -7,7 +7,7 @@ struct RunShelfApp: App {
             ContentView()
                 .frame(minWidth: 1120, minHeight: 680)
         }
-        .windowStyle(.titleBar)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .saveItem) {
                 Button("保存") {

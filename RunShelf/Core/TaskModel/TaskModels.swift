@@ -48,6 +48,23 @@ struct TaskSchedule: Codable, Equatable {
     )
 }
 
+extension TaskSchedule {
+    var validationError: CronParseError? {
+        guard type == "cron" else {
+            return CronParseError.invalidToken("类型", type)
+        }
+
+        if case .failure(let error) = CronSchedule.validate(expression) {
+            return error
+        }
+        return nil
+    }
+
+    var isValid: Bool {
+        validationError == nil
+    }
+}
+
 struct MissedRunPolicy: Codable, Equatable {
     var type: String
     var maxDelaySeconds: Int
@@ -149,5 +166,9 @@ struct RunShelfTask: Identifiable, Equatable {
 
     var latestRun: RunRecord? {
         runs.sorted { $0.startedAt > $1.startedAt }.first
+    }
+
+    var hasValidSchedule: Bool {
+        manifest.schedule.isValid
     }
 }

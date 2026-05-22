@@ -21,8 +21,19 @@ enum RunLogKind: String, CaseIterable, Identifiable {
 @MainActor
 final class TaskStore: ObservableObject {
     @Published private(set) var tasks: [RunShelfTask] = []
-    @Published var selectedTaskID: String?
+    @Published var selectedTaskID: String? {
+        didSet {
+            if oldValue != selectedTaskID {
+                if let oldValue {
+                    setScheduleDraftValidity(taskID: oldValue, isValid: true)
+                }
+                selectedRunID = nil
+            }
+        }
+    }
+    @Published var selectedRunID: String?
     @Published private(set) var runningTaskIDs: Set<String> = []
+    @Published private var invalidScheduleDraftTaskIDs: Set<String> = []
     @Published var lastErrorMessage: String?
 
     let tasksDirectoryURL: URL
@@ -98,6 +109,7 @@ final class TaskStore: ObservableObject {
             }
 
             tasks = loadedTasks
+            invalidScheduleDraftTaskIDs.formIntersection(Set(loadedTasks.map(\.id)))
             if selectedTaskID == nil || task(withID: selectedTaskID ?? "") == nil {
                 selectedTaskID = sortedTasks.first?.id
             }
@@ -117,14 +129,30 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    func createTask(from template: TaskTemplate, name: String? = nil) {
+    @discardableResult
+    func createTask(
+        from template: TaskTemplate,
+        name: String? = nil,
+        scheduleExpression: String? = nil
+    ) -> String? {
         do {
             let manifestName = normalizedName(name, fallback: template.name)
-            let task = try makeTask(from: template, name: manifestName, enabled: template.enabledByDefault)
+            var schedule = template.defaultSchedule
+            if let expr = scheduleExpression?.trimmingCharacters(in: .whitespacesAndNewlines), !expr.isEmpty {
+                schedule.expression = expr
+            }
+            let task = try makeTask(
+                from: template,
+                name: manifestName,
+                enabled: template.enabledByDefault,
+                schedule: schedule
+            )
             tasks.append(task)
             selectedTaskID = task.id
+            return task.id
         } catch {
             lastErrorMessage = "无法创建任务：\(error.localizedDescription)"
+            return nil
         }
     }
 
@@ -138,14 +166,31 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    func saveTask(id: String) {
-        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+    @discardableResult
+    func saveTask(id: String) -> Bool {
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return false }
+        guard validateScheduleBeforePersisting(tasks[index]) else {
+            return false
+        }
+
         do {
             tasks[index].manifest.updatedAt = Date()
             try writeTask(tasks[index])
             tasks[index].isDirty = false
+            return true
         } catch {
             lastErrorMessage = "无法保存任务：\(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func revertTask(id: String) {
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+        do {
+            tasks[index] = try loadTask(at: tasks[index].directoryURL)
+            setScheduleDraftValidity(taskID: id, isValid: true)
+        } catch {
+            lastErrorMessage = "无法放弃更改：\(error.localizedDescription)"
         }
     }
 
@@ -160,6 +205,7 @@ final class TaskStore: ObservableObject {
             var resultingURL: NSURL?
             try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
             tasks.remove(at: index)
+            setScheduleDraftValidity(taskID: id, isValid: true)
             selectedTaskID = sortedTasks.first?.id
         } catch {
             do {
@@ -168,6 +214,7 @@ final class TaskStore: ObservableObject {
                 let destination = trashURL.appendingPathComponent(task.id + "-" + UUID().uuidString, isDirectory: true)
                 try fileManager.moveItem(at: task.directoryURL, to: destination)
                 tasks.remove(at: index)
+                setScheduleDraftValidity(taskID: id, isValid: true)
                 selectedTaskID = sortedTasks.first?.id
             } catch {
                 lastErrorMessage = "无法删除任务：\(error.localizedDescription)"
@@ -177,7 +224,8 @@ final class TaskStore: ObservableObject {
 
     func runTask(id: String) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-        saveTask(id: id)
+        guard !runningTaskIDs.contains(id) else { return }
+        guard saveTask(id: id) else { return }
 
         let task = tasks[index]
         runningTaskIDs.insert(id)
@@ -199,6 +247,49 @@ final class TaskStore: ObservableObject {
                 }
             }
         }
+    }
+
+    func setScheduleDraftValidity(taskID: String, isValid: Bool) {
+        var next = invalidScheduleDraftTaskIDs
+        if isValid {
+            next.remove(taskID)
+        } else {
+            next.insert(taskID)
+        }
+
+        if next != invalidScheduleDraftTaskIDs {
+            invalidScheduleDraftTaskIDs = next
+        }
+    }
+
+    func isScheduleDraftValid(taskID: String) -> Bool {
+        !invalidScheduleDraftTaskIDs.contains(taskID)
+    }
+
+    func canSaveTask(_ task: RunShelfTask) -> Bool {
+        task.isDirty && canPersistTask(task)
+    }
+
+    func canRunTask(_ task: RunShelfTask) -> Bool {
+        !runningTaskIDs.contains(task.id) && canPersistTask(task)
+    }
+
+    private func canPersistTask(_ task: RunShelfTask) -> Bool {
+        task.hasValidSchedule && isScheduleDraftValid(taskID: task.id)
+    }
+
+    private func validateScheduleBeforePersisting(_ task: RunShelfTask) -> Bool {
+        if let error = task.manifest.schedule.validationError {
+            lastErrorMessage = "无法保存任务：\(error.localizedDescription)"
+            return false
+        }
+
+        guard isScheduleDraftValid(taskID: task.id) else {
+            lastErrorMessage = "无法保存任务：请先修正执行计划。"
+            return false
+        }
+
+        return true
     }
 
     func openTasksDirectory() {
@@ -270,7 +361,12 @@ final class TaskStore: ObservableObject {
         try "seeded\n".write(to: exampleSeedMarkerURL, atomically: true, encoding: .utf8)
     }
 
-    private func makeTask(from template: TaskTemplate, name: String, enabled: Bool) throws -> RunShelfTask {
+    private func makeTask(
+        from template: TaskTemplate,
+        name: String,
+        enabled: Bool,
+        schedule: TaskSchedule? = nil
+    ) throws -> RunShelfTask {
         let id = UUID().uuidString
         let directoryURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
@@ -281,7 +377,7 @@ final class TaskStore: ObservableObject {
             name: name,
             description: template.description,
             enabled: enabled,
-            schedule: template.defaultSchedule
+            schedule: schedule ?? template.defaultSchedule
         )
         let task = RunShelfTask(
             manifest: manifest,
@@ -304,7 +400,7 @@ final class TaskStore: ObservableObject {
             ])
         }
 
-        let script = readText(at: directoryURL.appendingPathComponent("run.sh"))
+        let script = normalizedTemplateScript(readText(at: directoryURL.appendingPathComponent("run.sh")))
         let notes = readText(at: directoryURL.appendingPathComponent("notes.md"))
         let runs = loadRuns(for: directoryURL)
 
@@ -384,5 +480,11 @@ final class TaskStore: ObservableObject {
     private func normalizedName(_ name: String?, fallback: String) -> String {
         let trimmed = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func normalizedTemplateScript(_ script: String) -> String {
+        script
+            .replacingOccurrences(of: "# Write your xscript here", with: "# Write your script here")
+            .replacingOccurrences(of: "# 在这里写脚本", with: "# Write your script here")
     }
 }

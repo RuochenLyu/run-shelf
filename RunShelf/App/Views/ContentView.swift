@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
+    private let inspectorWidth: CGFloat = 340
+
     @StateObject private var store = TaskStore()
     @State private var isShowingNewTask = false
     @State private var isShowingDeleteConfirmation = false
@@ -8,29 +10,41 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             TaskSidebarView(store: store)
-                .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 340)
+                .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 320)
         } content: {
             if let task = store.selectedTask {
                 TaskDetailView(store: store, taskID: task.id)
             } else {
-                EmptyStateView(title: "暂无任务", systemImage: "tray", description: "新建任务后会显示脚本、历史和日志。")
+                emptyDetailPlaceholder
             }
         } detail: {
             if let task = store.selectedTask {
                 TaskInspectorView(store: store, task: task)
-                    .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 380)
+                    .frame(width: inspectorWidth)
+                    .navigationSplitViewColumnWidth(
+                        min: inspectorWidth,
+                        ideal: inspectorWidth,
+                        max: inspectorWidth
+                    )
             } else {
-                EmptyStateView(title: "未选择任务", systemImage: "sidebar.right", description: nil)
+                Color.clear
+                    .frame(width: inspectorWidth)
+                    .navigationSplitViewColumnWidth(
+                        min: inspectorWidth,
+                        ideal: inspectorWidth,
+                        max: inspectorWidth
+                    )
             }
         }
-        .frame(minWidth: 1120, minHeight: 680)
+        .frame(minWidth: 1120, minHeight: 640)
         .toolbar {
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     isShowingNewTask = true
                 } label: {
                     Label("新建任务", systemImage: "plus")
                 }
+                .help("新建任务")
 
                 Button {
                     if let id = store.selectedTaskID {
@@ -39,7 +53,8 @@ struct ContentView: View {
                 } label: {
                     Label("立即运行", systemImage: "play.fill")
                 }
-                .disabled(store.selectedTaskID == nil || store.selectedTaskID.map { store.runningTaskIDs.contains($0) } == true)
+                .help("立即运行（⌘R）")
+                .disabled(!canRunSelectedTask)
 
                 Button {
                     if let id = store.selectedTaskID {
@@ -48,19 +63,20 @@ struct ContentView: View {
                 } label: {
                     Label("保存", systemImage: "square.and.arrow.down")
                 }
-                .disabled(store.selectedTask?.isDirty != true)
+                .help("保存（⌘S）")
+                .disabled(!canSaveSelectedTask)
 
                 Button(role: .destructive) {
                     isShowingDeleteConfirmation = true
                 } label: {
                     Label("删除", systemImage: "trash")
                 }
+                .help("删除任务")
                 .disabled(store.selectedTaskID == nil)
             }
         }
         .sheet(isPresented: $isShowingNewTask) {
             NewTaskSheet(store: store)
-                .frame(minWidth: 520, minHeight: 420)
         }
         .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
             Button("删除", role: .destructive) {
@@ -70,7 +86,7 @@ struct ContentView: View {
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("任务目录会移入废纸篓。运行中的任务不能删除。")
+            Text("任务目录会移入废纸篓，运行中的任务无法删除。")
         }
         .alert("Run Shelf", isPresented: errorBinding) {
             Button("好", role: .cancel) {
@@ -86,7 +102,7 @@ struct ContentView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 guard !Task.isCancelled else { break }
-                await store.refreshRunsFromDisk()
+                store.refreshRunsFromDisk()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveSelectedTaskFromMenu)) { _ in
@@ -101,10 +117,44 @@ struct ContentView: View {
         }
     }
 
+    private var emptyDetailPlaceholder: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray")
+                .font(.system(size: 44, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("还没有任务")
+                .font(.title3.weight(.semibold))
+            Text("点击工具栏的「新建任务」开始第一个计划脚本。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                isShowingNewTask = true
+            } label: {
+                Label("新建任务", systemImage: "plus")
+            }
+            .controlSize(.large)
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
+    }
+
     private var errorBinding: Binding<Bool> {
         Binding(
             get: { store.lastErrorMessage != nil },
             set: { if !$0 { store.lastErrorMessage = nil } }
         )
+    }
+
+    private var canSaveSelectedTask: Bool {
+        guard let task = store.selectedTask else { return false }
+        return store.canSaveTask(task)
+    }
+
+    private var canRunSelectedTask: Bool {
+        guard let task = store.selectedTask else { return false }
+        return store.canRunTask(task)
     }
 }

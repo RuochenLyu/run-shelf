@@ -6,37 +6,47 @@ struct TaskSidebarView: View {
     var body: some View {
         List(selection: $store.selectedTaskID) {
             ForEach(store.sortedTasks) { task in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(statusColor(for: task))
-                            .frame(width: 7, height: 7)
-
-                        Text(displayName(for: task))
-                            .font(.body.weight(.medium))
-                            .lineLimit(1)
-
-                        Spacer()
-                    }
-
-                    Text(verbatim: subtitle(for: task))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                .padding(.vertical, 5)
-                .tag(task.id)
+                TaskSidebarRow(task: task, isRunning: store.runningTaskIDs.contains(task.id))
+                    .tag(task.id)
             }
         }
+        .listStyle(.sidebar)
         .navigationTitle("任务")
     }
+}
 
-    private func displayName(for task: RunShelfTask) -> String {
+private struct TaskSidebarRow: View {
+    var task: RunShelfTask
+    var isRunning: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: statusSymbol)
+                .foregroundStyle(statusColor)
+                .imageScale(.small)
+                .frame(width: 14)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayName)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 3)
+    }
+
+    private var displayName: String {
         let name = task.manifest.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "未命名任务" : name
     }
 
-    private func subtitle(for task: RunShelfTask) -> String {
+    private var subtitle: String {
         guard task.manifest.enabled else {
             return "已停用"
         }
@@ -44,19 +54,31 @@ struct TaskSidebarView: View {
             return task.manifest.schedule.expression
         }
 
-        let nextRuns = try? schedule.nextRuns(count: 1)
-        if let nextRun = nextRuns?.first {
-            return "\(schedule.summary) · \(RunShelfFormatters.scheduleDateTime(nextRun))"
+        if let next = try? schedule.nextRuns(count: 1).first {
+            return "\(schedule.summary) · \(RunShelfFormatters.scheduleDateTime(next))"
         }
         return schedule.summary
     }
 
-    private func statusColor(for task: RunShelfTask) -> Color {
-        if store.runningTaskIDs.contains(task.id) {
+    private var statusSymbol: String {
+        if isRunning {
+            return "arrow.triangle.2.circlepath"
+        }
+        if let latest = task.latestRun {
+            return latest.status.statusSymbol
+        }
+        if task.manifest.enabled {
+            return "circle.fill"
+        }
+        return "pause.circle.fill"
+    }
+
+    private var statusColor: Color {
+        if isRunning {
             return .blue
         }
-        if let latestRun = task.latestRun {
-            return latestRun.status.badgeColor
+        if let latest = task.latestRun {
+            return latest.status.badgeColor
         }
         return task.manifest.enabled ? .green : .secondary
     }
