@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var controller = SchedulerServiceController()
+    @EnvironmentObject private var controller: SchedulerServiceController
     @AppStorage(RunShelfSettings.defaultRetentionDaysKey) private var defaultRetentionDays = RunShelfSettings.defaultRetentionDays
     @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
 
@@ -64,6 +64,10 @@ struct SettingsView: View {
                     Text("macOS 已阻止 Run Shelf 在登录时启动调度器。请前往「系统设置 › 通用 › 登录项」启用 Run Shelf。")
                         .font(.callout)
                         .foregroundStyle(.orange)
+                } else if !controller.isAuthorized {
+                    Text("自动调度已停止。下次启动 Run Shelf 时会要求重新启用。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -95,6 +99,9 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 540)
+        .onAppear {
+            controller.refresh()
+        }
         .alert("Run Shelf", isPresented: errorBinding) {
             Button("好", role: .cancel) {
                 controller.lastErrorMessage = nil

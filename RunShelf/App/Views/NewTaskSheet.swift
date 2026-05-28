@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct NewTaskSheet: View {
+    private static let notificationPromptDelayNanoseconds: UInt64 = 250_000_000
+
     @ObservedObject var store: TaskStore
     @EnvironmentObject private var schedulePrefs: SchedulePreferencesStore
+    @EnvironmentObject private var schedulerController: SchedulerServiceController
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedTemplateID: String = TaskTemplate.builtIns.first?.id ?? "blank"
@@ -90,7 +93,15 @@ struct NewTaskSheet: View {
                         if let mode = pickedMode {
                             schedulePrefs.setMode(mode.rawValue, for: id)
                         }
+                        let needsNotificationPrompt = store.task(withID: id)?.manifest.notifications.onFailure ?? false
                         dismiss()
+                        if needsNotificationPrompt {
+                            // macOS sheet 关闭动画约 200-300ms；等它让出焦点再弹系统权限对话框。
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: Self.notificationPromptDelayNanoseconds)
+                                schedulerController.requestNotificationAuthorizationIfNeeded()
+                            }
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)

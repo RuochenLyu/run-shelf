@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 struct TaskInspectorView: View {
     @ObservedObject var store: TaskStore
     @EnvironmentObject private var schedulePrefs: SchedulePreferencesStore
+    @EnvironmentObject private var schedulerController: SchedulerServiceController
     var task: RunShelfTask
 
     var body: some View {
@@ -49,6 +51,20 @@ struct TaskInspectorView: View {
                 }
 
                 Toggle("失败时通知", isOn: failureNotificationBinding)
+
+                if shouldShowNotificationDeniedHint {
+                    HStack(spacing: 6) {
+                        Text("已被系统拒绝")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("去系统设置") {
+                            openNotificationSettings()
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
+                }
 
                 LabeledContent("保留天数") {
                     RetentionNumberField(value: retentionDaysBinding, unit: "天", range: 1...365)
@@ -128,8 +144,27 @@ struct TaskInspectorView: View {
                 store.updateTask(id: task.id) { task in
                     task.manifest.notifications.onFailure = value
                 }
+                if value {
+                    schedulerController.requestNotificationAuthorizationIfNeeded()
+                }
             }
         )
+    }
+
+    private var shouldShowNotificationDeniedHint: Bool {
+        let onFailure = store.task(withID: task.id)?.manifest.notifications.onFailure ?? false
+        return onFailure && schedulerController.notificationStatus == .denied
+    }
+
+    /// 通知设置没有像 SMAppService 那样的官方单项 API，这里用 deeplink best-effort
+    /// 打开「系统设置 › 通知」。若 schema 失效，至少打开 System Settings 主面板。
+    private func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
+           NSWorkspace.shared.open(url) {
+            return
+        }
+
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
     }
 
     private var retentionDaysBinding: Binding<Int> {

@@ -12,23 +12,38 @@ final class SchedulerServiceController: ObservableObject {
 
     private let service = SMAppService.agent(plistName: "com.aix4u.runshelf.scheduler.plist")
     private let decoder: JSONDecoder
+    private var isRequestingNotificationAuthorization = false
 
     init() {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
-        refresh()
+        refreshAuthorization()
     }
 
-    func refresh() {
+    var isAuthorized: Bool {
+        serviceStatus == .enabled
+    }
+
+    /// Gate 期间用的轻量刷新：只查 SMAppService 状态和 helper 文件
+    func refreshAuthorization() {
         serviceStatus = service.status
         embeddedSchedulerAvailable = isEmbeddedSchedulerAvailable()
+    }
+
+    /// 主窗口/Settings 用的诊断刷新：通知权限 + 心跳
+    func refreshDiagnostics() {
         RunShelfNotifier.notificationSettings { [weak self] status in
             DispatchQueue.main.async {
                 self?.notificationStatus = status
             }
         }
         heartbeat = readHeartbeat()
+    }
+
+    func refresh() {
+        refreshAuthorization()
+        refreshDiagnostics()
     }
 
     var serviceStatusDisplayName: String {
@@ -38,22 +53,52 @@ final class SchedulerServiceController: ObservableObject {
         return serviceStatus.displayName
     }
 
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
+    /// Gate 主按钮入口。失败按 SMError 码分流文案；只有当状态最终为
+    /// `.requiresApproval` 时才主动跳登录项设置面板。
+    func registerForGate() {
+        lastErrorMessage = nil
+        var registrationErrorResponse: RegistrationErrorResponse = .stayOnGate
+
+        guard embeddedSchedulerAvailable else {
+            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf"
+            return
+        }
+
+        do {
+            try service.register()
+            refreshAuthorization()
+        } catch {
+            registrationErrorResponse = handleServiceRegistrationError(error)
+            refreshAuthorization()
+        }
+
+        if serviceStatus == .requiresApproval || registrationErrorResponse == .openSettings {
+            openLoginItemsSettings()
+        }
+    }
+
     func register() {
+        lastErrorMessage = nil
         do {
             try service.register()
             refresh()
         } catch {
-            lastErrorMessage = error.localizedDescription
+            _ = handleServiceRegistrationError(error)
             refresh()
         }
     }
 
     func unregister() {
+        lastErrorMessage = nil
         do {
             try service.unregister()
             refresh()
         } catch {
-            lastErrorMessage = error.localizedDescription
+            _ = handleServiceRegistrationError(error)
             refresh()
         }
     }
@@ -61,8 +106,65 @@ final class SchedulerServiceController: ObservableObject {
     func requestNotificationAuthorization() {
         RunShelfNotifier.requestAuthorization { [weak self] _ in
             DispatchQueue.main.async {
-                self?.refresh()
+                self?.refreshDiagnostics()
             }
+        }
+    }
+
+    /// 弱请求：仅当还没询问过时弹一次原生权限对话框。已授权/已拒绝都不打扰。
+    /// 先 sync 一次系统当前状态，避免我们缓存的 notificationStatus 落后于真实情况。
+    func requestNotificationAuthorizationIfNeeded() {
+        RunShelfNotifier.notificationSettings { [weak self] status in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.notificationStatus = status
+                guard status == .notDetermined else { return }
+                guard !self.isRequestingNotificationAuthorization else { return }
+                self.isRequestingNotificationAuthorization = true
+                RunShelfNotifier.requestAuthorization { _ in
+                    DispatchQueue.main.async {
+                        self.isRequestingNotificationAuthorization = false
+                        self.refreshDiagnostics()
+                    }
+                }
+            }
+        }
+    }
+
+    @discardableResult
+    private func handleServiceRegistrationError(_ error: Error) -> RegistrationErrorResponse {
+        let nsError = error as NSError
+        #if DEBUG
+        print("[Run Shelf] SMAppService 错误 domain=\(nsError.domain) code=\(nsError.code) userInfo=\(nsError.userInfo)")
+        #endif
+
+        // SMAppService 在 macOS 13+ 使用 SMAppServiceErrorDomain，code 用 kSMError* 常量。
+        // 我们 deployment target 26.0，直接按这些 code 分流。
+        guard nsError.domain == SMAppServiceErrorDomain else {
+            lastErrorMessage = "注册失败：\(error.localizedDescription)"
+            return .stayOnGate
+        }
+
+        switch nsError.code {
+        case Int(kSMErrorInvalidSignature):
+            lastErrorMessage = "调度组件签名无效，请重装 Run Shelf"
+            return .stayOnGate
+        case Int(kSMErrorJobPlistNotFound), Int(kSMErrorToolNotValid):
+            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf"
+            return .stayOnGate
+        case Int(kSMErrorInvalidPlist):
+            lastErrorMessage = "调度配置异常，请重装 Run Shelf"
+            return .stayOnGate
+        case Int(kSMErrorAlreadyRegistered):
+            // 静默吞掉，由 refreshAuthorization 把状态同步出来
+            lastErrorMessage = nil
+            return .stayOnGate
+        case Int(kSMErrorLaunchDeniedByUser):
+            lastErrorMessage = "已被系统拒绝，请在系统设置中重新开启"
+            return .openSettings
+        default:
+            lastErrorMessage = "注册失败：\(error.localizedDescription)"
+            return .stayOnGate
         }
     }
 
@@ -80,6 +182,11 @@ final class SchedulerServiceController: ObservableObject {
         return FileManager.default.fileExists(atPath: helperURL.path)
             && FileManager.default.fileExists(atPath: plistURL.path)
     }
+}
+
+private enum RegistrationErrorResponse {
+    case stayOnGate
+    case openSettings
 }
 
 extension SMAppService.Status {
