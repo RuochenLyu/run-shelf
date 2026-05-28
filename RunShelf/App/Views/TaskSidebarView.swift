@@ -124,7 +124,7 @@ private struct TaskSidebarRow: View {
 
     private var subtitle: String {
         guard task.manifest.enabled else {
-            return "已停用"
+            return "未启用"
         }
         guard let schedule = try? CronSchedule.parse(task.manifest.schedule.expression) else {
             return task.manifest.schedule.expression

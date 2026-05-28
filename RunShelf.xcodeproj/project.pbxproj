@@ -408,6 +408,7 @@
 				91B762E9645E3253CE3EFEDF /* Resources */,
 				39457F604C6EB48C655CB198 /* Embed Helpers */,
 				EE8EFE227D92F59DF2D0A3F0 /* Embed LaunchAgents */,
+				LPROJSTUB000000000000001 /* Ensure zh-Hans.lproj */,
 			);
 			buildRules = (
 			);
@@ -446,9 +447,10 @@
 			};
 			buildConfigurationList = CA1460462AE3ABA26EDF7B14 /* Build configuration list for PBXProject "RunShelf" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				"zh-Hans",
 				en,
 				Base,
 			);
@@ -476,6 +478,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		LPROJSTUB000000000000001 /* Ensure zh-Hans.lproj */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Ensure zh-Hans.lproj";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# 让 macOS 系统注入的菜单（File/Edit/Settings 等）使用简体中文。\n# 即使没有 .strings 翻译文件，bundle 里有空的 zh-Hans.lproj 也能让系统选中文。\nset -e\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/zh-Hans.lproj\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0871CEED3CCE656F6E3E98EE /* Sources */ = {

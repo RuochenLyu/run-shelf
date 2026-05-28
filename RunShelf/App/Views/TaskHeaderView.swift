@@ -132,9 +132,9 @@ struct TaskHeaderView: View {
     }
 
     private var nextRunText: String {
-        guard task.manifest.enabled else { return "已停用" }
+        guard task.manifest.enabled else { return "未启用" }
         guard let schedule = try? CronSchedule.parse(task.manifest.schedule.expression) else {
-            return "表达式无效"
+            return "计划无效"
         }
         let dates = try? schedule.nextRuns(count: 1)
         guard let date = dates?.first else { return "暂无" }
@@ -146,7 +146,7 @@ struct TaskHeaderView: View {
             return nil
         }
         if !task.manifest.enabled {
-            return ("已停用", .secondary, "pause.circle.fill")
+            return ("未启用", .secondary, "pause.circle.fill")
         }
         if let latest = task.latestRun {
             switch latest.status {

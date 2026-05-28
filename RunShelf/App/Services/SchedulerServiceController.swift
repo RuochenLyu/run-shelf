@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ServiceManagement
 import UserNotifications
@@ -46,15 +47,18 @@ final class SchedulerServiceController: ObservableObject {
         refreshDiagnostics()
     }
 
-    var serviceStatusDisplayName: String {
-        if serviceStatus == .notFound, embeddedSchedulerAvailable {
-            return "未注册（helper 已嵌入）"
-        }
-        return serviceStatus.displayName
-    }
-
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    /// 通知设置没有 SMAppService 那样的官方 API，用 deeplink best-effort。
+    /// schema 失效时 fallback 到 System Settings 主面板。
+    func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
+           NSWorkspace.shared.open(url) {
+            return
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
     }
 
     /// Gate 主按钮入口。失败按 SMError 码分流文案；只有当状态最终为
@@ -64,7 +68,7 @@ final class SchedulerServiceController: ObservableObject {
         var registrationErrorResponse: RegistrationErrorResponse = .stayOnGate
 
         guard embeddedSchedulerAvailable else {
-            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf"
+            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf。"
             return
         }
 
@@ -141,29 +145,29 @@ final class SchedulerServiceController: ObservableObject {
         // SMAppService 在 macOS 13+ 使用 SMAppServiceErrorDomain，code 用 kSMError* 常量。
         // 我们 deployment target 26.0，直接按这些 code 分流。
         guard nsError.domain == SMAppServiceErrorDomain else {
-            lastErrorMessage = "注册失败：\(error.localizedDescription)"
+            lastErrorMessage = "注册失败：\(error.localizedDescription)。"
             return .stayOnGate
         }
 
         switch nsError.code {
         case Int(kSMErrorInvalidSignature):
-            lastErrorMessage = "调度组件签名无效，请重装 Run Shelf"
+            lastErrorMessage = "调度组件签名无效，请重装 Run Shelf。"
             return .stayOnGate
         case Int(kSMErrorJobPlistNotFound), Int(kSMErrorToolNotValid):
-            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf"
+            lastErrorMessage = "调度组件文件损坏，请重装 Run Shelf。"
             return .stayOnGate
         case Int(kSMErrorInvalidPlist):
-            lastErrorMessage = "调度配置异常，请重装 Run Shelf"
+            lastErrorMessage = "调度配置异常，请重装 Run Shelf。"
             return .stayOnGate
         case Int(kSMErrorAlreadyRegistered):
             // 静默吞掉，由 refreshAuthorization 把状态同步出来
             lastErrorMessage = nil
             return .stayOnGate
         case Int(kSMErrorLaunchDeniedByUser):
-            lastErrorMessage = "已被系统拒绝，请在系统设置中重新开启"
+            lastErrorMessage = "登录项未授权，请在系统设置中重新启用 Run Shelf。"
             return .openSettings
         default:
-            lastErrorMessage = "注册失败：\(error.localizedDescription)"
+            lastErrorMessage = "注册失败：\(error.localizedDescription)。"
             return .stayOnGate
         }
     }
@@ -189,38 +193,3 @@ private enum RegistrationErrorResponse {
     case openSettings
 }
 
-extension SMAppService.Status {
-    var displayName: String {
-        switch self {
-        case .notRegistered:
-            return "未注册"
-        case .enabled:
-            return "已启用"
-        case .requiresApproval:
-            return "需要在系统设置中批准"
-        case .notFound:
-            return "未找到后台调度进程"
-        @unknown default:
-            return "未知"
-        }
-    }
-}
-
-extension UNAuthorizationStatus {
-    var displayName: String {
-        switch self {
-        case .notDetermined:
-            return "未询问"
-        case .denied:
-            return "已拒绝"
-        case .authorized:
-            return "已授权"
-        case .provisional:
-            return "临时授权"
-        case .ephemeral:
-            return "临时授权"
-        @unknown default:
-            return "未知"
-        }
-    }
-}

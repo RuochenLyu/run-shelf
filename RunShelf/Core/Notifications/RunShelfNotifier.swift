@@ -20,7 +20,7 @@ enum RunShelfNotifier {
         notificationSettings { status in
             guard canDeliverNotifications(status) else { return }
             let content = UNMutableNotificationContent()
-            content.title = "Run Shelf 任务失败"
+            content.title = "任务运行失败"
             content.subtitle = task.manifest.name
             content.body = failureBody(for: run)
             content.sound = .default

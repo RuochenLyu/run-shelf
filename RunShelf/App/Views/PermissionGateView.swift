@@ -82,7 +82,7 @@ struct PermissionGateView: View {
                 iconName: "exclamationmark.triangle.fill",
                 iconColor: .orange,
                 title: "应用安装不完整",
-                subtitle: "必要的后台组件缺失，请重新安装 Run Shelf。",
+                subtitle: "请重新下载并安装 Run Shelf。",
                 primaryLabel: "退出",
                 primaryAction: { NSApp.terminate(nil) },
                 hidesQuitButton: true
@@ -105,7 +105,7 @@ struct PermissionGateView: View {
             iconName: "clock.badge.checkmark",
             iconColor: .accentColor,
             title: "让 Run Shelf 在后台运行",
-            subtitle: "关闭应用后，定时任务仍能按时执行。\n点击下方按钮，在「登录项与扩展」中启用 Run Shelf。",
+            subtitle: "关闭应用后，定时任务仍能按时执行。\n在「登录项与扩展」中启用 Run Shelf 即可。",
             primaryLabel: "打开系统设置",
             primaryAction: action,
             hidesQuitButton: false

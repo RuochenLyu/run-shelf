@@ -96,7 +96,7 @@ final class SchedulerEngine {
             writeSystemRecord(
                 task: task,
                 status: .stale,
-                message: "计划运行时间 \(RunShelfFormatters.dateTimeWithSeconds(scheduledAt)) 已超过 \(Int(maxDelay)) 秒补跑窗口。",
+                message: "计划运行时间 \(RunShelfFormatters.dateTimeWithSeconds(scheduledAt)) 已错过太久，未补跑。",
                 scheduledAt: scheduledAt
             )
             state.lastScheduledMinuteByTaskID[task.id] = scheduledMinuteKey

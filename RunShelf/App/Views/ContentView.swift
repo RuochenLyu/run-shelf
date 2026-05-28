@@ -28,10 +28,10 @@ struct ContentView: View {
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("任务目录会移入废纸篓，运行中的任务无法删除。")
+                Text("任务目录会移入废纸篓。")
             }
             .alert("Run Shelf", isPresented: errorBinding) {
-                Button("好", role: .cancel) {
+                Button("知道了", role: .cancel) {
                     store.lastErrorMessage = nil
                 }
             } message: {

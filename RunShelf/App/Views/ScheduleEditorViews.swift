@@ -41,9 +41,9 @@ enum ScheduleDraftError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidTime(let text):
-            return "「\(text)」不是合法的 HH:mm 时间"
+            return "「\(text)」不是合法时间，请使用 HH:mm 格式，例如 09:30。"
         case .dailyTimesNeedSameMinute:
-            return "一天多次运行时，每个时间的分钟数得一样，比如 08:00, 12:00, 18:00"
+            return "一天多次运行时，每个时间的分钟数要一致，比如 08:00、12:00、18:00。"
         }
     }
 }

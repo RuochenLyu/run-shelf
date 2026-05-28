@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct TaskInspectorView: View {
@@ -54,12 +53,12 @@ struct TaskInspectorView: View {
 
                 if shouldShowNotificationDeniedHint {
                     HStack(spacing: 6) {
-                        Text("已被系统拒绝")
+                        Text("通知未授权")
                             .font(.caption)
                             .foregroundStyle(.orange)
                         Spacer()
-                        Button("去系统设置") {
-                            openNotificationSettings()
+                        Button("打开系统设置") {
+                            schedulerController.openNotificationSettings()
                         }
                         .buttonStyle(.link)
                         .font(.caption)
@@ -70,7 +69,7 @@ struct TaskInspectorView: View {
                     RetentionNumberField(value: retentionDaysBinding, unit: "天", range: 1...365)
                 }
 
-                LabeledContent("最多记录") {
+                LabeledContent("最多保留") {
                     RetentionNumberField(value: retentionMaxRunsBinding, unit: "次", range: 1...5000)
                 }
             }
@@ -154,17 +153,6 @@ struct TaskInspectorView: View {
     private var shouldShowNotificationDeniedHint: Bool {
         let onFailure = store.task(withID: task.id)?.manifest.notifications.onFailure ?? false
         return onFailure && schedulerController.notificationStatus == .denied
-    }
-
-    /// 通知设置没有像 SMAppService 那样的官方单项 API，这里用 deeplink best-effort
-    /// 打开「系统设置 › 通知」。若 schema 失效，至少打开 System Settings 主面板。
-    private func openNotificationSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
-           NSWorkspace.shared.open(url) {
-            return
-        }
-
-        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
     }
 
     private var retentionDaysBinding: Binding<Int> {

@@ -11,99 +11,87 @@ struct SettingsView: View {
         Form {
             Section("数据") {
                 LabeledContent("任务目录") {
-                    Text(RunShelfPaths.tasksDirectoryURL().path)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                }
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([RunShelfPaths.tasksDirectoryURL()])
-                } label: {
-                    Label("在 Finder 中显示", systemImage: "folder")
+                    HStack(spacing: 6) {
+                        Text(RunShelfPaths.tasksDirectoryURL().path)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Button {
+                            NSWorkspace.shared.activateFileViewerSelecting([RunShelfPaths.tasksDirectoryURL()])
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("在 Finder 中显示")
+                    }
                 }
             }
 
             Section("后台调度") {
-                LabeledContent("状态") {
+                HStack {
                     Label(schedulerStateText, systemImage: schedulerStateSymbol)
                         .foregroundStyle(schedulerStateColor)
-                }
-
-                if let heartbeat = controller.heartbeat {
-                    LabeledContent("最近心跳", value: heartbeatDescription(heartbeat))
-                }
-
-                HStack {
-                    Button {
-                        controller.register()
-                    } label: {
-                        Label("启动并开机自启", systemImage: "power")
-                    }
-                    .disabled(controller.serviceStatus == .enabled || !controller.embeddedSchedulerAvailable)
-
-                    Button(role: .destructive) {
-                        controller.unregister()
-                    } label: {
-                        Label("停止", systemImage: "stop.fill")
-                    }
-                    .disabled(controller.serviceStatus != .enabled)
-
                     Spacer()
-
-                    Button {
-                        controller.refresh()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                    Button(action: schedulerPrimaryAction) {
+                        Text(schedulerActionLabel)
                     }
-                    .help("刷新状态")
+                    .controlSize(.small)
+                    .disabled(!controller.embeddedSchedulerAvailable)
                 }
 
-                if controller.serviceStatus == .requiresApproval {
-                    Text("macOS 已阻止 Run Shelf 在登录时启动调度器。请前往「系统设置 › 通用 › 登录项」启用 Run Shelf。")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                } else if !controller.isAuthorized {
-                    Text("自动调度已停止。下次启动 Run Shelf 时会要求重新启用。")
+                if controller.serviceStatus == .enabled, let heartbeat = controller.heartbeat {
+                    LabeledContent("最近活动", value: heartbeatDescription(heartbeat))
+                        .foregroundStyle(.secondary)
+                }
+
+                if let hint = schedulerHint {
+                    Text(hint)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Section("通知") {
-                LabeledContent("失败通知授权") {
-                    Label(controller.notificationStatus.displayName, systemImage: notificationSymbol)
+                HStack {
+                    Label(notificationStateText, systemImage: notificationSymbol)
                         .foregroundStyle(notificationColor)
-                }
-                if controller.notificationStatus != .authorized {
-                    Button {
-                        controller.requestNotificationAuthorization()
-                    } label: {
-                        Label("请求通知权限", systemImage: "bell.badge")
+                    Spacer()
+                    Button(action: notificationPrimaryAction) {
+                        Text(notificationActionLabel)
                     }
+                    .controlSize(.small)
+                }
+
+                if let hint = notificationHint {
+                    Text(hint)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            Section("日志保留默认值") {
+            Section {
                 LabeledContent("保留天数") {
                     RetentionNumberField(value: defaultRetentionDaysBinding, unit: "天", range: 1...365)
                 }
-                LabeledContent("最多记录") {
+                LabeledContent("最多保留") {
                     RetentionNumberField(value: defaultRetentionMaxRunsBinding, unit: "次", range: 1...5000)
                 }
+            } header: {
+                Text("日志保留")
+            } footer: {
                 Text("仅影响新建任务；每个任务可在右侧检查器中单独调整。")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 540)
+        .frame(width: 520, height: 600)
         .onAppear {
             controller.refresh()
         }
         .alert("Run Shelf", isPresented: errorBinding) {
-            Button("好", role: .cancel) {
+            Button("知道了", role: .cancel) {
                 controller.lastErrorMessage = nil
             }
         } message: {
@@ -111,20 +99,16 @@ struct SettingsView: View {
         }
     }
 
-    private var errorBinding: Binding<Bool> {
-        Binding(
-            get: { controller.lastErrorMessage != nil },
-            set: { if !$0 { controller.lastErrorMessage = nil } }
-        )
-    }
+    // MARK: - Scheduler section
 
     private var schedulerStateText: String {
+        if !controller.embeddedSchedulerAvailable {
+            return "组件缺失"
+        }
         switch controller.serviceStatus {
-        case .enabled: return "运行中"
-        case .notRegistered:
-            return controller.embeddedSchedulerAvailable ? "已停止" : "组件缺失"
-        case .requiresApproval: return "需要批准"
-        case .notFound: return "组件缺失"
+        case .enabled: return "正在后台运行"
+        case .notRegistered, .notFound: return "未启用"
+        case .requiresApproval: return "等待授权"
         @unknown default: return "未知"
         }
     }
@@ -132,8 +116,8 @@ struct SettingsView: View {
     private var schedulerStateSymbol: String {
         switch controller.serviceStatus {
         case .enabled: return "checkmark.circle.fill"
-        case .notRegistered, .notFound: return "pause.circle.fill"
         case .requiresApproval: return "exclamationmark.triangle.fill"
+        case .notRegistered, .notFound: return "pause.circle.fill"
         @unknown default: return "questionmark.circle.fill"
         }
     }
@@ -146,11 +130,58 @@ struct SettingsView: View {
         }
     }
 
+    private var schedulerHint: String? {
+        if !controller.embeddedSchedulerAvailable {
+            return "应用文件不完整，请重新安装 Run Shelf。"
+        }
+        switch controller.serviceStatus {
+        case .enabled:
+            return nil
+        case .notRegistered, .notFound:
+            return "关闭 Run Shelf 后任务将不会按计划运行。"
+        case .requiresApproval:
+            return "请在系统设置中开启 Run Shelf 的登录项。"
+        @unknown default:
+            return nil
+        }
+    }
+
+    private var schedulerActionLabel: String {
+        switch controller.serviceStatus {
+        case .enabled, .requiresApproval: return "打开系统设置"
+        case .notRegistered, .notFound: return "启用后台运行"
+        @unknown default: return "重试"
+        }
+    }
+
+    private func schedulerPrimaryAction() {
+        switch controller.serviceStatus {
+        case .enabled, .requiresApproval:
+            controller.openLoginItemsSettings()
+        case .notRegistered, .notFound:
+            controller.register()
+        @unknown default:
+            controller.refresh()
+        }
+    }
+
+    // MARK: - Notification section
+
+    private var notificationStateText: String {
+        switch controller.notificationStatus {
+        case .authorized: return "已允许"
+        case .provisional, .ephemeral: return "已临时允许"
+        case .denied: return "已拒绝"
+        case .notDetermined: return "未授权"
+        @unknown default: return "未知"
+        }
+    }
+
     private var notificationSymbol: String {
         switch controller.notificationStatus {
         case .authorized, .provisional, .ephemeral: return "checkmark.circle.fill"
         case .denied: return "xmark.circle.fill"
-        default: return "questionmark.circle.fill"
+        default: return "bell.slash"
         }
     }
 
@@ -160,6 +191,44 @@ struct SettingsView: View {
         case .denied: return .red
         default: return .secondary
         }
+    }
+
+    private var notificationHint: String? {
+        switch controller.notificationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return "任务失败时会发送系统通知。"
+        case .denied:
+            return "请在系统设置中重新允许 Run Shelf 的通知。"
+        case .notDetermined:
+            return "首次创建任务时会请求授权。"
+        @unknown default:
+            return nil
+        }
+    }
+
+    private var notificationActionLabel: String {
+        switch controller.notificationStatus {
+        case .notDetermined: return "请求授权"
+        default: return "打开系统设置"
+        }
+    }
+
+    private func notificationPrimaryAction() {
+        switch controller.notificationStatus {
+        case .notDetermined:
+            controller.requestNotificationAuthorization()
+        default:
+            controller.openNotificationSettings()
+        }
+    }
+
+    // MARK: - Bindings
+
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { controller.lastErrorMessage != nil },
+            set: { if !$0 { controller.lastErrorMessage = nil } }
+        )
     }
 
     private var defaultRetentionDaysBinding: Binding<Int> {
