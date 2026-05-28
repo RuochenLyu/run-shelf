@@ -40,6 +40,18 @@ final class TaskStore: ObservableObject {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let diskLoader: TaskFileStore
+
+    // 异步 refresh 的状态：
+    // - generations: 每个任务的 epoch，每次 mutation 都 +1；
+    //   后台 scan 启动时打快照，apply 时比较 → 不一致就降级 runsOnly merge，
+    //   避免 scan 期间用户保存的版本被旧 scan 结果回滚。
+    // - signatureCache: 上次成功 scan 时的 file signature（task.json/run.sh/notes.md 各自 mtime+size），
+    //   任一变化就 fullReload，否则只刷 runs。
+    // - isRefreshingFromDisk: 重入保护，避免两个 detached scan 同时跑。
+    private var taskGenerations: [String: Int] = [:]
+    private var signatureCache: [String: TaskFileSignature] = [:]
+    private var isRefreshingFromDisk = false
 
     init(
         tasksDirectoryURL: URL = TaskStore.defaultTasksDirectoryURL(),
@@ -56,6 +68,8 @@ final class TaskStore: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
+
+        self.diskLoader = TaskFileStore(tasksDirectoryURL: tasksDirectoryURL, fileManager: fileManager)
 
         loadTasks()
     }
@@ -85,6 +99,11 @@ final class TaskStore: ObservableObject {
     }
 
     func loadTasks() {
+        loadTasks(includeRuns: false)
+        refreshRunsFromDisk()
+    }
+
+    private func loadTasks(includeRuns: Bool) {
         do {
             try ensureTasksDirectory()
             try seedExamplesIfNeeded()
@@ -101,7 +120,7 @@ final class TaskStore: ObservableObject {
                 guard directory.lastPathComponent != "trash" else { continue }
 
                 do {
-                    loadedTasks.append(try loadTask(at: directory))
+                    loadedTasks.append(try loadTask(at: directory, includeRuns: includeRuns))
                 } catch {
                     lastErrorMessage = "无法读取任务 \(directory.lastPathComponent)：\(error.localizedDescription)"
                 }
@@ -109,6 +128,11 @@ final class TaskStore: ObservableObject {
 
             tasks = loadedTasks
             invalidScheduleDraftTaskIDs.formIntersection(Set(loadedTasks.map(\.id)))
+            // 初始化 epoch 与 signature cache，让首次 refresh 能正确比较
+            taskGenerations = Dictionary(uniqueKeysWithValues: loadedTasks.map { ($0.id, 0) })
+            signatureCache = Dictionary(uniqueKeysWithValues: loadedTasks.map { task in
+                (task.id, TaskFileSignature.capture(for: task.directoryURL))
+            })
             if selectedTaskID == nil || task(withID: selectedTaskID ?? "") == nil {
                 selectedTaskID = sortedTasks.first?.id
             }
@@ -117,68 +141,109 @@ final class TaskStore: ObservableObject {
         }
     }
 
+    /// 入口签名不变。内部把磁盘 IO 搬到后台线程，避免阻塞 UI。
+    /// 重入保护：上一轮 scan 还没完成时直接跳过本次触发（避免 polling 雪崩）。
     func refreshRunsFromDisk() {
-        // 当前磁盘上的任务目录（约定：目录名 = task id，由 createTask 保证）
-        var diskTaskIDs = Set<String>()
-        do {
-            let entries = try fileManager.contentsOfDirectory(
-                at: tasksDirectoryURL,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            for url in entries where isDirectory(url) && url.lastPathComponent != "trash" {
-                diskTaskIDs.insert(url.lastPathComponent)
+        guard !isRefreshingFromDisk else { return }
+        isRefreshingFromDisk = true
+
+        let input = DiskScanInput(
+            tasksDirectoryURL: tasksDirectoryURL,
+            knownTasks: tasks.map { task in
+                DiskScanInput.KnownTask(
+                    id: task.id,
+                    directoryURL: task.directoryURL,
+                    isDirty: task.isDirty,
+                    generation: taskGenerations[task.id] ?? 0
+                )
+            },
+            signatureCache: signatureCache
+        )
+
+        Task { [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                DiskScanner.scan(input)
+            }.value
+            guard !Task.isCancelled else {
+                self?.isRefreshingFromDisk = false
+                return
             }
-        } catch {
-            lastErrorMessage = "无法刷新任务目录：\(error.localizedDescription)"
-            return
+            self?.applyDiskScan(result)
         }
+    }
 
-        var refreshedTasks = tasks
+    /// MainActor 上把后台 scan 结果合并进 store。
+    /// 关键不变量：
+    /// - fullReload 必须 generation 一致 + 当前 clean 才能覆盖；否则降级 runsOnly merge
+    /// - dirty 任务永远只更新 runs 字段
+    /// - 删除只清 clean 任务，dirty 草稿保留让 saveTask 失败让用户感知
+    private func applyDiskScan(_ result: DiskScanResult) {
+        defer { isRefreshingFromDisk = false }
 
-        // 1. 删掉磁盘上已经不存在的 clean 任务（dirty 任务保留草稿，让 saveTask 失败时让用户感知）
-        refreshedTasks.removeAll { task in
-            guard !diskTaskIDs.contains(task.id) else { return false }
-            return !task.isDirty
-        }
+        for entry in result.entries {
+            switch entry {
+            case let .fullReload(diskTask, scanGeneration):
+                if let index = tasks.firstIndex(where: { $0.id == diskTask.id }) {
+                    let currentGeneration = taskGenerations[diskTask.id] ?? 0
+                    if currentGeneration == scanGeneration && !tasks[index].isDirty {
+                        tasks[index] = diskTask
+                    } else {
+                        // Race: scan 期间用户改了/保存了。只 merge runs，
+                        // manifest/script/notes 保留内存版本（用户最新意图）
+                        tasks[index].runs = mergedRuns(existing: tasks[index].runs, incoming: diskTask.runs)
+                    }
+                } else {
+                    // 磁盘上新出现的任务（外部恢复 / sync / scheduler 直写不太可能但 defensive）
+                    tasks.append(diskTask)
+                    taskGenerations[diskTask.id] = 0
+                }
 
-        // 2. 加入磁盘上新出现的任务（例如外部恢复、其他设备 sync）
-        let memoryIDs = Set(refreshedTasks.map { $0.id })
-        for id in diskTaskIDs.subtracting(memoryIDs) {
-            let dirURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
-            do {
-                let task = try loadTask(at: dirURL)
-                refreshedTasks.append(task)
-            } catch {
-                lastErrorMessage = taskLoadFailureMessage(directoryURL: dirURL, error: error)
+            case let .runsOnly(taskID, runs, scanGeneration):
+                guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { continue }
+                let currentGeneration = taskGenerations[taskID] ?? 0
+                if currentGeneration == scanGeneration && !tasks[index].isDirty {
+                    tasks[index].runs = runs
+                } else {
+                    tasks[index].runs = mergedRuns(existing: tasks[index].runs, incoming: runs)
+                }
             }
         }
 
-        // 3. 对剩下的任务：刷新 runs；非 dirty 还要从磁盘 reload script/notes/manifest，
-        //    让外部修改（直接改 run.sh、他人 sync 等）能被 app 看到。
-        var nextTasks: [RunShelfTask] = []
-        for var task in refreshedTasks {
-            if task.isDirty {
-                task.runs = loadRuns(for: task.directoryURL)
-                nextTasks.append(task)
+        for id in result.deletedTaskIDs {
+            guard let index = tasks.firstIndex(where: { $0.id == id }), !tasks[index].isDirty else {
                 continue
             }
-
-            do {
-                nextTasks.append(try loadTask(at: task.directoryURL))
-            } catch {
-                lastErrorMessage = taskLoadFailureMessage(directoryURL: task.directoryURL, error: error)
-            }
+            tasks.remove(at: index)
+            taskGenerations.removeValue(forKey: id)
         }
-        refreshedTasks = nextTasks
 
-        if refreshedTasks != tasks {
-            tasks = refreshedTasks
-            // 选中任务被外部删了 → 自动切到第一个
-            if let sel = selectedTaskID, !refreshedTasks.contains(where: { $0.id == sel }) {
-                selectedTaskID = sortedTasks.first?.id
-            }
+        // 更新 signature 缓存 + 清掉已不存在任务的 cache
+        let aliveIDs = Set(tasks.map(\.id))
+        for (id, sig) in result.newSignatures where aliveIDs.contains(id) {
+            signatureCache[id] = sig
         }
+        signatureCache = signatureCache.filter { aliveIDs.contains($0.key) }
+
+        if let sel = selectedTaskID, !tasks.contains(where: { $0.id == sel }) {
+            selectedTaskID = sortedTasks.first?.id
+        }
+
+        if let firstError = result.errors.first {
+            lastErrorMessage = firstError
+        }
+    }
+
+    /// 用户编辑/保存/创建/恢复任务时调用，让后台 scan 的 apply 能识别"我看到的版本是旧的"。
+    private func bumpGeneration(_ taskID: String) {
+        taskGenerations[taskID, default: 0] += 1
+    }
+
+    private func mergedRuns(existing: [RunRecord], incoming: [RunRecord]) -> [RunRecord] {
+        var merged = Dictionary(uniqueKeysWithValues: existing.map { ($0.runId, $0) })
+        for run in incoming {
+            merged[run.runId] = run
+        }
+        return merged.values.sorted { $0.startedAt > $1.startedAt }
     }
 
     @discardableResult
@@ -200,6 +265,8 @@ final class TaskStore: ObservableObject {
                 schedule: schedule
             )
             tasks.append(task)
+            taskGenerations[task.id] = 0
+            signatureCache[task.id] = TaskFileSignature.capture(for: task.directoryURL)
             selectedTaskID = task.id
             return task.id
         } catch {
@@ -216,8 +283,10 @@ final class TaskStore: ObservableObject {
         // （writeTask 是整 task 级别的写，会重写 task.json / run.sh / notes.md）。
         if !tasks[index].isDirty {
             do {
-                let reloaded = try loadTask(at: tasks[index].directoryURL)
+                let reloaded = try loadTaskDefinitionPreservingRuns(at: index)
                 tasks[index] = reloaded
+                bumpGeneration(id)
+                signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
             } catch {
                 lastErrorMessage = taskLoadFailureMessage(directoryURL: tasks[index].directoryURL, error: error)
                 return
@@ -229,6 +298,7 @@ final class TaskStore: ObservableObject {
         if tasks[index] != originalTask {
             tasks[index].manifest.updatedAt = Date()
             tasks[index].isDirty = true
+            bumpGeneration(id)
         }
     }
 
@@ -243,6 +313,10 @@ final class TaskStore: ObservableObject {
             tasks[index].manifest.updatedAt = Date()
             try writeTask(tasks[index])
             tasks[index].isDirty = false
+            // 写盘成功 → bump generation + 更新 signature cache，
+            // 让正在跑的 detached scan apply 时能识别"内存版本已经领先于它看到的"
+            bumpGeneration(id)
+            signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
             return true
         } catch {
             lastErrorMessage = "无法保存任务：\(error.localizedDescription)"
@@ -254,6 +328,8 @@ final class TaskStore: ObservableObject {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         do {
             tasks[index] = try loadTask(at: tasks[index].directoryURL)
+            bumpGeneration(id)
+            signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
             setScheduleDraftValidity(taskID: id, isValid: true)
         } catch {
             lastErrorMessage = "无法放弃更改：\(error.localizedDescription)"
@@ -271,6 +347,8 @@ final class TaskStore: ObservableObject {
             var resultingURL: NSURL?
             try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
             tasks.remove(at: index)
+            taskGenerations.removeValue(forKey: id)
+            signatureCache.removeValue(forKey: id)
             setScheduleDraftValidity(taskID: id, isValid: true)
             NotificationCenter.default.post(
                 name: .runShelfTaskDeleted,
@@ -285,6 +363,8 @@ final class TaskStore: ObservableObject {
                 let destination = trashURL.appendingPathComponent(task.id + "-" + UUID().uuidString, isDirectory: true)
                 try fileManager.moveItem(at: task.directoryURL, to: destination)
                 tasks.remove(at: index)
+                taskGenerations.removeValue(forKey: id)
+                signatureCache.removeValue(forKey: id)
                 setScheduleDraftValidity(taskID: id, isValid: true)
                 NotificationCenter.default.post(
                     name: .runShelfTaskDeleted,
@@ -308,8 +388,10 @@ final class TaskStore: ObservableObject {
         } else {
             // 没有未保存改动：从磁盘重读一次，确保用上最新的外部修改
             do {
-                let reloaded = try loadTask(at: tasks[index].directoryURL)
+                let reloaded = try loadTaskDefinitionPreservingRuns(at: index)
                 tasks[index] = reloaded
+                bumpGeneration(id)
+                signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
             } catch {
                 lastErrorMessage = "无法运行任务：\(taskLoadFailureMessage(directoryURL: tasks[index].directoryURL, error: error))"
                 return
@@ -472,35 +554,14 @@ final class TaskStore: ObservableObject {
         return task
     }
 
-    private func loadTask(at directoryURL: URL) throws -> RunShelfTask {
-        let manifestData = try Data(contentsOf: directoryURL.appendingPathComponent("task.json"))
-        let manifest = try decoder.decode(TaskManifest.self, from: manifestData)
-        guard manifest.schemaVersion == 1 else {
-            throw CocoaError(.fileReadUnknown, userInfo: [
-                NSLocalizedDescriptionKey: "不支持的 schemaVersion：\(manifest.schemaVersion)"
-            ])
-        }
+    private func loadTask(at directoryURL: URL, includeRuns: Bool = true) throws -> RunShelfTask {
+        try diskLoader.loadTask(at: directoryURL, includeRuns: includeRuns)
+    }
 
-        let scriptURL = directoryURL.appendingPathComponent("run.sh")
-        // run.sh 是任务契约的必需文件；缺失视为损坏，让上层（loadTasks / refresh / save）感知
-        // 而不是 silently 把脚本当作空字符串继续运行。
-        guard fileManager.fileExists(atPath: scriptURL.path) else {
-            throw NSError(domain: "RunShelf", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "任务缺少 run.sh：\(directoryURL.lastPathComponent)"
-            ])
-        }
-        let script = normalizedTemplateScript(readText(at: scriptURL))
-        let notes = readText(at: directoryURL.appendingPathComponent("notes.md"))
-        let runs = loadRuns(for: directoryURL)
-
-        return RunShelfTask(
-            manifest: manifest,
-            directoryURL: directoryURL,
-            script: script,
-            notes: notes,
-            runs: runs,
-            isDirty: false
-        )
+    private func loadTaskDefinitionPreservingRuns(at index: Int) throws -> RunShelfTask {
+        var reloaded = try diskLoader.loadTask(at: tasks[index].directoryURL, includeRuns: false)
+        reloaded.runs = tasks[index].runs
+        return reloaded
     }
 
     private func writeTask(_ task: RunShelfTask) throws {
@@ -537,26 +598,7 @@ final class TaskStore: ObservableObject {
 
     private func refreshRuns(for id: String) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-        tasks[index].runs = loadRuns(for: tasks[index].directoryURL)
-    }
-
-    private func loadRuns(for taskDirectoryURL: URL) -> [RunRecord] {
-        let runsURL = taskDirectoryURL.appendingPathComponent("runs", isDirectory: true)
-        guard let runDirectories = try? fileManager.contentsOfDirectory(
-            at: runsURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
-        return runDirectories.compactMap { runDirectory -> RunRecord? in
-            guard isDirectory(runDirectory) else { return nil }
-            let metaURL = runDirectory.appendingPathComponent("meta.json")
-            guard let data = try? Data(contentsOf: metaURL) else { return nil }
-            return try? decoder.decode(RunRecord.self, from: data)
-        }
-        .sorted { $0.startedAt > $1.startedAt }
+        tasks[index].runs = diskLoader.loadRuns(for: tasks[index].directoryURL)
     }
 
     private func statusRank(_ task: RunShelfTask) -> Int {
@@ -583,9 +625,4 @@ final class TaskStore: ObservableObject {
         return trimmed.isEmpty ? fallback : trimmed
     }
 
-    private func normalizedTemplateScript(_ script: String) -> String {
-        script
-            .replacingOccurrences(of: "# Write your xscript here", with: "# Write your script here")
-            .replacingOccurrences(of: "# 在这里写脚本", with: "# Write your script here")
-    }
 }

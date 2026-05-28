@@ -165,7 +165,7 @@ struct RunShelfTask: Identifiable, Equatable, Sendable {
     var id: String { manifest.id }
 
     var latestRun: RunRecord? {
-        runs.sorted { $0.startedAt > $1.startedAt }.first
+        runs.first
     }
 
     var hasValidSchedule: Bool {

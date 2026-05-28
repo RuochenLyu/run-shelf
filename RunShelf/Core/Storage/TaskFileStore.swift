@@ -24,11 +24,11 @@ struct TaskFileStore {
         return decoder
     }
 
-    func loadTasks() throws -> [RunShelfTask] {
-        try loadTasksWithIssues().tasks
+    func loadTasks(includeRuns: Bool = true) throws -> [RunShelfTask] {
+        try loadTasksWithIssues(includeRuns: includeRuns).tasks
     }
 
-    func loadTasksWithIssues() throws -> TaskLoadResult {
+    func loadTasksWithIssues(includeRuns: Bool = true) throws -> TaskLoadResult {
         try fileManager.createDirectory(at: tasksDirectoryURL, withIntermediateDirectories: true)
         let directories = try fileManager.contentsOfDirectory(
             at: tasksDirectoryURL,
@@ -42,7 +42,7 @@ struct TaskFileStore {
         for directory in directories {
             guard isDirectory(directory), directory.lastPathComponent != "trash" else { continue }
             do {
-                tasks.append(try loadTask(at: directory))
+                tasks.append(try loadTask(at: directory, includeRuns: includeRuns))
             } catch {
                 issues.append(TaskLoadIssue(
                     directoryName: directory.lastPathComponent,
@@ -57,7 +57,7 @@ struct TaskFileStore {
         )
     }
 
-    func loadTask(at directoryURL: URL) throws -> RunShelfTask {
+    func loadTask(at directoryURL: URL, includeRuns: Bool = true) throws -> RunShelfTask {
         let manifestData = try Data(contentsOf: directoryURL.appendingPathComponent("task.json"))
         let manifest = try decoder.decode(TaskManifest.self, from: manifestData)
         guard manifest.schemaVersion == 1 else {
@@ -76,11 +76,19 @@ struct TaskFileStore {
         return RunShelfTask(
             manifest: manifest,
             directoryURL: directoryURL,
-            script: readText(at: scriptURL),
+            script: Self.normalizedTemplateScript(readText(at: scriptURL)),
             notes: readText(at: directoryURL.appendingPathComponent("notes.md")),
-            runs: loadRuns(for: directoryURL),
+            runs: includeRuns ? loadRuns(for: directoryURL) : [],
             isDirty: false
         )
+    }
+
+    /// 把旧版本（typo / 中文注释）的模板脚本统一成标准 placeholder。
+    /// 之前只在 TaskStore 内调，挪到这里让 scheduler 进程也用同一套加载语义。
+    static func normalizedTemplateScript(_ script: String) -> String {
+        script
+            .replacingOccurrences(of: "# Write your xscript here", with: "# Write your script here")
+            .replacingOccurrences(of: "# 在这里写脚本", with: "# Write your script here")
     }
 
     func loadRuns(for taskDirectoryURL: URL) -> [RunRecord] {

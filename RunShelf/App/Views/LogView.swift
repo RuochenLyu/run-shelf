@@ -2,20 +2,34 @@ import SwiftUI
 
 struct LogView: View {
     @ObservedObject var store: TaskStore
+    @StateObject private var loader = LogContentLoader()
     var task: RunShelfTask
 
     var body: some View {
-        if task.runs.isEmpty {
-            emptyState
-        } else {
-            HStack(spacing: 0) {
-                RunHistoryList(runs: sortedRuns, selection: selectionBinding)
-                    .frame(width: 200)
+        Group {
+            if task.runs.isEmpty {
+                emptyState
+            } else {
+                HStack(spacing: 0) {
+                    RunHistoryList(runs: sortedRuns, selection: selectionBinding)
+                        .frame(width: 200)
 
-                Divider()
+                    Divider()
 
-                logPane
+                    logPane
+                }
             }
+        }
+        .onAppear { reloadIfNeeded() }
+        .onChange(of: effectiveRun?.runId) { _, _ in reloadIfNeeded() }
+        .onChange(of: task.id) { _, _ in reloadIfNeeded() }
+    }
+
+    private func reloadIfNeeded() {
+        if let run = effectiveRun {
+            loader.load(task: task, run: run)
+        } else {
+            loader.clear()
         }
     }
 
@@ -62,12 +76,18 @@ struct LogView: View {
 
     @ViewBuilder
     private func output(for run: RunRecord) -> some View {
-        let stdout = store.logText(for: task, run: run, kind: .stdout)
-            .trimmingCharacters(in: .newlines)
-        let stderr = store.logText(for: task, run: run, kind: .stderr)
-            .trimmingCharacters(in: .newlines)
+        let stdout = loader.stdout.text
+        let stderr = loader.stderr.text
 
-        if stdout.isEmpty && stderr.isEmpty {
+        if loader.isLoading {
+            VStack {
+                Spacer()
+                ProgressView()
+                    .controlSize(.small)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if stdout.isEmpty && stderr.isEmpty {
             VStack {
                 Spacer()
                 Text("没有输出")
@@ -80,10 +100,15 @@ struct LogView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if !stdout.isEmpty {
-                        Text(stdout)
-                            .font(.system(.callout, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 6) {
+                            if loader.stdout.isFileTruncated {
+                                truncationHint(byteCount: loader.stdout.byteCount, color: .secondary)
+                            }
+                            Text(stdout)
+                                .font(.system(.callout, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
 
                     if !stderr.isEmpty {
@@ -92,6 +117,9 @@ struct LogView: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.orange)
 
+                            if loader.stderr.isFileTruncated {
+                                truncationHint(byteCount: loader.stderr.byteCount, color: .secondary)
+                            }
                             Text(stderr)
                                 .font(.system(.callout, design: .monospaced))
                                 .foregroundStyle(.red)
@@ -104,6 +132,12 @@ struct LogView: View {
                 .padding(.vertical, 14)
             }
         }
+    }
+
+    private func truncationHint(byteCount: Int64, color: Color) -> some View {
+        Text("仅显示最后 \(RunShelfFormatters.byteSize(LogContentLoader.maxBytes))（总 \(RunShelfFormatters.byteSize(byteCount))）")
+            .font(.caption)
+            .foregroundStyle(color)
     }
 
     private var emptyState: some View {
@@ -122,7 +156,7 @@ struct LogView: View {
     }
 
     private var sortedRuns: [RunRecord] {
-        task.runs.sorted { $0.startedAt > $1.startedAt }
+        task.runs
     }
 
     private var effectiveRun: RunRecord? {

@@ -13,6 +13,7 @@
 		166FD787521D31D770238E63 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
 		1C9D84A89A5E9DCBB87EA20A /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */; };
 		2171A4214633546CDC7CBEA0 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */; };
+		DISKSCAN00000000000000001 /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = DISKSCAN00000000000000002 /* DiskScan.swift */; };
 		289AFE672AEFEFB47E7D3B72 /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */; };
 		34A14A9BA3923BC711A2A1B7 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */; };
 		3617EAE8ECADA8A1C066D1AE /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */; };
@@ -23,6 +24,7 @@
 		4C3B25028ED84FC7E0BBAEC6 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
 		4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */; };
 		PERMGATE0000000000000001 /* PermissionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PERMGATE0000000000000002 /* PermissionGateView.swift */; };
+		LOGLOADER0000000000000001 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = LOGLOADER0000000000000002 /* LogContentLoader.swift */; };
 		A1B2C3D4E5F60718293A4B5D /* RunShelfWindowMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* RunShelfWindowMetrics.swift */; };
 		4C51249D068DCACD265644C9 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C54C102515E0E12C2498BF /* CronSchedule.swift */; };
 		4E91FD5380752063D1946197 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */ = {isa = PBXBuildFile; fileRef = C17DE32A8BDE27EEC8D39BB8 /* com.aix4u.runshelf.scheduler.plist */; };
@@ -109,6 +111,7 @@
 		45BACA9087858ABEEFA6394C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskHeaderView.swift; sourceTree = "<group>"; };
 		PERMGATE0000000000000002 /* PermissionGateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionGateView.swift; sourceTree = "<group>"; };
+		LOGLOADER0000000000000002 /* LogContentLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogContentLoader.swift; sourceTree = "<group>"; };
 		51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5A1699BD6308DDC11488C4BD /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfApp.swift; sourceTree = "<group>"; };
@@ -123,6 +126,7 @@
 		95F02CBBBFA3C3762648611A /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
 		58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifications.swift; sourceTree = "<group>"; };
 		9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskFileStore.swift; sourceTree = "<group>"; };
+		DISKSCAN00000000000000002 /* DiskScan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskScan.swift; sourceTree = "<group>"; };
 		A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfPaths.swift; sourceTree = "<group>"; };
 		B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
 		BAB936E446C8998F3CFCC077 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -172,6 +176,7 @@
 				318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */,
 				4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */,
 				PERMGATE0000000000000002 /* PermissionGateView.swift */,
+				LOGLOADER0000000000000002 /* LogContentLoader.swift */,
 			);
 			name = Views;
 			path = Views;
@@ -202,6 +207,7 @@
 			children = (
 				A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */,
 				9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */,
+				DISKSCAN00000000000000002 /* DiskScan.swift */,
 			);
 			name = Storage;
 			path = Storage;
@@ -526,6 +532,7 @@
 				9B34E2179B73ADF9E0C5A237 /* RunShelfSettings.swift in Sources */,
 				3617EAE8ECADA8A1C066D1AE /* RunShelfPaths.swift in Sources */,
 				2171A4214633546CDC7CBEA0 /* TaskFileStore.swift in Sources */,
+				DISKSCAN00000000000000001 /* DiskScan.swift in Sources */,
 				9E52291B91611A54074EE23D /* TaskStore.swift in Sources */,
 				33D3C719BFFC5988883B078A /* RunShelfNotifications.swift in Sources */,
 				E8EFA37ECFFDE0BE1205819C /* TaskModels.swift in Sources */,
@@ -538,6 +545,7 @@
 				7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */,
 				4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */,
 				PERMGATE0000000000000001 /* PermissionGateView.swift in Sources */,
+				LOGLOADER0000000000000001 /* LogContentLoader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

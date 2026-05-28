@@ -37,9 +37,6 @@ struct ContentView: View {
             } message: {
                 Text(store.lastErrorMessage ?? "")
             }
-            .onAppear {
-                store.loadTasks()
-            }
             .task {
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 15_000_000_000)

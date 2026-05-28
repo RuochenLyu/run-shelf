@@ -35,7 +35,6 @@ struct ShellScriptEditor: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = false
         textView.delegate = context.coordinator
-        textView.textStorage?.delegate = context.coordinator
         context.coordinator.textView = textView
 
         scrollView.documentView = textView
@@ -54,7 +53,7 @@ struct ShellScriptEditor: NSViewRepresentable {
         NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate {
         private var parent: ShellScriptEditor
         private var isApplyingHighlight = false
         weak var textView: NSTextView?
@@ -65,16 +64,6 @@ struct ShellScriptEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView, !isApplyingHighlight else { return }
-            syncFromTextView(textView)
-        }
-
-        func textStorage(
-            _ textStorage: NSTextStorage,
-            didProcessEditing editedMask: NSTextStorageEditActions,
-            range editedRange: NSRange,
-            changeInLength delta: Int
-        ) {
-            guard editedMask.contains(.editedCharacters), !isApplyingHighlight, let textView else { return }
             syncFromTextView(textView)
         }
 

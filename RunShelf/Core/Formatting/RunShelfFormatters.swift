@@ -59,12 +59,39 @@ enum RunShelfFormatters {
         return "\(days / 365) 年后"
     }
 
+    /// 人类可读的字节大小，例如 "1.0 MB" / "320 KB" / "12 B"。
+    static func byteSize(_ bytes: Int64) -> String {
+        byteCountFormatter.string(fromByteCount: bytes)
+    }
+
     private static func dateString(_ date: Date, format: String) -> String {
+        dateFormatter(format: format).string(from: date)
+    }
+
+    private static var byteCountFormatter: ByteCountFormatter {
+        let key = "RunShelfFormatters.byteCountFormatter"
+        if let formatter = Thread.current.threadDictionary[key] as? ByteCountFormatter {
+            return formatter
+        }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        Thread.current.threadDictionary[key] = formatter
+        return formatter
+    }
+
+    private static func dateFormatter(format: String) -> DateFormatter {
+        let key = "RunShelfFormatters.dateFormatter.\(format)"
+        if let formatter = Thread.current.threadDictionary[key] as? DateFormatter {
+            formatter.timeZone = .current
+            return formatter
+        }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = .current
         formatter.dateFormat = format
-        return formatter.string(from: date)
+        Thread.current.threadDictionary[key] = formatter
+        return formatter
     }
 }

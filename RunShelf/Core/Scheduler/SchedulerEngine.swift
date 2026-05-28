@@ -55,7 +55,7 @@ final class SchedulerEngine {
             try fileManager.createDirectory(at: RunShelfPaths.appSupportDirectoryURL(), withIntermediateDirectories: true)
 
             var state = loadState()
-            let loadResult = try taskFileStore.loadTasksWithIssues()
+            let loadResult = try taskFileStore.loadTasksWithIssues(includeRuns: false)
             for issue in loadResult.issues {
                 appendLog("task load skipped: \(issue.logMessage)")
             }

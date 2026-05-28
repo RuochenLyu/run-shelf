@@ -75,17 +75,9 @@ struct CronSchedule: Equatable {
         var calendar = inputCalendar
         calendar.timeZone = .current
 
-        var cursor = calendar.dateInterval(of: .minute, for: date)?.end ?? date.addingTimeInterval(60)
-        let limit = calendar.date(byAdding: .year, value: 5, to: cursor) ?? cursor.addingTimeInterval(60 * 60 * 24 * 366 * 5)
-        var results: [Date] = []
-
-        while cursor <= limit, results.count < count {
-            if matches(cursor, calendar: calendar) {
-                results.append(cursor)
-            }
-            guard let next = calendar.date(byAdding: .minute, value: 1, to: cursor) else { break }
-            cursor = next
-        }
+        let start = calendar.dateInterval(of: .minute, for: date)?.end ?? date.addingTimeInterval(60)
+        let limit = calendar.date(byAdding: .year, value: 5, to: start) ?? start.addingTimeInterval(60 * 60 * 24 * 366 * 5)
+        let results = candidateRuns(after: start, through: limit, limit: count, calendar: calendar)
 
         if results.isEmpty {
             throw CronParseError.noFutureRun
@@ -101,18 +93,61 @@ struct CronSchedule: Equatable {
 
         let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
         let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
-        var cursor = startMinute
+        return candidateRuns(after: startMinute, through: endMinute, limit: limit, calendar: calendar)
+    }
+
+    private func candidateRuns(after start: Date, through limitDate: Date, limit: Int, calendar: Calendar) -> [Date] {
+        guard limit > 0 else { return [] }
+
+        let sortedHours = hours.values.sorted()
+        let sortedMinutes = minutes.values.sorted()
+        var cursorDay = calendar.startOfDay(for: start)
         var results: [Date] = []
 
-        while cursor <= endMinute, results.count < limit {
-            if matches(cursor, calendar: calendar) {
-                results.append(cursor)
+        while cursorDay <= limitDate, results.count < limit {
+            if dayMatches(cursorDay, calendar: calendar) {
+                for hour in sortedHours {
+                    for minute in sortedMinutes {
+                        guard let candidate = date(on: cursorDay, hour: hour, minute: minute, calendar: calendar) else {
+                            continue
+                        }
+                        guard candidate >= start, candidate <= limitDate else { continue }
+                        guard results.last != candidate else { continue }
+                        results.append(candidate)
+                        if results.count >= limit {
+                            return results
+                        }
+                    }
+                }
             }
-            guard let next = calendar.date(byAdding: .minute, value: 1, to: cursor) else { break }
-            cursor = next
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: cursorDay) else {
+                break
+            }
+            cursorDay = nextDay
         }
 
         return results
+    }
+
+    private func date(on day: Date, hour: Int, minute: Int, calendar: Calendar) -> Date? {
+        var components = calendar.dateComponents([.year, .month, .day], from: day)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+
+        guard let date = calendar.date(from: components) else {
+            return nil
+        }
+
+        let actual = calendar.dateComponents([.hour, .minute, .second], from: date)
+        guard actual.hour == hour, actual.minute == minute, actual.second == 0 else {
+            return nil
+        }
+        guard calendar.isDate(date, inSameDayAs: day) else {
+            return nil
+        }
+        return date
     }
 
     func matches(_ date: Date, calendar: Calendar = .current) -> Bool {
@@ -132,6 +167,29 @@ struct CronSchedule: Equatable {
             return false
         }
 
+        let dayOfMonthMatches = daysOfMonth.values.contains(day)
+        let dayOfWeekMatches = daysOfWeek.values.contains(cronWeekday)
+
+        if !daysOfMonth.isWildcard && !daysOfWeek.isWildcard {
+            return dayOfMonthMatches || dayOfWeekMatches
+        }
+        if !daysOfMonth.isWildcard {
+            return dayOfMonthMatches
+        }
+        if !daysOfWeek.isWildcard {
+            return dayOfWeekMatches
+        }
+        return true
+    }
+
+    private func dayMatches(_ date: Date, calendar: Calendar) -> Bool {
+        let components = calendar.dateComponents([.day, .month, .weekday], from: date)
+        guard let day = components.day, let month = components.month, let weekday = components.weekday else {
+            return false
+        }
+        guard months.values.contains(month) else { return false }
+
+        let cronWeekday = weekday == 1 ? 0 : weekday - 1
         let dayOfMonthMatches = daysOfMonth.values.contains(day)
         let dayOfWeekMatches = daysOfWeek.values.contains(cronWeekday)
 
