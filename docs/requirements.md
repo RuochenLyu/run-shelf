@@ -975,7 +975,7 @@ com.aix4u.runshelf.scheduler
 
 ### 15.3 后台调度进程注册
 
-使用 `SMAppService` 管理 app 的 helper / Login Item。Apple 文档说明 macOS 13+ 可用 `SMAppService` 注册和控制 LoginItems、LaunchAgents、LaunchDaemons。([Apple Developer][2])
+Run Shelf 最低支持 macOS 14。后台调度进程使用 `SMAppService` 管理 app 的 helper / Login Item；Apple 文档说明 macOS 13+ 可用 `SMAppService` 注册和控制 LoginItems、LaunchAgents、LaunchDaemons。([Apple Developer][2])
 
 ### 15.4 常驻模型
 

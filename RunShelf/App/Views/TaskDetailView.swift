@@ -15,33 +15,25 @@ enum TaskDetailTab: String, Hashable, CaseIterable, Identifiable {
         case .log: return "日志"
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .script: return "terminal"
-        case .notes: return "note.text"
-        case .log: return "doc.text.magnifyingglass"
-        }
-    }
 }
 
 struct TaskDetailView: View {
     @ObservedObject var store: TaskStore
     let taskID: String
+    var titleLeadingInset: CGFloat = 0
 
     @State private var selectedTab: TaskDetailTab = .script
-    @State private var selectedLogKind: RunLogKind = .combined
 
     var body: some View {
         if let task = store.task(withID: taskID) {
             VStack(spacing: 0) {
-                TaskHeaderView(store: store, task: task)
+                TaskHeaderView(store: store, task: task, titleLeadingInset: titleLeadingInset)
                 Divider()
                 tabBar
                 Divider()
                 content(for: task)
             }
-            .onChange(of: store.selectedRunID) { newValue in
+            .onChange(of: store.selectedRunID) { _, newValue in
                 if newValue != nil {
                     selectedTab = .log
                 }
@@ -52,12 +44,20 @@ struct TaskDetailView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
-            DetailTabSwitcher(selection: $selectedTab)
+        HStack {
+            Spacer()
+            Picker("", selection: $selectedTab) {
+                ForEach(TaskDetailTab.allCases) { tab in
+                    Text(tab.displayName).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 240)
             Spacer()
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -68,7 +68,7 @@ struct TaskDetailView: View {
         case .notes:
             notesTab
         case .log:
-            LogView(store: store, task: task, selectedLogKind: $selectedLogKind)
+            LogView(store: store, task: task)
         }
     }
 
@@ -81,10 +81,21 @@ struct TaskDetailView: View {
     }
 
     private var notesTab: some View {
-        TextEditor(text: notesBinding)
-            .font(.system(.body, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .padding(16)
+        ZStack(alignment: .topLeading) {
+            if (store.task(withID: taskID)?.notes ?? "").isEmpty {
+                Text("添加备注…")
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 5)
+                    .allowsHitTesting(false)
+            }
+
+            TextEditor(text: notesBinding)
+                .scrollContentBackground(.hidden)
+        }
+        .font(.body)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var scriptBinding: Binding<String> {
@@ -110,47 +121,11 @@ struct TaskDetailView: View {
     }
 }
 
-private struct DetailTabSwitcher: View {
-    @Binding var selection: TaskDetailTab
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(TaskDetailTab.allCases) { tab in
-                Button {
-                    selection = tab
-                } label: {
-                    Label(tab.displayName, systemImage: tab.systemImage)
-                        .labelStyle(.titleAndIcon)
-                        .font(.callout.weight(selection == tab ? .semibold : .regular))
-                        .foregroundStyle(selection == tab ? .primary : .secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background {
-                    if selection == tab {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(nsColor: .unemphasizedSelectedContentBackgroundColor))
-                    }
-                }
-            }
-        }
-        .padding(2)
-        .frame(width: 260)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.35))
-        }
-    }
-}
-
 private struct ScriptToolbarView: View {
     @Binding var script: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 12) {
             Menu {
                 Button("严格模式") {
                     insertSnippet("set -euo pipefail")
@@ -168,6 +143,7 @@ private struct ScriptToolbarView: View {
                 Label("插入片段", systemImage: "text.badge.plus")
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .fixedSize()
 
             Button {
@@ -176,13 +152,12 @@ private struct ScriptToolbarView: View {
                 Label("插入目录", systemImage: "folder.badge.plus")
             }
             .buttonStyle(.borderless)
-            .foregroundStyle(.primary)
 
             Spacer()
         }
-        .foregroundStyle(.primary)
+        .controlSize(.small)
         .padding(.horizontal, 24)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
     }
 
     private func chooseDirectoryAndInsertCD() {

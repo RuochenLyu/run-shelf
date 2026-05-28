@@ -2,96 +2,87 @@ import SwiftUI
 
 struct TaskInspectorView: View {
     @ObservedObject var store: TaskStore
+    @EnvironmentObject private var schedulePrefs: SchedulePreferencesStore
     var task: RunShelfTask
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                scheduleSection
-                runnerSection
-                historySection
-                directoryButton
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private var scheduleSection: some View {
-        InspectorSection("计划") {
-            VStack(alignment: .leading, spacing: 10) {
-                ScheduleEditorView(expression: cronBinding) { isValid in
-                    store.setScheduleDraftValidity(taskID: task.id, isValid: isValid)
-                }
+        Form {
+            Section("计划") {
+                ScheduleEditorView(
+                    expression: cronBinding,
+                    initialMode: schedulePrefs.mode(for: task.id).flatMap(ScheduleMode.init(rawValue:)),
+                    onModeChange: { newMode in
+                        schedulePrefs.setMode(newMode.rawValue, for: task.id)
+                    },
+                    onValidityChange: { isValid in
+                        store.setScheduleDraftValidity(taskID: task.id, isValid: isValid)
+                    }
+                )
+                .id(task.id)
                 .onDisappear {
                     store.setScheduleDraftValidity(taskID: task.id, isValid: true)
                 }
+
                 CronPreviewView(expression: task.manifest.schedule.expression, nextRunCount: 3)
             }
-        }
-    }
 
-    private var runnerSection: some View {
-        InspectorSection("运行配置") {
-            InspectorGroup {
-                InspectorValueRow(title: "并发", value: concurrencyText)
-                Divider()
-                InspectorValueRow(title: "超时", value: timeoutText)
-                Divider()
-                InspectorValueRow(title: "失败通知", value: task.manifest.notifications.onFailure ? "开启" : "关闭")
-                Divider()
-                InspectorValueRow(title: "日志保留", value: "\(task.manifest.retention.days) 天 / \(task.manifest.retention.maxRuns) 次")
-            }
-        }
-    }
+            Section("运行配置") {
+                LabeledContent("并发") {
+                    Picker("", selection: concurrencyBinding) {
+                        Text("跳过重叠").tag("skip")
+                        Text("允许重叠").tag("allow")
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                }
 
-    private var historySection: some View {
-        InspectorSection("运行历史") {
-            InspectorGroup {
-                if task.runs.isEmpty {
-                    Text("暂无运行记录")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                } else {
-                    let runs = Array(task.runs.prefix(12))
-                    ForEach(Array(runs.enumerated()), id: \.element.id) { index, run in
-                        RunHistoryRow(
-                            run: run,
-                            isSelected: store.selectedRunID == run.runId,
-                            onSelect: { store.selectedRunID = run.runId }
-                        )
-                        if index < runs.count - 1 {
-                            Divider()
-                                .padding(.leading, 38)
+                LabeledContent("超时") {
+                    Picker("", selection: timeoutBinding) {
+                        ForEach(timeoutOptions, id: \.self) { value in
+                            Text(timeoutLabel(value)).tag(value)
                         }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                Toggle("失败时通知", isOn: failureNotificationBinding)
+
+                LabeledContent("保留天数") {
+                    RetentionNumberField(value: retentionDaysBinding, unit: "天", range: 1...365)
+                }
+
+                LabeledContent("最多记录") {
+                    RetentionNumberField(value: retentionMaxRunsBinding, unit: "次", range: 1...5000)
+                }
+            }
+
+            Section {
+                Button {
+                    store.openTaskDirectory(id: task.id)
+                } label: {
+                    Label("在 Finder 中显示任务目录", systemImage: "folder")
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
+        .formStyle(.grouped)
+        .padding(.top, 28)
     }
 
-    private var directoryButton: some View {
-        Button {
-            store.openTaskDirectory(id: task.id)
-        } label: {
-            Label("显示任务目录", systemImage: "folder")
+    private var timeoutOptions: [Int] {
+        [0, 30, 60, 120, 300, 600, 1800, 3600]
+    }
+
+    private func timeoutLabel(_ seconds: Int) -> String {
+        switch seconds {
+        case 0: return "不限制"
+        case ..<60: return "\(seconds) 秒"
+        case ..<3600: return "\(seconds / 60) 分钟"
+        default: return "\(seconds / 3600) 小时"
         }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
-    }
-
-    private var concurrencyText: String {
-        task.manifest.runner.concurrency == "allow" ? "允许重叠" : "跳过重叠"
-    }
-
-    private var timeoutText: String {
-        task.manifest.runner.timeoutSeconds == 0 ? "不限制" : "\(task.manifest.runner.timeoutSeconds) 秒"
     }
 
     private var cronBinding: Binding<String> {
@@ -104,106 +95,103 @@ struct TaskInspectorView: View {
             }
         )
     }
-}
 
-private struct InspectorSection<Content: View>: View {
-    var title: String
-    @ViewBuilder var content: () -> Content
-
-    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.content = content
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct InspectorGroup<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            content()
-        }
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-private struct InspectorValueRow: View {
-    var title: String
-    var value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            Text(value)
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-    }
-}
-
-private struct RunHistoryRow: View {
-    var run: RunRecord
-    var isSelected: Bool
-    var onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 10) {
-                Image(systemName: run.status.statusSymbol)
-                    .foregroundStyle(run.status.badgeColor)
-                    .frame(width: 16)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(RunShelfFormatters.dateTime(run.startedAt))
-                        .font(.callout)
-                        .lineLimit(1)
-                    Text(secondaryLine)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tint)
+    private var concurrencyBinding: Binding<String> {
+        Binding(
+            get: { store.task(withID: task.id)?.manifest.runner.concurrency ?? "skip" },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.runner.concurrency = value
                 }
             }
-            .contentShape(Rectangle())
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(selectionBackground, in: RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
+        )
     }
 
-    private var selectionBackground: Color {
-        isSelected ? Color.accentColor.opacity(0.10) : Color.clear
+    private var timeoutBinding: Binding<Int> {
+        Binding(
+            get: {
+                let current = store.task(withID: task.id)?.manifest.runner.timeoutSeconds ?? 0
+                return timeoutOptions.contains(current) ? current : 0
+            },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.runner.timeoutSeconds = value
+                }
+            }
+        )
     }
 
-    private var secondaryLine: String {
-        var parts: [String] = [run.status.displayName, run.trigger.displayName]
-        if let duration = run.durationMs {
-            parts.append(RunShelfFormatters.duration(duration))
+    private var failureNotificationBinding: Binding<Bool> {
+        Binding(
+            get: { store.task(withID: task.id)?.manifest.notifications.onFailure ?? true },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.notifications.onFailure = value
+                }
+            }
+        )
+    }
+
+    private var retentionDaysBinding: Binding<Int> {
+        Binding(
+            get: { store.task(withID: task.id)?.manifest.retention.days ?? 30 },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.retention.days = value
+                }
+            }
+        )
+    }
+
+    private var retentionMaxRunsBinding: Binding<Int> {
+        Binding(
+            get: { store.task(withID: task.id)?.manifest.retention.maxRuns ?? 500 },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.retention.maxRuns = value
+                }
+            }
+        )
+    }
+}
+
+struct InspectorEmptyView: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "list.bullet.rectangle")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("从左侧选择任务查看配置")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        return parts.joined(separator: " · ")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+    }
+}
+
+struct RetentionNumberField: View {
+    @Binding var value: Int
+    var unit: String
+    var range: ClosedRange<Int>
+
+    var body: some View {
+        HStack(spacing: 6) {
+            TextField("", value: clampedValue, format: .number)
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+                .multilineTextAlignment(.trailing)
+                .frame(width: 72)
+            Text(unit)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var clampedValue: Binding<Int> {
+        Binding(
+            get: { value },
+            set: { value = min(max($0, range.lowerBound), range.upperBound) }
+        )
     }
 }

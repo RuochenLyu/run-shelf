@@ -1,119 +1,162 @@
 import SwiftUI
 
 struct ContentView: View {
-    private let inspectorWidth: CGFloat = 340
+    private let inspectorWidth: CGFloat = 300
+    private let collapsedSidebarTitleInset: CGFloat = 128
 
     @StateObject private var store = TaskStore()
+    @StateObject private var schedulePrefs = SchedulePreferencesStore()
     @State private var isShowingNewTask = false
     @State private var isShowingDeleteConfirmation = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        navigationContent
+            .environmentObject(schedulePrefs)
+            .frame(minWidth: 1120, minHeight: 640)
+            .overlay(alignment: .topTrailing) {
+                windowActionBar
+            }
+            .sheet(isPresented: $isShowingNewTask) {
+                NewTaskSheet(store: store)
+            }
+            .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
+                Button("删除", role: .destructive) {
+                    if let id = store.selectedTaskID {
+                        store.deleteTask(id: id)
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("任务目录会移入废纸篓，运行中的任务无法删除。")
+            }
+            .alert("Run Shelf", isPresented: errorBinding) {
+                Button("好", role: .cancel) {
+                    store.lastErrorMessage = nil
+                }
+            } message: {
+                Text(store.lastErrorMessage ?? "")
+            }
+            .onAppear {
+                store.loadTasks()
+            }
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 15_000_000_000)
+                    guard !Task.isCancelled else { break }
+                    store.refreshRunsFromDisk()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .saveSelectedTaskFromMenu)) { _ in
+                if let id = store.selectedTaskID {
+                    store.saveTask(id: id)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .runSelectedTaskFromMenu)) { _ in
+                if let id = store.selectedTaskID {
+                    store.runTask(id: id)
+                }
+            }
+    }
+
+    private var navigationContent: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             TaskSidebarView(store: store)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 320)
-        } content: {
-            if let task = store.selectedTask {
-                TaskDetailView(store: store, taskID: task.id)
-            } else {
-                emptyDetailPlaceholder
-            }
         } detail: {
-            if let task = store.selectedTask {
-                TaskInspectorView(store: store, task: task)
-                    .frame(width: inspectorWidth)
-                    .navigationSplitViewColumnWidth(
-                        min: inspectorWidth,
-                        ideal: inspectorWidth,
-                        max: inspectorWidth
-                    )
-            } else {
-                Color.clear
-                    .frame(width: inspectorWidth)
-                    .navigationSplitViewColumnWidth(
-                        min: inspectorWidth,
-                        ideal: inspectorWidth,
-                        max: inspectorWidth
-                    )
+            HStack(spacing: 0) {
+                detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if store.selectedTask != nil {
+                    Divider()
+                    inspectorContent
+                        .frame(width: inspectorWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                }
             }
+            .ignoresSafeArea(.container, edges: .top)
         }
-        .frame(minWidth: 1120, minHeight: 640)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    isShowingNewTask = true
-                } label: {
-                    Label("新建任务", systemImage: "plus")
-                }
-                .help("新建任务")
+    }
 
-                Button {
-                    if let id = store.selectedTaskID {
-                        store.runTask(id: id)
-                    }
-                } label: {
-                    Label("立即运行", systemImage: "play.fill")
-                }
-                .help("立即运行（⌘R）")
-                .disabled(!canRunSelectedTask)
-
-                Button {
-                    if let id = store.selectedTaskID {
-                        store.saveTask(id: id)
-                    }
-                } label: {
-                    Label("保存", systemImage: "square.and.arrow.down")
-                }
-                .help("保存（⌘S）")
-                .disabled(!canSaveSelectedTask)
-
-                Button(role: .destructive) {
-                    isShowingDeleteConfirmation = true
-                } label: {
-                    Label("删除", systemImage: "trash")
-                }
-                .help("删除任务")
-                .disabled(store.selectedTaskID == nil)
+    private var windowActionBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                isShowingNewTask = true
+            } label: {
+                toolbarIcon("plus")
             }
-        }
-        .sheet(isPresented: $isShowingNewTask) {
-            NewTaskSheet(store: store)
-        }
-        .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
-            Button("删除", role: .destructive) {
+            .help("新建任务")
+
+            Button {
                 if let id = store.selectedTaskID {
-                    store.deleteTask(id: id)
+                    store.runTask(id: id)
                 }
+            } label: {
+                toolbarIcon("play.fill")
             }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("任务目录会移入废纸篓，运行中的任务无法删除。")
-        }
-        .alert("Run Shelf", isPresented: errorBinding) {
-            Button("好", role: .cancel) {
-                store.lastErrorMessage = nil
+            .help("立即运行（⌘R）")
+            .disabled(!canRunSelectedTask)
+
+            Button {
+                if let id = store.selectedTaskID {
+                    store.saveTask(id: id)
+                }
+            } label: {
+                toolbarIcon("square.and.arrow.down")
             }
-        } message: {
-            Text(store.lastErrorMessage ?? "")
-        }
-        .onAppear {
-            store.loadTasks()
-        }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
-                guard !Task.isCancelled else { break }
-                store.refreshRunsFromDisk()
+            .help("保存改动（⌘S）")
+            .disabled(!canSaveSelectedTask)
+
+            Button(role: .destructive) {
+                isShowingDeleteConfirmation = true
+            } label: {
+                toolbarIcon("trash")
             }
+            .help("删除任务")
+            .disabled(store.selectedTaskID == nil)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .saveSelectedTaskFromMenu)) { _ in
-            if let id = store.selectedTaskID {
-                store.saveTask(id: id)
-            }
+        .buttonStyle(.borderless)
+        .labelStyle(.iconOnly)
+        .controlSize(.large)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar, in: Capsule())
+        .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 4)
+        .padding(.top, 8)
+        .padding(.trailing, 12)
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    private func toolbarIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 16, weight: .regular))
+            .symbolRenderingMode(.hierarchical)
+            .frame(width: 22, height: 22)
+            .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        if let task = store.selectedTask {
+            TaskDetailView(
+                store: store,
+                taskID: task.id,
+                titleLeadingInset: isSidebarCollapsed ? collapsedSidebarTitleInset : 0
+            )
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            emptyDetailPlaceholder
         }
-        .onReceive(NotificationCenter.default.publisher(for: .runSelectedTaskFromMenu)) { _ in
-            if let id = store.selectedTaskID {
-                store.runTask(id: id)
-            }
+    }
+
+    @ViewBuilder
+    private var inspectorContent: some View {
+        if let task = store.selectedTask {
+            TaskInspectorView(store: store, task: task)
+        } else {
+            InspectorEmptyView()
         }
     }
 
@@ -124,18 +167,10 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
             Text("还没有任务")
                 .font(.title3.weight(.semibold))
-            Text("点击工具栏的「新建任务」开始第一个计划脚本。")
+            Text("点右上角的 + 新建一个任务")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button {
-                isShowingNewTask = true
-            } label: {
-                Label("新建任务", systemImage: "plus")
-            }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -156,5 +191,9 @@ struct ContentView: View {
     private var canRunSelectedTask: Bool {
         guard let task = store.selectedTask else { return false }
         return store.canRunTask(task)
+    }
+
+    private var isSidebarCollapsed: Bool {
+        columnVisibility == .detailOnly
     }
 }

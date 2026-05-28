@@ -70,7 +70,7 @@ SMAppService 约束会影响最低系统版本、签名、helper target 和调�
 默认决策：
 
 ```text
-最低支持 macOS 13
+最低支持 macOS 14
 开发使用当前稳定版 Xcode
 P0 不兼容 macOS 12 及以下
 ```

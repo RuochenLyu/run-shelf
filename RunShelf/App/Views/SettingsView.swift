@@ -19,7 +19,7 @@ struct SettingsView: View {
                         .truncationMode(.middle)
                 }
                 Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([RunShelfPaths.appSupportDirectoryURL()])
+                    NSWorkspace.shared.activateFileViewerSelecting([RunShelfPaths.tasksDirectoryURL()])
                 } label: {
                     Label("在 Finder 中显示", systemImage: "folder")
                 }
@@ -82,13 +82,13 @@ struct SettingsView: View {
             }
 
             Section("日志保留默认值") {
-                Stepper(value: $defaultRetentionDays, in: 1...365) {
-                    LabeledContent("保留天数", value: "\(defaultRetentionDays) 天")
+                LabeledContent("保留天数") {
+                    RetentionNumberField(value: defaultRetentionDaysBinding, unit: "天", range: 1...365)
                 }
-                Stepper(value: $defaultRetentionMaxRuns, in: 50...5000, step: 50) {
-                    LabeledContent("最多记录", value: "\(defaultRetentionMaxRuns) 次")
+                LabeledContent("最多记录") {
+                    RetentionNumberField(value: defaultRetentionMaxRunsBinding, unit: "次", range: 1...5000)
                 }
-                Text("仅影响新建任务；每个任务可在自己的 task.json 中改写策略。")
+                Text("仅影响新建任务；每个任务可在右侧检查器中单独调整。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -153,6 +153,20 @@ struct SettingsView: View {
         case .denied: return .red
         default: return .secondary
         }
+    }
+
+    private var defaultRetentionDaysBinding: Binding<Int> {
+        Binding(
+            get: { defaultRetentionDays },
+            set: { defaultRetentionDays = min(max($0, 1), 365) }
+        )
+    }
+
+    private var defaultRetentionMaxRunsBinding: Binding<Int> {
+        Binding(
+            get: { defaultRetentionMaxRuns },
+            set: { defaultRetentionMaxRuns = min(max($0, 1), 5000) }
+        )
     }
 
     private func heartbeatDescription(_ heartbeat: SchedulerHeartbeat) -> String {

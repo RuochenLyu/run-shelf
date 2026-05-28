@@ -37,6 +37,28 @@ enum RunShelfFormatters {
         return String(format: "%.2f秒", Double(durationMs) / 1000.0)
     }
 
+    /// 相对未来时间,例如 "3 小时后" / "10 分钟后" / "现在"。
+    static func relativeFuture(_ date: Date, now: Date = Date()) -> String {
+        let interval = date.timeIntervalSince(now)
+        if interval < 60 {
+            return "现在"
+        }
+        if interval < 3600 {
+            return "\(Int(interval / 60)) 分钟后"
+        }
+        if interval < 86400 {
+            return "\(Int(interval / 3600)) 小时后"
+        }
+        let days = Int(interval / 86400)
+        if days < 30 {
+            return "\(days) 天后"
+        }
+        if days < 365 {
+            return "\(days / 30) 个月后"
+        }
+        return "\(days / 365) 年后"
+    }
+
     private static func dateString(_ date: Date, format: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")

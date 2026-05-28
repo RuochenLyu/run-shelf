@@ -3,7 +3,6 @@ import Combine
 import Foundation
 
 enum RunLogKind: String, CaseIterable, Identifiable {
-    case combined
     case stdout
     case stderr
 
@@ -11,7 +10,6 @@ enum RunLogKind: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .combined: return "合并"
         case .stdout: return "stdout"
         case .stderr: return "stderr"
         }
@@ -33,6 +31,7 @@ final class TaskStore: ObservableObject {
     }
     @Published var selectedRunID: String?
     @Published private(set) var runningTaskIDs: Set<String> = []
+    @Published private(set) var runningStartedAt: [String: Date] = [:]
     @Published private var invalidScheduleDraftTaskIDs: Set<String> = []
     @Published var lastErrorMessage: String?
 
@@ -119,13 +118,66 @@ final class TaskStore: ObservableObject {
     }
 
     func refreshRunsFromDisk() {
-        var refreshedTasks = tasks
-        for index in refreshedTasks.indices {
-            refreshedTasks[index].runs = loadRuns(for: refreshedTasks[index].directoryURL)
+        // 当前磁盘上的任务目录（约定：目录名 = task id，由 createTask 保证）
+        var diskTaskIDs = Set<String>()
+        do {
+            let entries = try fileManager.contentsOfDirectory(
+                at: tasksDirectoryURL,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+            for url in entries where isDirectory(url) && url.lastPathComponent != "trash" {
+                diskTaskIDs.insert(url.lastPathComponent)
+            }
+        } catch {
+            lastErrorMessage = "无法刷新任务目录：\(error.localizedDescription)"
+            return
         }
+
+        var refreshedTasks = tasks
+
+        // 1. 删掉磁盘上已经不存在的 clean 任务（dirty 任务保留草稿，让 saveTask 失败时让用户感知）
+        refreshedTasks.removeAll { task in
+            guard !diskTaskIDs.contains(task.id) else { return false }
+            return !task.isDirty
+        }
+
+        // 2. 加入磁盘上新出现的任务（例如外部恢复、其他设备 sync）
+        let memoryIDs = Set(refreshedTasks.map { $0.id })
+        for id in diskTaskIDs.subtracting(memoryIDs) {
+            let dirURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
+            do {
+                let task = try loadTask(at: dirURL)
+                refreshedTasks.append(task)
+            } catch {
+                lastErrorMessage = taskLoadFailureMessage(directoryURL: dirURL, error: error)
+            }
+        }
+
+        // 3. 对剩下的任务：刷新 runs；非 dirty 还要从磁盘 reload script/notes/manifest，
+        //    让外部修改（直接改 run.sh、他人 sync 等）能被 app 看到。
+        var nextTasks: [RunShelfTask] = []
+        for var task in refreshedTasks {
+            if task.isDirty {
+                task.runs = loadRuns(for: task.directoryURL)
+                nextTasks.append(task)
+                continue
+            }
+
+            do {
+                nextTasks.append(try loadTask(at: task.directoryURL))
+            } catch {
+                lastErrorMessage = taskLoadFailureMessage(directoryURL: task.directoryURL, error: error)
+            }
+        }
+        refreshedTasks = nextTasks
 
         if refreshedTasks != tasks {
             tasks = refreshedTasks
+            // 选中任务被外部删了 → 自动切到第一个
+            if let sel = selectedTaskID, !refreshedTasks.contains(where: { $0.id == sel }) {
+                selectedTaskID = sortedTasks.first?.id
+            }
         }
     }
 
@@ -158,6 +210,20 @@ final class TaskStore: ObservableObject {
 
     func updateTask(id: String, mutate: (inout RunShelfTask) -> Void) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+
+        // 若当前任务是 clean 的，先把磁盘最新版 reload 进内存再 mutate；
+        // 防止「右键切启停」这种 manifest-only 操作把过时的 script/notes 写回磁盘
+        // （writeTask 是整 task 级别的写，会重写 task.json / run.sh / notes.md）。
+        if !tasks[index].isDirty {
+            do {
+                let reloaded = try loadTask(at: tasks[index].directoryURL)
+                tasks[index] = reloaded
+            } catch {
+                lastErrorMessage = taskLoadFailureMessage(directoryURL: tasks[index].directoryURL, error: error)
+                return
+            }
+        }
+
         let originalTask = tasks[index]
         mutate(&tasks[index])
         if tasks[index] != originalTask {
@@ -206,6 +272,11 @@ final class TaskStore: ObservableObject {
             try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
             tasks.remove(at: index)
             setScheduleDraftValidity(taskID: id, isValid: true)
+            NotificationCenter.default.post(
+                name: .runShelfTaskDeleted,
+                object: nil,
+                userInfo: [RunShelfNotificationUserInfoKey.taskID: id]
+            )
             selectedTaskID = sortedTasks.first?.id
         } catch {
             do {
@@ -215,6 +286,11 @@ final class TaskStore: ObservableObject {
                 try fileManager.moveItem(at: task.directoryURL, to: destination)
                 tasks.remove(at: index)
                 setScheduleDraftValidity(taskID: id, isValid: true)
+                NotificationCenter.default.post(
+                    name: .runShelfTaskDeleted,
+                    object: nil,
+                    userInfo: [RunShelfNotificationUserInfoKey.taskID: id]
+                )
                 selectedTaskID = sortedTasks.first?.id
             } catch {
                 lastErrorMessage = "无法删除任务：\(error.localizedDescription)"
@@ -225,16 +301,31 @@ final class TaskStore: ObservableObject {
     func runTask(id: String) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         guard !runningTaskIDs.contains(id) else { return }
-        guard saveTask(id: id) else { return }
+
+        if tasks[index].isDirty {
+            // 有 app 内未保存的草稿，先保存再跑（保留原 auto-save 行为）
+            guard saveTask(id: id) else { return }
+        } else {
+            // 没有未保存改动：从磁盘重读一次，确保用上最新的外部修改
+            do {
+                let reloaded = try loadTask(at: tasks[index].directoryURL)
+                tasks[index] = reloaded
+            } catch {
+                lastErrorMessage = "无法运行任务：\(taskLoadFailureMessage(directoryURL: tasks[index].directoryURL, error: error))"
+                return
+            }
+        }
 
         let task = tasks[index]
         runningTaskIDs.insert(id)
+        runningStartedAt[id] = Date()
 
         Task.detached(priority: .userInitiated) {
             let result = Result { try TaskRunner.run(task: task, trigger: .manual) }
 
             await MainActor.run {
                 self.runningTaskIDs.remove(id)
+                self.runningStartedAt.removeValue(forKey: id)
                 switch result {
                 case .success(let run):
                     if run.status == .failed || run.status == .timeout {
@@ -314,16 +405,6 @@ final class TaskStore: ObservableObject {
             return readText(at: stdoutURL)
         case .stderr:
             return readText(at: stderrURL)
-        case .combined:
-            let stdout = readText(at: stdoutURL)
-            let stderr = readText(at: stderrURL)
-            return """
-            # stdout
-            \(stdout.isEmpty ? "无输出" : stdout)
-
-            # stderr
-            \(stderr.isEmpty ? "无输出" : stderr)
-            """
         }
     }
 
@@ -400,7 +481,15 @@ final class TaskStore: ObservableObject {
             ])
         }
 
-        let script = normalizedTemplateScript(readText(at: directoryURL.appendingPathComponent("run.sh")))
+        let scriptURL = directoryURL.appendingPathComponent("run.sh")
+        // run.sh 是任务契约的必需文件；缺失视为损坏，让上层（loadTasks / refresh / save）感知
+        // 而不是 silently 把脚本当作空字符串继续运行。
+        guard fileManager.fileExists(atPath: scriptURL.path) else {
+            throw NSError(domain: "RunShelf", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "任务缺少 run.sh：\(directoryURL.lastPathComponent)"
+            ])
+        }
+        let script = normalizedTemplateScript(readText(at: scriptURL))
         let notes = readText(at: directoryURL.appendingPathComponent("notes.md"))
         let runs = loadRuns(for: directoryURL)
 
@@ -415,7 +504,15 @@ final class TaskStore: ObservableObject {
     }
 
     private func writeTask(_ task: RunShelfTask) throws {
-        try fileManager.createDirectory(at: task.directoryURL, withIntermediateDirectories: true)
+        // 不允许「静默 resurrect」被外部删掉的任务目录：
+        // makeTask 走 createTask 路径，会在调本函数前先 createDirectory，所以这里看得到目录；
+        // saveTask 走的是「写既有任务」路径，目录被外部 rm -rf 时这里就要让保存失败，
+        // 让用户看到 lastErrorMessage 而不是凭空把目录建出来。
+        guard fileManager.fileExists(atPath: task.directoryURL.path) else {
+            throw NSError(domain: "RunShelf", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "任务目录已不存在（可能被外部删除）：\(task.directoryURL.lastPathComponent)"
+            ])
+        }
         try fileManager.createDirectory(at: task.directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
 
         let manifestData = try encoder.encode(task.manifest)
@@ -475,6 +572,10 @@ final class TaskStore: ObservableObject {
 
     private func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+    }
+
+    private func taskLoadFailureMessage(directoryURL: URL, error: Error) -> String {
+        "无法读取任务 \(directoryURL.lastPathComponent)：\(error.localizedDescription)"
     }
 
     private func normalizedName(_ name: String?, fallback: String) -> String {

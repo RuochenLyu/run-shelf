@@ -1,6 +1,6 @@
 import Foundation
 
-enum TaskRunStatus: String, Codable, CaseIterable {
+enum TaskRunStatus: String, Codable, CaseIterable, Sendable {
     case pending
     case running
     case success
@@ -24,7 +24,7 @@ enum TaskRunStatus: String, Codable, CaseIterable {
     }
 }
 
-enum RunTrigger: String, Codable {
+enum RunTrigger: String, Codable, Sendable {
     case scheduled
     case manual
 
@@ -36,7 +36,7 @@ enum RunTrigger: String, Codable {
     }
 }
 
-struct TaskSchedule: Codable, Equatable {
+struct TaskSchedule: Codable, Equatable, Sendable {
     var type: String
     var expression: String
     var timezone: String
@@ -65,14 +65,14 @@ extension TaskSchedule {
     }
 }
 
-struct MissedRunPolicy: Codable, Equatable {
+struct MissedRunPolicy: Codable, Equatable, Sendable {
     var type: String
     var maxDelaySeconds: Int
 
     static let defaultPolicy = MissedRunPolicy(type: "skipIfLate", maxDelaySeconds: 1800)
 }
 
-struct TaskRunnerPolicy: Codable, Equatable {
+struct TaskRunnerPolicy: Codable, Equatable, Sendable {
     var concurrency: String
     var timeoutSeconds: Int
     var missedRunPolicy: MissedRunPolicy
@@ -84,21 +84,21 @@ struct TaskRunnerPolicy: Codable, Equatable {
     )
 }
 
-struct NotificationPolicy: Codable, Equatable {
+struct NotificationPolicy: Codable, Equatable, Sendable {
     var onFailure: Bool
     var onSuccess: Bool
 
     static let defaultPolicy = NotificationPolicy(onFailure: true, onSuccess: false)
 }
 
-struct RetentionPolicy: Codable, Equatable {
+struct RetentionPolicy: Codable, Equatable, Sendable {
     var days: Int
     var maxRuns: Int
 
     static let defaultPolicy = RetentionPolicy(days: 30, maxRuns: 500)
 }
 
-struct TaskManifest: Codable, Identifiable, Equatable {
+struct TaskManifest: Codable, Identifiable, Equatable, Sendable {
     var schemaVersion: Int
     var id: String
     var name: String
@@ -136,7 +136,7 @@ struct TaskManifest: Codable, Identifiable, Equatable {
     }
 }
 
-struct RunRecord: Codable, Identifiable, Equatable {
+struct RunRecord: Codable, Identifiable, Equatable, Sendable {
     var runId: String
     var taskId: String
     var trigger: RunTrigger
@@ -154,7 +154,7 @@ struct RunRecord: Codable, Identifiable, Equatable {
     var id: String { runId }
 }
 
-struct RunShelfTask: Identifiable, Equatable {
+struct RunShelfTask: Identifiable, Equatable, Sendable {
     var manifest: TaskManifest
     var directoryURL: URL
     var script: String

@@ -66,10 +66,17 @@ struct TaskFileStore {
             ])
         }
 
+        let scriptURL = directoryURL.appendingPathComponent("run.sh")
+        guard fileManager.fileExists(atPath: scriptURL.path) else {
+            throw NSError(domain: "RunShelf", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "任务缺少 run.sh：\(directoryURL.lastPathComponent)"
+            ])
+        }
+
         return RunShelfTask(
             manifest: manifest,
             directoryURL: directoryURL,
-            script: readText(at: directoryURL.appendingPathComponent("run.sh")),
+            script: readText(at: scriptURL),
             notes: readText(at: directoryURL.appendingPathComponent("notes.md")),
             runs: loadRuns(for: directoryURL),
             isDirty: false

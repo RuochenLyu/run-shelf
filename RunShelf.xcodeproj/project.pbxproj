@@ -35,11 +35,13 @@
 		7C5BAFC88CD5939332F8E30C /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
 		7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */; };
 		7FE2E75D771240E63D659373 /* SchedulerServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */; };
+		A09B0D8767ECFDA952E94CD2 /* SchedulePreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */; };
 		85D867EFC1E4E209BF1B2F8A /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */; };
 		85D90E7CB7695CA389FFA994 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */; };
 		8D4D4EE72C1BAB0B30E3076D /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */; };
 		9B34E2179B73ADF9E0C5A237 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
 		9E52291B91611A54074EE23D /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F02CBBBFA3C3762648611A /* TaskStore.swift */; };
+		33D3C719BFFC5988883B078A /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */; };
 		A33871A3D61908E5DF42A191 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A115BE875312135B7BDE3D /* TaskTemplate.swift */; };
 		A90BEDF53634189DC9255A58 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */; };
 		AE06EF7799204FB01A8E756A /* TaskInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 043EFA46EB17EA287D69428B /* TaskInspectorView.swift */; };
@@ -95,6 +97,7 @@
 		043EFA46EB17EA287D69428B /* TaskInspectorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskInspectorView.swift; sourceTree = "<group>"; };
 		1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
 		1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerServiceController.swift; sourceTree = "<group>"; };
+		D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulePreferencesStore.swift; sourceTree = "<group>"; };
 		2313E9329AFABE63D17BA434 /* LogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		2B67D3B78860C69DBAD290E1 /* RunShelfScheduler */ = {isa = PBXFileReference; includeInIndex = 0; path = RunShelfScheduler; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -114,6 +117,7 @@
 		8A309F739E837A412F349225 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunner.swift; sourceTree = "<group>"; };
 		95F02CBBBFA3C3762648611A /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
+		58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifications.swift; sourceTree = "<group>"; };
 		9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskFileStore.swift; sourceTree = "<group>"; };
 		A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfPaths.swift; sourceTree = "<group>"; };
 		B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
@@ -182,6 +186,7 @@
 				F19C16B1A2D66E6ADB4369D5 /* Stores */,
 				E82438840CFE17DD137ADE98 /* TaskModel */,
 				F6226F0603F6D918BC8F753B /* Templates */,
+				58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */,
 			);
 			name = Core;
 			path = Core;
@@ -370,6 +375,7 @@
 			isa = PBXGroup;
 			children = (
 				1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */,
+				D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -471,6 +477,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7FE2E75D771240E63D659373 /* SchedulerServiceController.swift in Sources */,
+				A09B0D8767ECFDA952E94CD2 /* SchedulePreferencesStore.swift in Sources */,
 				D36C51B16C86814E41528E06 /* ContentView.swift in Sources */,
 				65600F1E6741465ABD4FC410 /* EmptyStateView.swift in Sources */,
 				471D3BCC49DE948E3E03FB78 /* NewTaskSheet.swift in Sources */,
@@ -490,6 +497,7 @@
 				3617EAE8ECADA8A1C066D1AE /* RunShelfPaths.swift in Sources */,
 				2171A4214633546CDC7CBEA0 /* TaskFileStore.swift in Sources */,
 				9E52291B91611A54074EE23D /* TaskStore.swift in Sources */,
+				33D3C719BFFC5988883B078A /* RunShelfNotifications.swift in Sources */,
 				E8EFA37ECFFDE0BE1205819C /* TaskModels.swift in Sources */,
 				E7B4121D39D3E7B573309C9A /* TaskTemplate.swift in Sources */,
 				F7CF61906FDDE3DA9443A559 /* ShellScriptEditor.swift in Sources */,
@@ -542,7 +550,7 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.scheduler;
 				PRODUCT_NAME = RunShelfScheduler;
 				SDKROOT = macosx;
@@ -596,7 +604,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -617,7 +625,7 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.scheduler;
 				PRODUCT_NAME = RunShelfScheduler;
 				SDKROOT = macosx;
@@ -677,7 +685,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -705,7 +713,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
 				PRODUCT_NAME = "Run Shelf";
 				SDKROOT = macosx;
@@ -729,7 +737,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
 				PRODUCT_NAME = "Run Shelf";
 				SDKROOT = macosx;

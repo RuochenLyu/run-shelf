@@ -3,13 +3,17 @@ import SwiftUI
 struct TaskHeaderView: View {
     @ObservedObject var store: TaskStore
     var task: RunShelfTask
+    var titleLeadingInset: CGFloat = 0
 
     @State private var isShowingEditSheet = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             titleRow
-            descriptionRow
+                .frame(height: 50, alignment: .center)
+            if hasDescription {
+                descriptionRow
+            }
             statusRow
 
             let risks = DangerousCommandScanner.scan(task.script)
@@ -18,22 +22,26 @@ struct TaskHeaderView: View {
                     .padding(.top, 4)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.leading, 24 + titleLeadingInset)
+        .padding(.trailing, 24)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(nil, value: titleLeadingInset)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
         .sheet(isPresented: $isShowingEditSheet) {
             TaskEditSheet(store: store, task: task)
         }
     }
 
     private var titleRow: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 8) {
             Text(displayName)
-                .font(.title2.weight(.semibold))
+                .font(.title3.weight(.semibold))
                 .lineLimit(1)
 
-            taskMenu
+            moreMenu
 
             if task.isDirty {
                 dirtyBadge
@@ -41,38 +49,53 @@ struct TaskHeaderView: View {
 
             Spacer()
 
-            HStack(spacing: 8) {
+            Toggle(isOn: enabledBinding) {
                 Text("启用")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                Toggle("", isOn: enabledBinding)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .labelsHidden()
             }
+            .toggleStyle(.switch)
+            .controlSize(.small)
         }
     }
 
     private var descriptionRow: some View {
-        Text(descriptionDisplay)
+        Text(task.manifest.description)
             .font(.callout)
-            .foregroundStyle(hasDescription ? .secondary : .tertiary)
+            .foregroundStyle(.secondary)
             .lineLimit(2)
     }
 
     private var statusRow: some View {
         HStack(spacing: 10) {
-            statusChip
-            divider
+            if let startedAt = store.runningStartedAt[task.id] {
+                runningChip(startedAt: startedAt)
+                divider
+            } else if let chip = abnormalStatusChip {
+                chip
+                divider
+            }
             Label(scheduleSummary, systemImage: "calendar")
+                .font(.callout)
+                .foregroundStyle(.secondary)
             divider
             Label(nextRunText, systemImage: "arrow.right.circle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
             Spacer()
         }
-        .font(.callout)
-        .foregroundStyle(.secondary)
         .labelStyle(.titleAndIcon)
         .lineLimit(1)
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { store.task(withID: task.id)?.manifest.enabled ?? false },
+            set: { value in
+                store.updateTask(id: task.id) { task in
+                    task.manifest.enabled = value
+                }
+            }
+        )
     }
 
     private var divider: some View {
@@ -80,7 +103,78 @@ struct TaskHeaderView: View {
             .foregroundStyle(.tertiary)
     }
 
-    private var taskMenu: some View {
+    private func runningChip(startedAt: Date) -> some View {
+        HStack(spacing: 4) {
+            ProgressView()
+                .controlSize(.mini)
+            Text("运行中")
+            Text("·")
+                .foregroundStyle(.tertiary)
+            RunningDurationText(startedAt: startedAt)
+                .monospacedDigit()
+        }
+        .font(.callout)
+        .foregroundStyle(.blue)
+    }
+
+    private var abnormalStatusChip: AnyView? {
+        guard let status = abnormalStatus() else { return nil }
+        return AnyView(
+            Label(status.text, systemImage: status.symbol)
+                .font(.callout)
+                .foregroundStyle(status.color)
+                .labelStyle(.titleAndIcon)
+        )
+    }
+
+    private var scheduleSummary: String {
+        (try? CronSchedule.parse(task.manifest.schedule.expression).summary) ?? task.manifest.schedule.expression
+    }
+
+    private var nextRunText: String {
+        guard task.manifest.enabled else { return "已停用" }
+        guard let schedule = try? CronSchedule.parse(task.manifest.schedule.expression) else {
+            return "表达式无效"
+        }
+        let dates = try? schedule.nextRuns(count: 1)
+        guard let date = dates?.first else { return "暂无" }
+        return "\(RunShelfFormatters.scheduleDateTime(date)) · \(RunShelfFormatters.relativeFuture(date))"
+    }
+
+    private func abnormalStatus() -> (text: String, color: Color, symbol: String)? {
+        if store.runningTaskIDs.contains(task.id) {
+            return nil
+        }
+        if !task.manifest.enabled {
+            return ("已停用", .secondary, "pause.circle.fill")
+        }
+        if let latest = task.latestRun {
+            switch latest.status {
+            case .failed, .timeout:
+                return ("上次\(latest.status.displayName)", .red, latest.status.statusSymbol)
+            case .stale:
+                return ("已过期", .orange, latest.status.statusSymbol)
+            case .skipped:
+                return ("上次跳过", .orange, latest.status.statusSymbol)
+            case .cancelled:
+                return ("上次已取消", .secondary, latest.status.statusSymbol)
+            case .success, .running, .pending:
+                return nil
+            }
+        }
+        return nil
+    }
+
+    private var displayName: String {
+        let name = task.manifest.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "未命名任务" : name
+    }
+
+    private var hasDescription: Bool {
+        !task.manifest.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var moreMenu: some View {
         Menu {
             Button {
                 isShowingEditSheet = true
@@ -93,7 +187,7 @@ struct TaskHeaderView: View {
             Button {
                 store.saveTask(id: task.id)
             } label: {
-                Label("保存更改", systemImage: "square.and.arrow.down")
+                Label("保存更改", systemImage: "checkmark.circle")
             }
             .disabled(!store.canSaveTask(task))
 
@@ -114,7 +208,7 @@ struct TaskHeaderView: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.callout.weight(.semibold))
-                .frame(width: 26, height: 22)
+                .frame(width: 28, height: 22)
                 .contentShape(Rectangle())
         }
         .menuIndicator(.hidden)
@@ -123,89 +217,17 @@ struct TaskHeaderView: View {
         .help("更多")
     }
 
-    private var statusChip: some View {
-        let (text, color, symbol) = currentStatus()
-        return Label(text, systemImage: symbol)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.12), in: Capsule())
-    }
-
     private var dirtyBadge: some View {
         Text("未保存")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.orange)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(.orange.opacity(0.12), in: Capsule())
     }
-
-    private var displayName: String {
-        let name = task.manifest.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名任务" : name
-    }
-
-    private var scheduleSummary: String {
-        (try? CronSchedule.parse(task.manifest.schedule.expression).summary) ?? task.manifest.schedule.expression
-    }
-
-    private var nextRunText: String {
-        guard task.manifest.enabled else { return "已停用" }
-        guard let schedule = try? CronSchedule.parse(task.manifest.schedule.expression) else {
-            return "表达式无效"
-        }
-        let dates = try? schedule.nextRuns(count: 1)
-        guard let date = dates?.first else { return "暂无" }
-        return RunShelfFormatters.scheduleDateTime(date)
-    }
-
-    private func currentStatus() -> (String, Color, String) {
-        if store.runningTaskIDs.contains(task.id) {
-            return ("运行中", .blue, "arrow.triangle.2.circlepath")
-        }
-        if !task.manifest.enabled {
-            return ("已停用", .secondary, "pause.circle.fill")
-        }
-        if let latest = task.latestRun {
-            switch latest.status {
-            case .failed, .timeout:
-                return ("上次\(latest.status.displayName)", .red, latest.status.statusSymbol)
-            case .stale:
-                return ("已过期", .orange, latest.status.statusSymbol)
-            case .skipped:
-                return ("上次跳过", .orange, latest.status.statusSymbol)
-            case .cancelled:
-                return ("上次已取消", .secondary, latest.status.statusSymbol)
-            case .success, .running, .pending:
-                return ("已启用", .green, "circle.fill")
-            }
-        }
-        return ("已启用", .green, "circle.fill")
-    }
-
-    private var hasDescription: Bool {
-        !task.manifest.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var descriptionDisplay: String {
-        hasDescription ? task.manifest.description : "无描述"
-    }
-
-    private var enabledBinding: Binding<Bool> {
-        Binding(
-            get: { store.task(withID: task.id)?.manifest.enabled ?? false },
-            set: { value in
-                store.updateTask(id: task.id) { task in
-                    task.manifest.enabled = value
-                }
-            }
-        )
-    }
 }
 
-private struct TaskEditSheet: View {
+struct TaskEditSheet: View {
     @ObservedObject var store: TaskStore
     @Environment(\.dismiss) private var dismiss
 
@@ -221,38 +243,40 @@ private struct TaskEditSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 0) {
             HStack {
                 Text("编辑任务")
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                 Spacer()
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 18)
+            .padding(.bottom, 4)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("名称")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                TextField("任务名称", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("描述")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                TextEditor(text: $description)
-                    .font(.callout)
-                    .scrollContentBackground(.hidden)
-                    .frame(height: 92)
-                    .padding(6)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.7))
+            Form {
+                Section {
+                    LabeledContent {
+                        TextField("", text: $name, prompt: Text("任务名称"))
+                            .textFieldStyle(.plain)
+                            .multilineTextAlignment(.trailing)
+                    } label: {
+                        Text("名称")
                     }
-            }
 
-            HStack {
+                    LabeledContent {
+                        TextField("", text: $description, prompt: Text("无"), axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(1...4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } label: {
+                        Text("描述")
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            HStack(spacing: 10) {
                 Spacer()
                 Button("取消") {
                     dismiss()
@@ -267,9 +291,10 @@ private struct TaskEditSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
         }
-        .padding(24)
-        .frame(width: 460)
+        .frame(width: 460, height: 320)
     }
 
     private func commit() {

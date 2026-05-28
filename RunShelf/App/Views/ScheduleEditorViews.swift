@@ -41,15 +41,17 @@ enum ScheduleDraftError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidTime(let text):
-            return "`\(text)` 不是有效的 HH:mm 时间。"
+            return "「\(text)」不是合法的 HH:mm 时间"
         case .dailyTimesNeedSameMinute:
-            return "每天多次运行目前要求分钟相同，例如 08:00, 12:00, 18:00。"
+            return "一天多次运行时，每个时间的分钟数得一样，比如 08:00, 12:00, 18:00"
         }
     }
 }
 
 struct ScheduleEditorView: View {
     @Binding var expression: String
+    var initialMode: ScheduleMode? = nil
+    var onModeChange: ((ScheduleMode) -> Void)? = nil
     var onValidityChange: (Bool) -> Void = { _ in }
 
     @State private var mode: ScheduleMode = .advanced
@@ -61,10 +63,9 @@ struct ScheduleEditorView: View {
     @State private var intervalValue = 15
     @State private var validationMessage: String?
     @State private var lastEcho: String?
+    @State private var hasInitialized = false
 
-    private let labelWidth: CGFloat = 56
-
-    private let weekdays = [
+    private let weekdays: [(Int, String)] = [
         (0, "周日"),
         (1, "周一"),
         (2, "周二"),
@@ -75,169 +76,209 @@ struct ScheduleEditorView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ScheduleModeSwitcher(selection: $mode)
-                .onChange(of: mode) { _ in
-                    applyIfSimple()
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            ScheduleModePicker(selection: userPickedMode)
 
-            settingsGroup {
-                if mode != .advanced {
-                    simpleControls
-                } else {
-                    advancedField
-                }
-            }
+            modeFields
 
             if let validationMessage {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Spacer()
-                        .frame(width: labelWidth)
-                    Label(validationMessage, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
+                Label(validationMessage, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
-        .onAppear { syncDraft(from: expression) }
-        .onChange(of: expression) { newValue in
-            // Skip if this change was just our own write
+        .onAppear {
+            guard !hasInitialized else { return }
+            hasInitialized = true
+            if let pinned = initialMode {
+                // 用户之前选过 tab，按用户的选择来；只读表达式同步子字段，不再推断 tab
+                // 这里是程序性赋值，不走 userPickedMode 的 setter，所以不会触发 applyIfSimple
+                mode = pinned
+                loadSubFields(from: expression)
+            } else {
+                // 没有保存过偏好，按表达式推断一次 tab
+                syncDraft(from: expression)
+            }
+        }
+        .onChange(of: expression) { _, newValue in
             if let echo = lastEcho, echo == newValue {
                 lastEcho = nil
                 return
             }
-            syncDraft(from: newValue)
-        }
-        .onChange(of: intervalUnit) { _ in
-            if !validIntervals.contains(intervalValue), let first = validIntervals.first {
-                intervalValue = first
+            // 表达式外部变化（例如切到别的任务）：
+            //  - 用户对当前任务有 pinned mode 时尊重它，只重新同步子字段
+            //  - 否则推断 mode
+            if initialMode != nil {
+                loadSubFields(from: newValue)
+            } else {
+                syncDraft(from: newValue)
             }
-            applyIfSimple()
         }
-        .onChange(of: intervalValue) { _ in applyIfSimple() }
-        .onChange(of: weeklyWeekday) { _ in applyIfSimple() }
-        .onChange(of: monthlyDay) { _ in applyIfSimple() }
-        .onChange(of: dailyTimes) { _ in applyIfSimple() }
-        .onChange(of: timeText) { _ in applyIfSimple() }
     }
 
     @ViewBuilder
-    private var simpleControls: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            switch mode {
-            case .daily:
-                fieldRow("时间") {
-                    TextField("时间", text: $dailyTimes, prompt: Text("09:00, 12:00, 18:00"))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .labelsHidden()
-                        .frame(maxWidth: .infinity)
-                }
-            case .weekly:
-                fieldRow("星期") {
-                    Picker("星期", selection: $weeklyWeekday) {
-                        ForEach(weekdays, id: \.0) { value, name in
-                            Text(name).tag(value)
-                        }
-                    }
-                    .controlSize(.small)
+    private var modeFields: some View {
+        switch mode {
+        case .daily:
+            ScheduleEditorRow("时间") {
+                TextField("", text: userDailyTimes, prompt: Text("09:00, 12:00, 18:00"))
+                    .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                SettingsDivider()
-                fieldRow("时间") {
-                    TextField("时间", text: $timeText, prompt: Text("09:00"))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .labelsHidden()
-                        .frame(maxWidth: .infinity)
-                }
-            case .monthly:
-                fieldRow("日期") {
-                    Stepper(value: $monthlyDay, in: 1...31) {
-                        Text("每月 \(monthlyDay) 日")
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity)
+            }
+        case .weekly:
+            ScheduleEditorRow("星期") {
+                Picker("", selection: userWeeklyWeekday) {
+                    ForEach(weekdays, id: \.0) { value, name in
+                        Text(name).tag(value)
                     }
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                SettingsDivider()
-                fieldRow("时间") {
-                    TextField("时间", text: $timeText, prompt: Text("09:00"))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .labelsHidden()
-                        .frame(maxWidth: .infinity)
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            }
+            ScheduleEditorRow("时间") {
+                TextField("", text: userTimeText, prompt: Text("09:00"))
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity)
+            }
+        case .monthly:
+            ScheduleEditorRow("日期") {
+                Picker("", selection: userMonthlyDay) {
+                    ForEach(1...31, id: \.self) { day in
+                        Text("\(day) 日").tag(day)
+                    }
                 }
-            case .interval:
-                fieldRow("间隔") {
-                    Picker("每", selection: $intervalValue) {
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            }
+            ScheduleEditorRow("时间") {
+                TextField("", text: userTimeText, prompt: Text("09:00"))
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity)
+            }
+        case .interval:
+            ScheduleEditorRow("每隔") {
+                HStack(spacing: 8) {
+                    Picker("", selection: userIntervalValue) {
                         ForEach(validIntervals, id: \.self) { value in
                             Text("\(value)").tag(value)
                         }
                     }
-                    .controlSize(.small)
+                    .pickerStyle(.menu)
                     .labelsHidden()
-                    .frame(width: 82)
+                    .fixedSize()
 
-                    Picker("单位", selection: $intervalUnit) {
+                    Picker("", selection: userIntervalUnit) {
                         ForEach(ScheduleIntervalUnit.allCases) { unit in
                             Text(unit.displayName).tag(unit)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
+                    .pickerStyle(.menu)
                     .labelsHidden()
-                    .frame(maxWidth: .infinity)
+                    .fixedSize()
                 }
-            case .advanced:
-                EmptyView()
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-
-            SettingsDivider()
-            fieldRow("Cron") {
-                Text(simpleCronText)
-                    .font(.system(.callout, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func fieldRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            Text(label)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(width: labelWidth, alignment: .leading)
-            content()
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 38)
-    }
-
-    private var advancedField: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            fieldRow("Cron") {
-                TextField("Cron", text: advancedExpressionBinding, prompt: Text("0 9 * * *"))
+        case .advanced:
+            ScheduleEditorRow("表达式") {
+                TextField("", text: advancedExpressionBinding, prompt: Text("0 9 * * *"))
                     .font(.system(.callout, design: .monospaced))
                     .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
                     .labelsHidden()
+                    .multilineTextAlignment(.trailing)
                     .frame(maxWidth: .infinity)
             }
-
-            Link("参考 crontab.guru", destination: URL(string: "https://crontab.guru/")!)
-                .font(.caption)
-                .padding(.leading, labelWidth + 22)
-                .padding(.bottom, 10)
         }
     }
 
-    private var simpleCronText: String {
-        validationMessage == nil ? expression : "修正输入后生成"
+    // Picker 专用 binding：只有用户主动点 tab 才走 setter，
+    // 这样 applyIfSimple 和 onModeChange 不会在 onAppear / syncDraft 这种程序性 mode 赋值时被触发。
+    private var userPickedMode: Binding<ScheduleMode> {
+        Binding(
+            get: { mode },
+            set: { newMode in
+                guard newMode != mode else { return }
+                mode = newMode
+                applyIfSimple()
+                onModeChange?(newMode)
+            }
+        )
+    }
+
+    private var userDailyTimes: Binding<String> {
+        Binding(
+            get: { dailyTimes },
+            set: { newValue in
+                guard dailyTimes != newValue else { return }
+                dailyTimes = newValue
+                applyIfSimple()
+            }
+        )
+    }
+
+    private var userTimeText: Binding<String> {
+        Binding(
+            get: { timeText },
+            set: { newValue in
+                guard timeText != newValue else { return }
+                timeText = newValue
+                applyIfSimple()
+            }
+        )
+    }
+
+    private var userWeeklyWeekday: Binding<Int> {
+        Binding(
+            get: { weeklyWeekday },
+            set: { newValue in
+                guard weeklyWeekday != newValue else { return }
+                weeklyWeekday = newValue
+                applyIfSimple()
+            }
+        )
+    }
+
+    private var userMonthlyDay: Binding<Int> {
+        Binding(
+            get: { monthlyDay },
+            set: { newValue in
+                guard monthlyDay != newValue else { return }
+                monthlyDay = newValue
+                applyIfSimple()
+            }
+        )
+    }
+
+    private var userIntervalValue: Binding<Int> {
+        Binding(
+            get: { intervalValue },
+            set: { newValue in
+                guard intervalValue != newValue else { return }
+                intervalValue = newValue
+                applyIfSimple()
+            }
+        )
+    }
+
+    private var userIntervalUnit: Binding<ScheduleIntervalUnit> {
+        Binding(
+            get: { intervalUnit },
+            set: { newValue in
+                guard intervalUnit != newValue else { return }
+                intervalUnit = newValue
+                if !validIntervals.contains(intervalValue), let first = validIntervals.first {
+                    intervalValue = first
+                }
+                applyIfSimple()
+            }
+        )
     }
 
     private var advancedExpressionBinding: Binding<String> {
@@ -251,12 +292,6 @@ struct ScheduleEditorView: View {
                 validateAdvancedExpression(newValue)
             }
         )
-    }
-
-    @ViewBuilder
-    private func settingsGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var validIntervals: [Int] {
@@ -283,6 +318,10 @@ struct ScheduleEditorView: View {
             onValidityChange(true)
         } catch {
             validationMessage = error.localizedDescription
+            if !expression.isEmpty {
+                lastEcho = ""
+                expression = ""
+            }
             onValidityChange(false)
         }
     }
@@ -339,8 +378,55 @@ struct ScheduleEditorView: View {
         return (hour, minute)
     }
 
+    // 已经知道用户选的 tab 时（pinned mode），只按当前 mode 读子字段，不再推断 mode。
+    private func loadSubFields(from expression: String) {
+        validationMessage = nil
+        if expression.isEmpty { return }
+
+        guard let schedule = try? CronSchedule.parse(expression) else {
+            if mode == .advanced { validateAdvancedExpression(expression) }
+            return
+        }
+        onValidityChange(true)
+
+        switch mode {
+        case .daily:
+            if schedule.minutes.values.count == 1, let minute = schedule.minutes.values.first {
+                dailyTimes = schedule.hours.values.sorted()
+                    .map { String(format: "%02d:%02d", $0, minute) }
+                    .joined(separator: ", ")
+            }
+        case .weekly:
+            if let weekday = schedule.daysOfWeek.values.first,
+               let minute = schedule.minutes.values.first,
+               let hour = schedule.hours.values.first {
+                weeklyWeekday = weekday
+                timeText = String(format: "%02d:%02d", hour, minute)
+            }
+        case .monthly:
+            if let day = schedule.daysOfMonth.values.first,
+               let minute = schedule.minutes.values.first,
+               let hour = schedule.hours.values.first {
+                monthlyDay = day
+                timeText = String(format: "%02d:%02d", hour, minute)
+            }
+        case .interval:
+            if let m = stepValue(from: expression, prefix: "*/", suffix: " * * * *", allowed: [1,2,3,4,5,6,10,12,15,20,30]) {
+                intervalUnit = .minutes
+                intervalValue = m
+            } else if let h = stepValue(from: expression, prefix: "0 */", suffix: " * * *", allowed: [1,2,3,4,6,8,12]) {
+                intervalUnit = .hours
+                intervalValue = h
+            }
+        case .advanced:
+            validateAdvancedExpression(expression)
+        }
+    }
+
     private func syncDraft(from expression: String) {
         validationMessage = nil
+
+        if expression.isEmpty { return }
 
         guard let schedule = try? CronSchedule.parse(expression) else {
             mode = .advanced
@@ -407,7 +493,6 @@ struct ScheduleEditorView: View {
         }
 
         mode = .advanced
-        onValidityChange(true)
     }
 
     private func validateAdvancedExpression(_ expression: String) {
@@ -431,80 +516,68 @@ struct ScheduleEditorView: View {
     }
 }
 
-private struct SettingsDivider: View {
-    var body: some View {
-        Divider()
-            .padding(.leading, 68)
-    }
-}
-
-private struct ScheduleModeSwitcher: View {
-    @Binding var selection: ScheduleMode
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(ScheduleMode.allCases) { mode in
-                Button {
-                    selection = mode
-                } label: {
-                    Text(mode.displayName)
-                        .font(.callout.weight(selection == mode ? .semibold : .regular))
-                        .foregroundStyle(selection == mode ? .white : .primary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background {
-                    if selection == mode {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.accentColor)
-                    }
-                }
-            }
-        }
-        .padding(2)
-        .frame(maxWidth: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.3))
-        }
-    }
-}
-
 struct CronPreviewView: View {
     var expression: String
-    var nextRunCount = 5
+    var nextRunCount = 3
 
     var body: some View {
         switch CronSchedule.validate(expression) {
         case .success(let schedule):
-            VStack(alignment: .leading, spacing: 6) {
-                Label(schedule.summary, systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-
-                Text("接下来 \(nextRunCount) 次")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-
-                ForEach(nextRuns(for: schedule), id: \.self) { date in
-                    Text(RunShelfFormatters.scheduleDateTime(date))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+            ScheduleEditorRow("接下来") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    let runs = nextRuns(for: schedule)
+                    if runs.isEmpty {
+                        Text("暂无")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(runs, id: \.self) { date in
+                            Text(RunShelfFormatters.scheduleDateTime(date))
+                                .font(.callout.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
-        case .failure(let error):
-            if !expression.isEmpty {
-                Label(error.localizedDescription, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+        case .failure:
+            EmptyView()
         }
     }
 
     private func nextRuns(for schedule: CronSchedule) -> [Date] {
         (try? schedule.nextRuns(count: nextRunCount)) ?? []
+    }
+}
+
+private struct ScheduleModePicker: View {
+    @Binding var selection: ScheduleMode
+
+    var body: some View {
+        Picker("", selection: $selection) {
+            ForEach(ScheduleMode.allCases) { item in
+                Text(item.displayName).tag(item)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct ScheduleEditorRow<Content: View>: View {
+    private let title: String
+    private let content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        LabeledContent {
+            content
+        } label: {
+            Text(title)
+        }
     }
 }
