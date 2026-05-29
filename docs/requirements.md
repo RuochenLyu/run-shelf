@@ -975,7 +975,9 @@ com.aix4u.runshelf.scheduler
 
 ### 15.3 后台调度进程注册
 
-Run Shelf 最低支持 macOS 14。后台调度进程使用 `SMAppService` 管理 app 的 helper / Login Item；Apple 文档说明 macOS 13+ 可用 `SMAppService` 注册和控制 LoginItems、LaunchAgents、LaunchDaemons。([Apple Developer][2])
+Run Shelf 首版最低支持 macOS 15。后台调度进程使用 `SMAppService` 管理 app 的 helper / Login Item；Apple 文档说明 macOS 13+ 可用 `SMAppService` 注册和控制 LoginItems、LaunchAgents、LaunchDaemons。([Apple Developer][2])
+
+macOS 26 上使用系统自动提供的新视觉表现；macOS 15/16 保持同一套核心功能，不为首版单独仿制 macOS 26 视觉效果。
 
 ### 15.4 常驻模型
 
@@ -1640,7 +1642,7 @@ Task = Schedule + run.sh + Runner History
 Task = 一堆表单字段
 ```
 
-[1]: https://developer.apple.com/documentation/appkit/nstextview?utm_source=chatgpt.com "NSTextView | Apple Developer Documentation"
-[2]: https://developer.apple.com/documentation/servicemanagement/smappservice?utm_source=chatgpt.com "SMAppService | Apple Developer Documentation"
-[3]: https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog?utm_source=chatgpt.com "Localizing and varying text with a string catalog"
+[1]: https://developer.apple.com/documentation/appkit/nstextview "NSTextView | Apple Developer Documentation"
+[2]: https://developer.apple.com/documentation/servicemanagement/smappservice "SMAppService | Apple Developer Documentation"
+[3]: https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog "Localizing and varying text with a string catalog"
 [4]: https://crontab.guru/ "Crontab.guru"

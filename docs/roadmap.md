@@ -70,17 +70,17 @@ SMAppService 约束会影响最低系统版本、签名、helper target 和调�
 默认决策：
 
 ```text
-最低支持 macOS 14
+最低支持 macOS 15
 开发使用当前稳定版 Xcode
-P0 不兼容 macOS 12 及以下
+P0 不兼容 macOS 14 及以下
 ```
 
 原因：
 
 ```text
-降低后台调度进程注册复杂度
-避免为旧系统增加 LaunchAgent 兼容层
-符合 P0 不做系统级 LaunchDaemon 的边界
+保留 SMAppService / MenuBarExtra / SwiftUI 原生控件的稳定路径
+让 macOS 26 自动呈现系统新视觉，同时允许 macOS 15+ 使用同一套核心功能
+避免为更旧系统增加 LaunchAgent 兼容层
 ```
 
 ### 2.2 App 沙盒、签名与发布方式

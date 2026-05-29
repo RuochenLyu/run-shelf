@@ -37,6 +37,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "FC9760B0A561F45C562DDFE7"
+               BuildableName = "RunShelfTests.xctest"
+               BlueprintName = "RunShelfTests"
+               ReferencedContainer = "container:RunShelf.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

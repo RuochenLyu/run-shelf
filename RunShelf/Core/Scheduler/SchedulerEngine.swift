@@ -24,6 +24,7 @@ final class SchedulerEngine {
     private let queue = DispatchQueue(label: "com.aix4u.runshelf.scheduler")
     private let fileManager: FileManager
     private let taskFileStore: TaskFileStore
+    private let appSupportDirectoryURL: URL
     private let stateURL: URL
     private let heartbeatURL: URL
     private let logURL: URL
@@ -32,12 +33,14 @@ final class SchedulerEngine {
 
     init(
         taskFileStore: TaskFileStore = TaskFileStore(),
+        appSupportDirectoryURL: URL = RunShelfPaths.appSupportDirectoryURL(),
         stateURL: URL = RunShelfPaths.schedulerStateURL(),
         heartbeatURL: URL = RunShelfPaths.schedulerHeartbeatURL(),
         logURL: URL = RunShelfPaths.schedulerLogURL(),
         fileManager: FileManager = .default
     ) {
         self.taskFileStore = taskFileStore
+        self.appSupportDirectoryURL = appSupportDirectoryURL
         self.stateURL = stateURL
         self.heartbeatURL = heartbeatURL
         self.logURL = logURL
@@ -52,7 +55,7 @@ final class SchedulerEngine {
 
     private func performTick(now: Date) {
         do {
-            try fileManager.createDirectory(at: RunShelfPaths.appSupportDirectoryURL(), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: appSupportDirectoryURL, withIntermediateDirectories: true)
 
             var state = loadState()
             let loadResult = try taskFileStore.loadTasksWithIssues(includeRuns: false)

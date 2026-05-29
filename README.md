@@ -1,26 +1,51 @@
 # Run Shelf
 
-Run Shelf 是一个简洁的 macOS 定时 Shell 脚本管理工具，用来创建、运行、查看和调试本地自动化脚本。
+Run Shelf is a local-first macOS app for creating, scheduling, running, and inspecting Shell automation tasks.
 
-当前实现覆盖 P0-A/P0-B 主链路：主 App、文件任务模型、模板、Shell 编辑器、简单计划生成 Cron、Cron 预览、立即运行、日志历史、后台调度进程、失败通知入口和保留清理。
+It is designed for personal developer workflows: recurring scripts, local health checks, maintenance jobs, and small automation snippets that should stay readable on disk.
 
-## 构建
+## Features
 
-要求：
+- File-based task model: each task is a folder with `task.json`, `run.sh`, `notes.md`, and run history.
+- Built-in task templates for common local automation jobs.
+- Native Shell editor with lightweight syntax highlighting and dangerous-command warnings.
+- Manual runs with stdout/stderr history, script snapshots, exit status, timeout handling, and cancellation.
+- Five-field cron schedules with preview and missed-run handling.
+- Background scheduler helper managed through `SMAppService`.
+- Failure notifications and retention cleanup.
+- Local-first storage. Run Shelf does not upload task definitions, scripts, logs, or run history.
+
+## Requirements
 
 ```text
-macOS 13+
-Xcode 26+
-Ruby xcodeproj gem
+macOS 15 or later
+Xcode 26 or later for source builds
+Ruby + xcodeproj gem for regenerating the Xcode project
 ```
 
-生成 Xcode project：
+Run Shelf targets macOS 15+. On macOS 26, the app uses the system's current native visual treatment where available. macOS 15 and 16 keep the same core functionality with the native controls available on those systems.
+
+## Install
+
+Download the latest release from GitHub, unzip `RunShelf-<version>-macOS15.zip`, and move `Run Shelf.app` to `/Applications`.
+
+The background scheduler is optional. Enable it inside the app settings after first launch.
+
+## Build From Source
+
+Install the project generator dependency:
+
+```bash
+gem install xcodeproj
+```
+
+Regenerate the Xcode project when files are added or removed:
 
 ```bash
 ruby scripts/generate_xcodeproj.rb
 ```
 
-命令行构建：
+Build from the command line:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -32,21 +57,54 @@ xcodebuild -project RunShelf.xcodeproj \
   build
 ```
 
-启动调试版：
+Run tests:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild test \
+  -project RunShelf.xcodeproj \
+  -scheme RunShelf \
+  -configuration Debug \
+  -derivedDataPath .build/TestDerivedData \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+Launch a local debug build:
 
 ```bash
 open ".build/DerivedData/Build/Products/Debug/Run Shelf.app"
 ```
 
-## 数据目录
+## Release Builds
 
-任务文件默认写入：
+Release packaging requires a local Developer ID Application certificate:
+
+```bash
+RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+scripts/package_release.sh 1.0.0
+```
+
+To notarize the zip, provide a notarytool keychain profile:
+
+```bash
+RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
+scripts/package_release.sh 1.0.0
+```
+
+Release artifacts are written to `.build/release/RunShelf-<version>/`.
+
+See [docs/release.md](docs/release.md) for the full release checklist.
+
+## Data Layout
+
+Task data is stored under:
 
 ```text
 ~/Library/Application Support/Run Shelf/tasks/
 ```
 
-后台调度状态写入：
+Scheduler state is stored under:
 
 ```text
 ~/Library/Application Support/Run Shelf/scheduler-state.json
@@ -54,9 +112,7 @@ open ".build/DerivedData/Build/Products/Debug/Run Shelf.app"
 ~/Library/Application Support/Run Shelf/scheduler.log
 ```
 
-设置页会展示任务存储目录，并可调整新建任务使用的默认日志保留天数和最大运行记录数。
-
-每个任务目录包含：
+Each task directory contains:
 
 ```text
 task.json
@@ -68,25 +124,28 @@ runs/<run-id>/stderr.log
 runs/<run-id>/run.sh.snapshot
 ```
 
-## 后台调度
+## Background Scheduler
 
-主 App 构建时会把 `RunShelfScheduler` helper 嵌入：
+The app embeds a helper executable:
 
 ```text
 Run Shelf.app/Contents/Library/Helpers/RunShelfScheduler
 ```
 
-同时把 SMAppService LaunchAgent plist 嵌入：
+It also embeds the `SMAppService` LaunchAgent plist:
 
 ```text
 Run Shelf.app/Contents/Library/LaunchAgents/com.aix4u.runshelf.scheduler.plist
 ```
 
-App 设置页通过 `SMAppService.agent(plistName:)` 启动/停止后台调度进程。后台调度进程每 30 秒检查一次任务，每分钟粒度匹配 5 段 Cron；错过运行在默认 30 分钟窗口内补跑，超过窗口记录为 `stale`。
+When enabled, the scheduler checks tasks every 30 seconds, matches five-field cron expressions at minute granularity, records stale runs that missed their allowed delay window, and writes heartbeat state for the app to inspect.
 
-调度 smoke test 可使用独立数据目录，避免污染真实任务：
+## Project Docs
 
-```bash
-RUN_SHELF_APP_SUPPORT_DIR=/tmp/run-shelf-smoke \
-  ".build/DerivedData/Build/Products/Debug/RunShelfScheduler"
-```
+- [docs/requirements.md](docs/requirements.md): product and implementation requirements.
+- [docs/roadmap.md](docs/roadmap.md): development roadmap and deferred work.
+- [docs/release.md](docs/release.md): release checklist and packaging flow.
+
+## License
+
+Run Shelf is released under the MIT License. See [LICENSE](LICENSE).

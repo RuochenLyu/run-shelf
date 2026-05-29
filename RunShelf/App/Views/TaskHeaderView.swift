@@ -112,6 +112,14 @@ struct TaskHeaderView: View {
                 .foregroundStyle(.tertiary)
             RunningDurationText(startedAt: startedAt)
                 .monospacedDigit()
+            Button {
+                store.cancelTask(id: task.id)
+            } label: {
+                Image(systemName: "stop.fill")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("停止运行")
         }
         .font(.callout)
         .foregroundStyle(.blue)

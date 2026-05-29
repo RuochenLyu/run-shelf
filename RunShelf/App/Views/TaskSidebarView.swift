@@ -32,6 +32,13 @@ struct TaskSidebarView: View {
         }
         .disabled(!store.canRunTask(task))
 
+        Button(role: .destructive) {
+            store.cancelTask(id: task.id)
+        } label: {
+            Label("停止运行", systemImage: "stop.fill")
+        }
+        .disabled(!store.runningTaskIDs.contains(task.id))
+
         Button {
             editingTaskID = task.id
         } label: {

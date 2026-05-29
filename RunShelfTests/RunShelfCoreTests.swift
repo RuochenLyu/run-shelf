@@ -1,0 +1,320 @@
+import Darwin
+import Foundation
+import XCTest
+
+final class RunShelfCoreTests: XCTestCase {
+    private var temporaryDirectories: [URL] = []
+
+    override func tearDownWithError() throws {
+        let fileManager = FileManager.default
+        for url in temporaryDirectories {
+            try? fileManager.removeItem(at: url)
+        }
+        temporaryDirectories.removeAll()
+        try super.tearDownWithError()
+    }
+
+    func testCronUsesOrSemanticsWhenDayOfMonthAndWeekdayAreBothRestricted() throws {
+        let schedule = try CronSchedule.parse("0 9 1 * 1")
+        let firstOfMonth = try makeDate(year: 2026, month: 1, day: 1, hour: 9, minute: 0)
+        let monday = try makeDate(year: 2026, month: 1, day: 5, hour: 9, minute: 0)
+        let unrelatedDay = try makeDate(year: 2026, month: 1, day: 6, hour: 9, minute: 0)
+
+        XCTAssertTrue(schedule.matches(firstOfMonth, calendar: gregorianCalendar()))
+        XCTAssertTrue(schedule.matches(monday, calendar: gregorianCalendar()))
+        XCTAssertFalse(schedule.matches(unrelatedDay, calendar: gregorianCalendar()))
+    }
+
+    func testTaskFileStoreLoadsValidTasksAndReportsBrokenDirectories() throws {
+        let root = try makeTemporaryDirectory()
+        try writeTaskDirectory(
+            root: root,
+            id: "valid-task",
+            name: "Valid",
+            enabled: true,
+            scheduleExpression: "*/15 * * * *",
+            script: "#!/bin/zsh\necho ok\n"
+        )
+
+        let brokenURL = root.appendingPathComponent("broken-task", isDirectory: true)
+        try FileManager.default.createDirectory(at: brokenURL, withIntermediateDirectories: true)
+        try "{ broken".write(to: brokenURL.appendingPathComponent("task.json"), atomically: true, encoding: .utf8)
+        try "#!/bin/zsh\n".write(to: brokenURL.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
+
+        let futureURL = root.appendingPathComponent("future-task", isDirectory: true)
+        try writeTaskDirectory(
+            root: root,
+            id: "future-task",
+            name: "Future",
+            enabled: false,
+            scheduleExpression: "0 9 * * *",
+            script: "#!/bin/zsh\necho future\n",
+            schemaVersion: 99
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: futureURL.path))
+
+        let result = try TaskFileStore(tasksDirectoryURL: root).loadTasksWithIssues(includeRuns: false)
+
+        XCTAssertEqual(result.tasks.map(\.manifest.name), ["Valid"])
+        XCTAssertEqual(result.issues.count, 2)
+        XCTAssertTrue(result.issues.contains { $0.directoryName == "broken-task" })
+        XCTAssertTrue(result.issues.contains { $0.directoryName == "future-task" })
+    }
+
+    func testTaskRunnerTimeoutTerminatesChildProcessGroup() throws {
+        let root = try makeTemporaryDirectory()
+        let markerURL = root.appendingPathComponent("child-survived.txt")
+        let pidURL = root.appendingPathComponent("child.pid")
+        let script = """
+        #!/bin/zsh
+        set -euo pipefail
+        (
+          trap '' TERM HUP
+          sleep 30
+          echo survived > \(markerURL.path)
+        ) &
+        echo $! > \(pidURL.path)
+        wait
+        """
+        let task = try makeTask(root: root, id: "timeout-task", script: script, timeoutSeconds: 1)
+
+        let record = try TaskRunner.run(
+            task: task,
+            trigger: .manual,
+            terminationGraceSeconds: 0.2
+        )
+
+        XCTAssertEqual(record.status, .timeout)
+        XCTAssertEqual(record.message, "超过 1 秒未结束")
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: markerURL.path))
+
+        let childPID = try readPID(at: pidURL)
+        XCTAssertFalse(isProcessAlive(childPID), "timeout should terminate the whole child process group")
+    }
+
+    func testTaskRunnerCancellationWritesCancelledRun() throws {
+        let root = try makeTemporaryDirectory()
+        let task = try makeTask(
+            root: root,
+            id: "cancel-task",
+            script: "#!/bin/zsh\nsleep 30\n",
+            timeoutSeconds: 0
+        )
+        let cancellation = TaskRunCancellation()
+        let finished = expectation(description: "run finishes after cancellation")
+        let lock = NSLock()
+        var result: Result<RunRecord, Error>?
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let runResult = Result {
+                try TaskRunner.run(
+                    task: task,
+                    trigger: .manual,
+                    cancellation: cancellation,
+                    terminationGraceSeconds: 0.2
+                )
+            }
+            lock.withLock {
+                result = runResult
+            }
+            finished.fulfill()
+        }
+
+        Thread.sleep(forTimeInterval: 0.3)
+        cancellation.cancel()
+        wait(for: [finished], timeout: 3)
+
+        let runResult = lock.withLock { result }
+        let record = try XCTUnwrap(runResult?.get())
+        XCTAssertEqual(record.status, .cancelled)
+        XCTAssertEqual(record.message, "用户取消了运行")
+    }
+
+    func testSchedulerWritesStaleRecordForExpiredMissedRun() throws {
+        let appSupportURL = try makeTemporaryDirectory()
+        let tasksURL = appSupportURL.appendingPathComponent("tasks", isDirectory: true)
+        let stateURL = appSupportURL.appendingPathComponent("scheduler-state.json")
+        let heartbeatURL = appSupportURL.appendingPathComponent("scheduler-heartbeat.json")
+        let logURL = appSupportURL.appendingPathComponent("scheduler.log")
+        let now = try makeDate(year: 2026, month: 1, day: 2, hour: 10, minute: 0)
+        let lastCheck = try makeDate(year: 2025, month: 12, day: 31, hour: 0, minute: 0)
+        let scheduledAt = try makeDate(year: 2026, month: 1, day: 1, hour: 9, minute: 0)
+
+        try writeTaskDirectory(
+            root: tasksURL,
+            id: "stale-task",
+            name: "Stale",
+            enabled: true,
+            scheduleExpression: "0 9 1 1 *",
+            script: "#!/bin/zsh\necho should-not-run\n",
+            maxDelaySeconds: 60
+        )
+        try writeSchedulerState(
+            SchedulerState(
+                schemaVersion: 1,
+                lastCheckAt: lastCheck,
+                lastScheduledMinuteByTaskID: [:]
+            ),
+            to: stateURL
+        )
+
+        let engine = SchedulerEngine(
+            taskFileStore: TaskFileStore(tasksDirectoryURL: tasksURL),
+            appSupportDirectoryURL: appSupportURL,
+            stateURL: stateURL,
+            heartbeatURL: heartbeatURL,
+            logURL: logURL
+        )
+
+        engine.tick(now: now)
+        let metaURL = try waitForFirstRunMeta(root: tasksURL.appendingPathComponent("stale-task/runs"))
+        let record = try decodeRunRecord(at: metaURL)
+
+        XCTAssertEqual(record.status, .stale)
+        XCTAssertEqual(record.scheduledAt, scheduledAt)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: heartbeatURL.path))
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RunShelfTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        temporaryDirectories.append(url)
+        return url
+    }
+
+    private func makeTask(root: URL, id: String, script: String, timeoutSeconds: Int) throws -> RunShelfTask {
+        let directoryURL = root.appendingPathComponent(id, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
+        let manifest = TaskManifest(
+            schemaVersion: 1,
+            id: id,
+            name: id,
+            description: "",
+            enabled: true,
+            createdAt: Date(),
+            updatedAt: Date(),
+            schedule: .defaultDaily,
+            runner: TaskRunnerPolicy(
+                concurrency: "skip",
+                timeoutSeconds: timeoutSeconds,
+                missedRunPolicy: .defaultPolicy
+            ),
+            notifications: .defaultPolicy,
+            retention: .defaultPolicy
+        )
+        return RunShelfTask(
+            manifest: manifest,
+            directoryURL: directoryURL,
+            script: script,
+            notes: "",
+            runs: [],
+            isDirty: false
+        )
+    }
+
+    private func writeTaskDirectory(
+        root: URL,
+        id: String,
+        name: String,
+        enabled: Bool,
+        scheduleExpression: String,
+        script: String,
+        schemaVersion: Int = 1,
+        maxDelaySeconds: Int = 1_800
+    ) throws {
+        let directoryURL = root.appendingPathComponent(id, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
+        let manifest = TaskManifest(
+            schemaVersion: schemaVersion,
+            id: id,
+            name: name,
+            description: "",
+            enabled: enabled,
+            createdAt: Date(),
+            updatedAt: Date(),
+            schedule: TaskSchedule(type: "cron", expression: scheduleExpression, timezone: "local"),
+            runner: TaskRunnerPolicy(
+                concurrency: "skip",
+                timeoutSeconds: 0,
+                missedRunPolicy: MissedRunPolicy(type: "skipIfLate", maxDelaySeconds: maxDelaySeconds)
+            ),
+            notifications: .defaultPolicy,
+            retention: .defaultPolicy
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: directoryURL.appendingPathComponent("task.json"), options: [.atomic])
+        try script.write(to: directoryURL.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
+        try "".write(to: directoryURL.appendingPathComponent("notes.md"), atomically: true, encoding: .utf8)
+    }
+
+    private func writeSchedulerState(_ state: SchedulerState, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(state).write(to: url, options: [.atomic])
+    }
+
+    private func waitForFirstRunMeta(root: URL) throws -> URL {
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if let metaURL = findFirstRunMeta(root: root) {
+                return metaURL
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTFail("timed out waiting for run meta under \(root.path)")
+        throw CocoaError(.fileNoSuchFile)
+    }
+
+    private func findFirstRunMeta(root: URL) -> URL? {
+        guard let directories = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ) else {
+            return nil
+        }
+        return directories
+            .map { $0.appendingPathComponent("meta.json") }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    private func decodeRunRecord(at url: URL) throws -> RunRecord {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(RunRecord.self, from: Data(contentsOf: url))
+    }
+
+    private func readPID(at url: URL) throws -> pid_t {
+        let text = try String(contentsOf: url, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return try XCTUnwrap(pid_t(text))
+    }
+
+    private func isProcessAlive(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0
+    }
+
+    private func makeDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) throws -> Date {
+        var components = DateComponents()
+        components.calendar = gregorianCalendar()
+        components.timeZone = .current
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        return try XCTUnwrap(components.date)
+    }
+
+    private func gregorianCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+}

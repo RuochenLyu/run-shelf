@@ -52,6 +52,7 @@ final class TaskStore: ObservableObject {
     private var taskGenerations: [String: Int] = [:]
     private var signatureCache: [String: TaskFileSignature] = [:]
     private var isRefreshingFromDisk = false
+    private var runningCancellations: [String: TaskRunCancellation] = [:]
 
     init(
         tasksDirectoryURL: URL = TaskStore.defaultTasksDirectoryURL(),
@@ -399,15 +400,18 @@ final class TaskStore: ObservableObject {
         }
 
         let task = tasks[index]
+        let cancellation = TaskRunCancellation()
+        runningCancellations[id] = cancellation
         runningTaskIDs.insert(id)
         runningStartedAt[id] = Date()
 
         Task.detached(priority: .userInitiated) {
-            let result = Result { try TaskRunner.run(task: task, trigger: .manual) }
+            let result = Result { try TaskRunner.run(task: task, trigger: .manual, cancellation: cancellation) }
 
             await MainActor.run {
                 self.runningTaskIDs.remove(id)
                 self.runningStartedAt.removeValue(forKey: id)
+                self.runningCancellations.removeValue(forKey: id)
                 switch result {
                 case .success(let run):
                     if run.status == .failed || run.status == .timeout {
@@ -420,6 +424,11 @@ final class TaskStore: ObservableObject {
                 }
             }
         }
+    }
+
+    func cancelTask(id: String) {
+        guard runningTaskIDs.contains(id), let cancellation = runningCancellations[id] else { return }
+        cancellation.cancel()
     }
 
     func setScheduleDraftValidity(taskID: String, isValid: Bool) {

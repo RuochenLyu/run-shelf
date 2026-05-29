@@ -16,8 +16,44 @@ enum TaskRunnerError: LocalizedError {
     }
 }
 
+final class TaskRunCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancellationHandler: (() -> Void)?
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func cancel() {
+        let handler: (() -> Void)?
+        lock.lock()
+        cancelled = true
+        handler = cancellationHandler
+        lock.unlock()
+        handler?()
+    }
+
+    func setCancellationHandler(_ handler: (() -> Void)?) {
+        let shouldCall: Bool
+        lock.lock()
+        cancellationHandler = handler
+        shouldCall = cancelled && handler != nil
+        lock.unlock()
+        if shouldCall {
+            handler?()
+        }
+    }
+}
+
 enum TaskRunner {
-    static func run(task: RunShelfTask, trigger: RunTrigger, scheduledAt: Date? = nil) throws -> RunRecord {
+    static func run(
+        task: RunShelfTask,
+        trigger: RunTrigger,
+        scheduledAt: Date? = nil,
+        cancellation: TaskRunCancellation? = nil,
+        terminationGraceSeconds: TimeInterval = 5
+    ) throws -> RunRecord {
         let fileManager = FileManager.default
         let startedAt = Date()
         let runId = makeRunID(from: startedAt)
@@ -50,51 +86,25 @@ enum TaskRunner {
             try? stderrHandle.close()
         }
 
-        let process = Process()
-        process.executableURL = snapshotURL
-        process.currentDirectoryURL = task.directoryURL
-        process.standardOutput = stdoutHandle
-        process.standardError = stderrHandle
-
-        let semaphore = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in
-            semaphore.signal()
-        }
-
-        do {
-            try process.run()
-        } catch {
-            throw TaskRunnerError.processDidNotStart(error.localizedDescription)
-        }
-
-        var didTimeout = false
-        let timeoutSeconds = task.manifest.runner.timeoutSeconds
-        if timeoutSeconds > 0 {
-            let result = semaphore.wait(timeout: .now() + .seconds(timeoutSeconds))
-            if result == .timedOut {
-                didTimeout = true
-                let timeoutMessage = "\nRun Shelf：超过 \(timeoutSeconds) 秒未结束，正在终止进程。\n"
-                if let data = timeoutMessage.data(using: .utf8) {
-                    stderrHandle.write(data)
-                }
-                process.terminate()
-
-                if semaphore.wait(timeout: .now() + .seconds(5)) == .timedOut {
-                    let killMessage = "Run Shelf：进程收到终止信号后仍未退出，已强制结束。\n"
-                    if let data = killMessage.data(using: .utf8) {
-                        stderrHandle.write(data)
-                    }
-                    kill(process.processIdentifier, SIGKILL)
-                    semaphore.wait()
-                }
-            }
-        } else {
-            semaphore.wait()
-        }
+        let execution = try runSnapshot(
+            snapshotURL: snapshotURL,
+            workingDirectoryURL: task.directoryURL,
+            stdoutHandle: stdoutHandle,
+            stderrHandle: stderrHandle,
+            timeoutSeconds: task.manifest.runner.timeoutSeconds,
+            cancellation: cancellation,
+            terminationGraceSeconds: terminationGraceSeconds
+        )
 
         let endedAt = Date()
-        let exitCode = Int(process.terminationStatus)
-        let status: TaskRunStatus = didTimeout ? .timeout : (exitCode == 0 ? .success : .failed)
+        let status: TaskRunStatus
+        if execution.didTimeout {
+            status = .timeout
+        } else if execution.wasCancelled {
+            status = .cancelled
+        } else {
+            status = execution.exitCode == 0 ? .success : .failed
+        }
         let durationMs = Int(endedAt.timeIntervalSince(startedAt) * 1000)
         let scriptSha256 = try sha256Hex(for: snapshotURL)
 
@@ -103,7 +113,7 @@ enum TaskRunner {
             taskId: task.id,
             trigger: trigger,
             status: status,
-            exitCode: exitCode,
+            exitCode: execution.exitCode,
             scheduledAt: scheduledAt,
             startedAt: startedAt,
             endedAt: endedAt,
@@ -111,7 +121,7 @@ enum TaskRunner {
             scriptSha256: scriptSha256,
             stdoutPath: "stdout.log",
             stderrPath: "stderr.log",
-            message: didTimeout ? "超过 \(timeoutSeconds) 秒未结束" : nil
+            message: execution.message
         )
 
         try write(record: record, to: metaURL)
@@ -183,5 +193,202 @@ enum TaskRunner {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         try encoder.encode(record).write(to: url, options: [.atomic])
+    }
+}
+
+private extension TaskRunner {
+    struct ExecutionResult {
+        var exitCode: Int
+        var didTimeout: Bool
+        var wasCancelled: Bool
+        var message: String?
+    }
+
+    static func runSnapshot(
+        snapshotURL: URL,
+        workingDirectoryURL: URL,
+        stdoutHandle: FileHandle,
+        stderrHandle: FileHandle,
+        timeoutSeconds: Int,
+        cancellation: TaskRunCancellation?,
+        terminationGraceSeconds: TimeInterval
+    ) throws -> ExecutionResult {
+        let pid = try spawnProcessGroup(
+            executableURL: snapshotURL,
+            workingDirectoryURL: workingDirectoryURL,
+            stdoutHandle: stdoutHandle,
+            stderrHandle: stderrHandle
+        )
+        cancellation?.setCancellationHandler {
+            terminateProcessGroup(pid: pid, signal: SIGTERM)
+        }
+        defer {
+            cancellation?.setCancellationHandler(nil)
+        }
+
+        var status: Int32 = 0
+        var didTimeout = false
+        var wasCancelled = false
+        var sentKill = false
+        var terminationRequestedAt: Date?
+        let deadline = timeoutSeconds > 0 ? Date().addingTimeInterval(TimeInterval(timeoutSeconds)) : nil
+        let graceSeconds = max(terminationGraceSeconds, 0)
+
+        while true {
+            let waitResult = waitpid(pid, &status, WNOHANG)
+            if waitResult == pid {
+                if !wasCancelled, cancellation?.isCancelled == true {
+                    wasCancelled = true
+                }
+                if (didTimeout || wasCancelled), !sentKill {
+                    terminateProcessGroup(pid: pid, signal: SIGKILL)
+                }
+                break
+            }
+            if waitResult == -1 {
+                if errno == EINTR {
+                    continue
+                }
+                throw TaskRunnerError.processDidNotStart(String(cString: strerror(errno)))
+            }
+
+            let now = Date()
+            if !wasCancelled, cancellation?.isCancelled == true {
+                wasCancelled = true
+                terminationRequestedAt = now
+                writeLine("Run Shelf：用户取消了运行，正在终止进程组。", to: stderrHandle)
+                terminateProcessGroup(pid: pid, signal: SIGTERM)
+            }
+
+            if !didTimeout, let deadline, now >= deadline {
+                didTimeout = true
+                terminationRequestedAt = now
+                writeLine("Run Shelf：超过 \(timeoutSeconds) 秒未结束，正在终止进程组。", to: stderrHandle)
+                terminateProcessGroup(pid: pid, signal: SIGTERM)
+            }
+
+            if let terminationRequestedAt, !sentKill, now.timeIntervalSince(terminationRequestedAt) >= graceSeconds {
+                sentKill = true
+                writeLine("Run Shelf：进程组收到终止信号后仍未退出，已强制结束。", to: stderrHandle)
+                terminateProcessGroup(pid: pid, signal: SIGKILL)
+            }
+
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+
+        let exitCode = exitCode(fromWaitStatus: status)
+        let message: String?
+        if didTimeout {
+            message = "超过 \(timeoutSeconds) 秒未结束"
+        } else if wasCancelled {
+            message = "用户取消了运行"
+        } else {
+            message = nil
+        }
+
+        return ExecutionResult(
+            exitCode: exitCode,
+            didTimeout: didTimeout,
+            wasCancelled: wasCancelled,
+            message: message
+        )
+    }
+
+    static func spawnProcessGroup(
+        executableURL: URL,
+        workingDirectoryURL: URL,
+        stdoutHandle: FileHandle,
+        stderrHandle: FileHandle
+    ) throws -> pid_t {
+        var attributes: posix_spawnattr_t?
+        var fileActions: posix_spawn_file_actions_t?
+        var pid = pid_t()
+
+        guard posix_spawnattr_init(&attributes) == 0 else {
+            throw TaskRunnerError.processDidNotStart("无法初始化进程属性")
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+            throw TaskRunnerError.processDidNotStart("无法初始化进程文件动作")
+        }
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+
+        let flags = Int16(POSIX_SPAWN_SETSID)
+        guard posix_spawnattr_setflags(&attributes, flags) == 0 else {
+            throw TaskRunnerError.processDidNotStart("无法设置进程组")
+        }
+
+        let chdirResult = workingDirectoryURL.path.withCString {
+            posix_spawn_file_actions_addchdir_np(&fileActions, $0)
+        }
+        guard chdirResult == 0 else {
+            throw TaskRunnerError.processDidNotStart(String(cString: strerror(chdirResult)))
+        }
+
+        guard posix_spawn_file_actions_adddup2(&fileActions, stdoutHandle.fileDescriptor, STDOUT_FILENO) == 0,
+              posix_spawn_file_actions_adddup2(&fileActions, stderrHandle.fileDescriptor, STDERR_FILENO) == 0
+        else {
+            throw TaskRunnerError.processDidNotStart("无法连接 stdout/stderr")
+        }
+
+        let executablePath = strdup(executableURL.path)
+        guard let executablePath else {
+            throw TaskRunnerError.processDidNotStart("无法编码脚本路径")
+        }
+        defer { free(executablePath) }
+
+        var argv: [UnsafeMutablePointer<CChar>?] = [executablePath, nil]
+        var environment = makeEnvironment()
+        defer {
+            for entry in environment where entry != nil {
+                free(entry)
+            }
+        }
+
+        let spawnResult = argv.withUnsafeMutableBufferPointer { argvBuffer in
+            environment.withUnsafeMutableBufferPointer { environmentBuffer in
+                posix_spawn(
+                    &pid,
+                    executablePath,
+                    &fileActions,
+                    &attributes,
+                    argvBuffer.baseAddress,
+                    environmentBuffer.baseAddress
+                )
+            }
+        }
+        guard spawnResult == 0 else {
+            throw TaskRunnerError.processDidNotStart(String(cString: strerror(spawnResult)))
+        }
+
+        return pid
+    }
+
+    static func terminateProcessGroup(pid: pid_t, signal: Int32) {
+        _ = kill(-pid, signal)
+    }
+
+    static func writeLine(_ line: String, to handle: FileHandle) {
+        if let data = ("\n" + line + "\n").data(using: .utf8) {
+            handle.write(data)
+        }
+    }
+
+    static func exitCode(fromWaitStatus status: Int32) -> Int {
+        let value = Int(status)
+        let terminationSignal = value & 0x7f
+        if terminationSignal == 0 {
+            return (value >> 8) & 0xff
+        }
+        return 128 + terminationSignal
+    }
+
+    static func makeEnvironment() -> [UnsafeMutablePointer<CChar>?] {
+        var entries = ProcessInfo.processInfo.environment.map { key, value in
+            strdup("\(key)=\(value)")
+        }
+        entries.append(nil)
+        return entries
     }
 }

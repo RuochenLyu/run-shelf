@@ -19,9 +19,11 @@ require "xcodeproj"
 PROJECT_PATH = "RunShelf.xcodeproj"
 APP_TARGET_NAME = "RunShelf"
 SCHEDULER_TARGET_NAME = "RunShelfScheduler"
+TEST_TARGET_NAME = "RunShelfTests"
 
 def app_source?(relative_path)
   return false unless File.extname(relative_path) == ".swift"
+  return false unless relative_path.start_with?("RunShelf/")
   !relative_path.start_with?("RunShelf/SchedulerProcess/")
 end
 
@@ -32,8 +34,13 @@ def scheduler_source?(relative_path)
   !relative_path.start_with?("RunShelf/Core/Stores/")
 end
 
+def test_source?(relative_path)
+  return false unless File.extname(relative_path) == ".swift"
+  relative_path.start_with?("RunShelf/Core/") || relative_path.start_with?("RunShelfTests/")
+end
+
 def collect_disk_swift_paths
-  Dir.glob("RunShelf/**/*.swift").sort
+  (Dir.glob("RunShelf/**/*.swift") + Dir.glob("RunShelfTests/**/*.swift")).sort
 end
 
 def collect_referenced_paths(project)
@@ -66,8 +73,10 @@ project = Xcodeproj::Project.open(PROJECT_PATH)
 
 app_target = project.targets.find { |t| t.name == APP_TARGET_NAME }
 scheduler_target = project.targets.find { |t| t.name == SCHEDULER_TARGET_NAME }
+test_target = project.targets.find { |t| t.name == TEST_TARGET_NAME }
 raise "App target not found" unless app_target
 raise "Scheduler target not found" unless scheduler_target
+raise "Test target not found" unless test_target
 
 referenced = collect_referenced_paths(project)
 on_disk = collect_disk_swift_paths
@@ -87,6 +96,9 @@ on_disk.each do |relative_path|
   end
   if scheduler_source?(relative_path)
     scheduler_target.source_build_phase.add_file_reference(file_ref)
+  end
+  if test_source?(relative_path)
+    test_target.source_build_phase.add_file_reference(file_ref)
   end
 
   added << relative_path
