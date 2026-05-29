@@ -1,17 +1,17 @@
-# Run Shelf Release Checklist
+# Run Shelf 发布流程
 
-## Support Matrix
+## 支持范围
 
 ```text
-Minimum OS: macOS 15
-Recommended OS: macOS 26 or later
-Distribution: Developer ID signed zip, optionally notarized
-Architecture: universal x86_64 + arm64
+最低系统：macOS 15
+推荐系统：macOS 26 或更高版本
+发布形式：Developer ID 签名 zip，可选公证
+架构：universal x86_64 + arm64
 ```
 
-macOS 15 and 16 use the same core feature set with native controls available on those systems. macOS 26-only APIs must be guarded with `#available(macOS 26, *)` and must keep a macOS 15 fallback path.
+macOS 15 和 16 使用同一套核心功能，外观跟随系统可用的原生控件。macOS 26 专属 API 必须放在 `#available(macOS 26, *)` 分支里，并保留 macOS 15 可用的路径。
 
-## Preflight
+## 发布前检查
 
 ```bash
 git status --short
@@ -20,9 +20,9 @@ rg --hidden --pcre2 -n "/Users/|gh[pousr]_[A-Za-z0-9_]+|Developer ID Application
   -g '!.build/**'
 ```
 
-The search must not find real tokens, local absolute paths, or hardcoded signing identities.
+这条搜索不应命中真实 token、本机绝对路径或硬编码的签名身份。
 
-## Test
+## 测试
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -34,29 +34,29 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-## Manual Smoke
+## 手动冒烟检查
 
 ```text
-1. First launch reaches the scheduler permission gate.
-2. Enabling background scheduling reaches the main window.
-3. Creating a task from a template writes task.json, run.sh, and notes.md.
-4. Running a successful script writes stdout.log and a success meta.json.
-5. Running a failing script writes stderr.log and a failed meta.json.
-6. Stopping a sleep task writes a cancelled meta.json.
-7. A scheduled task continues to run after the main window closes.
-8. Reopening the app reads scheduler-created history.
+1. 首次打开能进入后台调度授权页。
+2. 启用后台运行后能进入主窗口。
+3. 从模板新建任务后，会写入 task.json、run.sh 和 notes.md。
+4. 运行成功脚本后，会写入 stdout.log 和 success meta.json。
+5. 运行失败脚本后，会写入 stderr.log 和 failed meta.json。
+6. 停止 sleep 任务后，会写入 cancelled meta.json。
+7. 设置定时任务后，关闭主窗口，后台辅助进程仍能继续运行。
+8. 重新打开 App 后，能读到后台写入的历史记录。
 ```
 
-## Package
+## 打包
 
-The script requires a local Developer ID Application certificate:
+脚本需要本机有 Developer ID Application 证书：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 scripts/package_release.sh 1.0.0
 ```
 
-To notarize, provide a notarytool keychain profile:
+如需公证，额外提供 `notarytool` 的钥匙串配置：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -64,14 +64,14 @@ RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
 scripts/package_release.sh 1.0.0
 ```
 
-Artifacts:
+产物位置：
 
 ```text
 .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip
 .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip.sha256
 ```
 
-## Verify Artifact
+## 校验产物
 
 ```bash
 codesign --verify --deep --strict --verbose=2 \
@@ -84,7 +84,7 @@ unzip -l .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip | \
   rg '(^|/)\\._|__MACOSX' && exit 1 || true
 ```
 
-If notarized:
+如果做了公证，再跑：
 
 ```bash
 spctl --assess --type execute --verbose=2 \

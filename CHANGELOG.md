@@ -1,12 +1,13 @@
-# Changelog
+# 更新记录
 
 ## 1.0.0 - 2026-05-29
 
-First usable release.
+第一个可用版本。
 
-- Added the native macOS task manager app.
-- Added file-based task storage, templates, notes, script editing, and run history.
-- Added manual runs with stdout/stderr capture, script snapshots, timeout handling, and cancellation.
-- Added five-field cron scheduling, missed-run handling, stale records, retention cleanup, and a background scheduler helper.
-- Added failure notification support and scheduler status in settings.
-- Added macOS 15+ release packaging with Developer ID signing and optional notarization.
+- 完成原生 macOS 主 App。
+- 支持文件化任务、内置模板、备注、脚本编辑和运行历史。
+- 支持手动运行，记录 stdout/stderr、脚本快照、退出码、耗时和状态。
+- 支持停止正在运行的任务；超时或取消时会清理整组子进程。
+- 支持 5 段 cron、错过运行记录、保留清理和后台调度辅助进程。
+- 支持失败通知和设置页里的后台状态检查。
+- 支持 macOS 15+ 发布包，发布脚本可做 Developer ID 签名，并可选公证。

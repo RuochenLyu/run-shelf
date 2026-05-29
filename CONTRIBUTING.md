@@ -1,15 +1,17 @@
-# Contributing
+# 参与开发
 
-Run Shelf is a small native macOS project. Keep changes local-first, file-format compatible, and easy to inspect.
+Run Shelf 是一个小型原生 macOS 项目。改动应当坚持本机保存、文件格式清楚、运行状态可排查。
 
-## Development Setup
+## 开发环境
+
+先安装生成 Xcode 工程需要的依赖：
 
 ```bash
 gem install xcodeproj
 ruby scripts/generate_xcodeproj.rb
 ```
 
-Build and test before sending changes:
+提交改动前至少跑一遍测试：
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -21,10 +23,10 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-## Project Rules
+## 约定
 
-- Keep task data readable on disk.
-- Preserve `schemaVersion` compatibility unless the migration path is included.
-- Keep background scheduling observable through files and logs.
-- Do not add telemetry or network sync without a product decision and documentation update.
-- Put macOS 26-only APIs behind `#available(macOS 26, *)` and keep the macOS 15 path working.
+- 任务数据必须保持可读，不能变成只能由 App 理解的黑盒。
+- 修改 `schemaVersion` 时必须同时给出迁移方案。
+- 后台调度的行为要能通过文件、日志和心跳记录排查。
+- 不要在没有产品决策和文档说明的情况下加入遥测、账号系统或网络同步。
+- 只在 `#available(macOS 26, *)` 分支里使用 macOS 26 专属 API，并保留 macOS 15 可用的路径。

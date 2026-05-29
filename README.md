@@ -1,51 +1,51 @@
 # Run Shelf
 
-Run Shelf is a local-first macOS app for creating, scheduling, running, and inspecting Shell automation tasks.
+Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Shell 脚本放进来，手动运行，按 cron 表达式定时运行，并查看每次运行的输出和失败原因。
 
-It is designed for personal developer workflows: recurring scripts, local health checks, maintenance jobs, and small automation snippets that should stay readable on disk.
+它的重点不是做一套复杂的自动化平台，而是把个人电脑上的脚本管理做得清楚、可控、容易排查。任务、脚本、备注和历史记录都保存在本机文件里，不需要账号，也不会上传。
 
-## Features
+## 功能
 
-- File-based task model: each task is a folder with `task.json`, `run.sh`, `notes.md`, and run history.
-- Built-in task templates for common local automation jobs.
-- Native Shell editor with lightweight syntax highlighting and dangerous-command warnings.
-- Manual runs with stdout/stderr history, script snapshots, exit status, timeout handling, and cancellation.
-- Five-field cron schedules with preview and missed-run handling.
-- Background scheduler helper managed through `SMAppService`.
-- Failure notifications and retention cleanup.
-- Local-first storage. Run Shelf does not upload task definitions, scripts, logs, or run history.
+- 文件化任务：每个任务都是一个目录，里面有 `task.json`、`run.sh`、`notes.md` 和运行历史。
+- 内置模板：快速创建常见的本地巡检、清理、备份类脚本。
+- Shell 编辑器：支持基础高亮，并在发现危险命令时给出提示。
+- 手动运行：记录 stdout、stderr、退出码、脚本快照、耗时和运行状态。
+- 停止运行：可以取消正在运行的任务，超时或取消时会清理整组子进程。
+- 定时调度：支持 5 段 cron，提供预览，并记录错过执行窗口的任务。
+- 后台调度：通过 `SMAppService` 管理后台辅助进程，主窗口关闭后也能继续检查任务。
+- 数据留在本机：Run Shelf 不上传任务定义、脚本内容、日志或运行历史。
 
-## Requirements
+## 系统要求
 
 ```text
-macOS 15 or later
-Xcode 26 or later for source builds
-Ruby + xcodeproj gem for regenerating the Xcode project
+macOS 15 或更高版本
+Xcode 26 或更高版本（从源码构建时需要）
+Ruby + xcodeproj gem（重新生成 Xcode 工程时需要）
 ```
 
-Run Shelf targets macOS 15+. On macOS 26, the app uses the system's current native visual treatment where available. macOS 15 and 16 keep the same core functionality with the native controls available on those systems.
+Run Shelf 最低支持 macOS 15。macOS 26 上会自然使用系统提供的新视觉效果；macOS 15 和 16 保持同一套核心功能，使用系统当时可用的原生控件外观。
 
-## Install
+## 安装
 
-Download the latest release from GitHub, unzip `RunShelf-<version>-macOS15.zip`, and move `Run Shelf.app` to `/Applications`.
+从 GitHub Release 下载最新版，解压 `RunShelf-<version>-macOS15.zip`，把 `Run Shelf.app` 拖到 `/Applications`。
 
-The background scheduler is optional. Enable it inside the app settings after first launch.
+后台调度默认不强制开启。第一次打开后，在设置里启用后台运行即可。
 
-## Build From Source
+## 从源码构建
 
-Install the project generator dependency:
+安装工程生成脚本需要的依赖：
 
 ```bash
 gem install xcodeproj
 ```
 
-Regenerate the Xcode project when files are added or removed:
+新增或删除源码文件后，重新生成 Xcode 工程：
 
 ```bash
 ruby scripts/generate_xcodeproj.rb
 ```
 
-Build from the command line:
+命令行构建：
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -57,7 +57,7 @@ xcodebuild -project RunShelf.xcodeproj \
   build
 ```
 
-Run tests:
+运行测试：
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -69,22 +69,22 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Launch a local debug build:
+启动调试版：
 
 ```bash
 open ".build/DerivedData/Build/Products/Debug/Run Shelf.app"
 ```
 
-## Release Builds
+## 发布打包
 
-Release packaging requires a local Developer ID Application certificate:
+发布包需要本机有 Developer ID Application 证书：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 scripts/package_release.sh 1.0.0
 ```
 
-To notarize the zip, provide a notarytool keychain profile:
+如果要公证，额外提供 `notarytool` 的钥匙串配置：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -92,19 +92,19 @@ RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
 scripts/package_release.sh 1.0.0
 ```
 
-Release artifacts are written to `.build/release/RunShelf-<version>/`.
+产物会写到 `.build/release/RunShelf-<version>/`。
 
-See [docs/release.md](docs/release.md) for the full release checklist.
+完整发布流程见 [docs/release.md](docs/release.md)。
 
-## Data Layout
+## 数据位置
 
-Task data is stored under:
+任务默认保存在：
 
 ```text
 ~/Library/Application Support/Run Shelf/tasks/
 ```
 
-Scheduler state is stored under:
+后台调度状态保存在：
 
 ```text
 ~/Library/Application Support/Run Shelf/scheduler-state.json
@@ -112,7 +112,7 @@ Scheduler state is stored under:
 ~/Library/Application Support/Run Shelf/scheduler.log
 ```
 
-Each task directory contains:
+每个任务目录大致如下：
 
 ```text
 task.json
@@ -124,28 +124,28 @@ runs/<run-id>/stderr.log
 runs/<run-id>/run.sh.snapshot
 ```
 
-## Background Scheduler
+## 后台调度
 
-The app embeds a helper executable:
+应用内嵌了一个后台辅助进程：
 
 ```text
 Run Shelf.app/Contents/Library/Helpers/RunShelfScheduler
 ```
 
-It also embeds the `SMAppService` LaunchAgent plist:
+同时内嵌 `SMAppService` 使用的 LaunchAgent plist：
 
 ```text
 Run Shelf.app/Contents/Library/LaunchAgents/com.aix4u.runshelf.scheduler.plist
 ```
 
-When enabled, the scheduler checks tasks every 30 seconds, matches five-field cron expressions at minute granularity, records stale runs that missed their allowed delay window, and writes heartbeat state for the app to inspect.
+启用后台运行后，辅助进程每 30 秒检查一次任务，按分钟粒度匹配 5 段 cron。超过补跑时间窗口的任务会记为 `stale`，主应用会读取心跳文件来显示后台状态。
 
-## Project Docs
+## 项目文档
 
-- [docs/requirements.md](docs/requirements.md): product and implementation requirements.
-- [docs/roadmap.md](docs/roadmap.md): development roadmap and deferred work.
-- [docs/release.md](docs/release.md): release checklist and packaging flow.
+- [docs/requirements.md](docs/requirements.md)：产品需求和实现约束。
+- [docs/roadmap.md](docs/roadmap.md)：路线图和暂缓事项。
+- [docs/release.md](docs/release.md)：发布前检查和打包流程。
 
-## License
+## 许可证
 
-Run Shelf is released under the MIT License. See [LICENSE](LICENSE).
+Run Shelf 使用 MIT 许可证，见 [LICENSE](LICENSE)。
