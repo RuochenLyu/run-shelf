@@ -27,7 +27,7 @@ Run Shelf 最低支持 macOS 15。macOS 26 上会自然使用系统提供的新�
 
 ## 安装
 
-从 GitHub Release 下载最新版，解压 `RunShelf-<version>-macOS15.zip`，把 `Run Shelf.app` 拖到 `/Applications`。
+从 GitHub Release 下载最新版的 `RunShelf-<version>-macOS15.dmg`，打开后把 `Run Shelf.app` 拖到 `Applications`。
 
 后台调度默认不强制开启。第一次打开后，在设置里启用后台运行即可。
 
@@ -77,7 +77,7 @@ open ".build/DerivedData/Build/Products/Debug/Run Shelf.app"
 
 ## 发布打包
 
-发布包需要本机有 Developer ID Application 证书：
+发布包需要本机有 Developer ID Application 证书。脚本会生成 zip 和 DMG：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -92,7 +92,7 @@ RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
 scripts/package_release.sh 1.0.0
 ```
 
-产物会写到 `.build/release/RunShelf-<version>/`。
+产物会写到 `.build/release/RunShelf-<version>/`。配置 `RUN_SHELF_NOTARY_PROFILE` 后，脚本会公证 app 和 DMG，并把 ticket stapled 到产物里。
 
 完整发布流程见 [docs/release.md](docs/release.md)。
 

@@ -5,7 +5,7 @@
 ```text
 最低系统：macOS 15
 推荐系统：macOS 26 或更高版本
-发布形式：Developer ID 签名 zip，可选公证
+发布形式：Developer ID 签名 DMG + zip，可选公证
 架构：universal x86_64 + arm64
 ```
 
@@ -49,7 +49,7 @@ xcodebuild test \
 
 ## 打包
 
-脚本需要本机有 Developer ID Application 证书：
+脚本需要本机有 Developer ID Application 证书。默认会生成 zip 和带 `Applications` 快捷方式的 DMG：
 
 ```bash
 RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -67,6 +67,8 @@ scripts/package_release.sh 1.0.0
 产物位置：
 
 ```text
+.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
+.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg.sha256
 .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip
 .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip.sha256
 ```
@@ -82,6 +84,8 @@ vtool -show-build \
 
 unzip -l .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip | \
   rg '(^|/)\\._|__MACOSX' && exit 1 || true
+
+hdiutil verify .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
 ```
 
 如果做了公证，再跑：
@@ -89,6 +93,9 @@ unzip -l .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip | \
 ```bash
 spctl --assess --type execute --verbose=2 \
   ".build/ReleaseDerivedData/Build/Products/Release/Run Shelf.app"
+
+spctl --assess --type open --context context:primary-signature --verbose=2 \
+  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
 ```
 
 ## GitHub Release
@@ -97,6 +104,8 @@ spctl --assess --type execute --verbose=2 \
 git tag v1.0.0
 git push origin main v1.0.0
 gh release create v1.0.0 \
+  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg \
+  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg.sha256 \
   .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip \
   .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip.sha256 \
   --title "Run Shelf 1.0.0" \
