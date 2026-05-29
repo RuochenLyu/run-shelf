@@ -8,6 +8,7 @@ DIST_ROOT="$ROOT_DIR/.build/release"
 DIST_DIR="$DIST_ROOT/RunShelf-$VERSION"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/Run Shelf.app"
 HELPER_PATH="$APP_PATH/Contents/Library/Helpers/RunShelfScheduler"
+CLI_PATH="$APP_PATH/Contents/Library/Helpers/runshelf"
 ZIP_PATH="$DIST_DIR/RunShelf-$VERSION-macOS15.zip"
 DMG_PATH="$DIST_DIR/RunShelf-$VERSION-macOS15.dmg"
 ZIP_CHECKSUM_PATH="$ZIP_PATH.sha256"
@@ -86,6 +87,7 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 sign_artifact "$HELPER_PATH" --options runtime
+sign_artifact "$CLI_PATH" --options runtime
 sign_artifact "$APP_PATH" --options runtime
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 

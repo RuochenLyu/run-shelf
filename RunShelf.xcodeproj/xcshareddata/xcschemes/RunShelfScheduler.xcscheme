@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CBEF32C491DD33ED98815C98"
+               BlueprintIdentifier = "C3F774E5343D7EE6C3AC6728"
                BuildableName = "RunShelfScheduler"
                BlueprintName = "RunShelfScheduler"
                ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CBEF32C491DD33ED98815C98"
+            BlueprintIdentifier = "C3F774E5343D7EE6C3AC6728"
             BuildableName = "RunShelfScheduler"
             BlueprintName = "RunShelfScheduler"
             ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -53,7 +53,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CBEF32C491DD33ED98815C98"
+            BlueprintIdentifier = "C3F774E5343D7EE6C3AC6728"
             BuildableName = "RunShelfScheduler"
             BlueprintName = "RunShelfScheduler"
             ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -70,7 +70,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CBEF32C491DD33ED98815C98"
+            BlueprintIdentifier = "C3F774E5343D7EE6C3AC6728"
             BuildableName = "RunShelfScheduler"
             BlueprintName = "RunShelfScheduler"
             ReferencedContainer = "container:RunShelf.xcodeproj">

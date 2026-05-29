@@ -16,6 +16,9 @@ app_target.product_reference.path = "Run Shelf.app"
 scheduler_target = project.new_target(:command_line_tool, "RunShelfScheduler", :osx, "15.0")
 scheduler_target.product_reference.path = "RunShelfScheduler"
 
+cli_target = project.new_target(:command_line_tool, "RunShelfCLI", :osx, "15.0")
+cli_target.product_reference.path = "runshelf"
+
 test_target = project.new_target(:unit_test_bundle, "RunShelfTests", :osx, "15.0")
 test_target.product_reference.path = "RunShelfTests.xctest"
 
@@ -27,12 +30,21 @@ test_group = main_group.new_group("RunShelfTests", "RunShelfTests")
 def app_source?(path)
   File.extname(path) == ".swift" &&
     path.start_with?("RunShelf/") &&
-    !path.start_with?("RunShelf/SchedulerProcess/")
+    !path.start_with?("RunShelf/SchedulerProcess/") &&
+    !path.start_with?("RunShelf/CLI/")
 end
 
 def scheduler_source?(path)
   return false unless File.extname(path) == ".swift"
   return true if path.start_with?("RunShelf/SchedulerProcess/")
+  return false unless path.start_with?("RunShelf/Core/")
+  return false if path.start_with?("RunShelf/Core/Stores/")
+  true
+end
+
+def cli_source?(path)
+  return false unless File.extname(path) == ".swift"
+  return true if path.start_with?("RunShelf/CLI/")
   return false unless path.start_with?("RunShelf/Core/")
   return false if path.start_with?("RunShelf/Core/Stores/")
   true
@@ -45,7 +57,7 @@ end
 
 launch_agent_file_refs = []
 
-def add_files(group, filesystem_path, app_target, scheduler_target, test_target, launch_agent_file_refs)
+def add_files(group, filesystem_path, app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
   Dir.children(filesystem_path).sort.each do |entry|
     next if entry.start_with?(".")
 
@@ -57,7 +69,7 @@ def add_files(group, filesystem_path, app_target, scheduler_target, test_target,
         next
       end
 
-      add_files(group.new_group(entry, entry), path, app_target, scheduler_target, test_target, launch_agent_file_refs)
+      add_files(group.new_group(entry, entry), path, app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
       next
     end
 
@@ -66,6 +78,7 @@ def add_files(group, filesystem_path, app_target, scheduler_target, test_target,
     when ".swift"
       app_target.source_build_phase.add_file_reference(file_ref) if app_source?(path)
       scheduler_target.source_build_phase.add_file_reference(file_ref) if scheduler_source?(path)
+      cli_target.source_build_phase.add_file_reference(file_ref) if cli_source?(path)
       test_target.source_build_phase.add_file_reference(file_ref) if test_source?(path)
     when ".xcstrings"
       app_target.resources_build_phase.add_file_reference(file_ref)
@@ -75,14 +88,16 @@ def add_files(group, filesystem_path, app_target, scheduler_target, test_target,
   end
 end
 
-add_files(source_group, "RunShelf", app_target, scheduler_target, test_target, launch_agent_file_refs)
-add_files(test_group, "RunShelfTests", app_target, scheduler_target, test_target, launch_agent_file_refs)
+add_files(source_group, "RunShelf", app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
+add_files(test_group, "RunShelfTests", app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
 app_target.add_dependency(scheduler_target)
+app_target.add_dependency(cli_target)
 
 helpers_phase = app_target.new_copy_files_build_phase("Embed Helpers")
 helpers_phase.symbol_dst_subfolder_spec = :wrapper
 helpers_phase.dst_path = "Contents/Library/Helpers"
 helpers_phase.add_file_reference(scheduler_target.product_reference)
+helpers_phase.add_file_reference(cli_target.product_reference)
 
 launch_agents_phase = app_target.new_copy_files_build_phase("Embed LaunchAgents")
 launch_agents_phase.symbol_dst_subfolder_spec = :wrapper
@@ -125,6 +140,19 @@ scheduler_target.build_configurations.each do |config|
   config.build_settings["SKIP_INSTALL"] = "YES"
 end
 
+cli_target.build_configurations.each do |config|
+  config.build_settings["PRODUCT_NAME"] = "runshelf"
+  config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.aix4u.runshelf.cli"
+  config.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
+  config.build_settings["CREATE_INFOPLIST_SECTION_IN_BINARY"] = "YES"
+  config.build_settings["SWIFT_VERSION"] = "5.0"
+  config.build_settings["CODE_SIGN_STYLE"] = "Automatic"
+  config.build_settings["DEVELOPMENT_TEAM"] = development_team unless development_team.empty?
+  config.build_settings["ENABLE_HARDENED_RUNTIME"] = "YES"
+  config.build_settings["ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS"] = "NO"
+  config.build_settings["SKIP_INSTALL"] = "YES"
+end
+
 test_target.build_configurations.each do |config|
   config.build_settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
   config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.aix4u.runshelf.tests"
@@ -140,6 +168,7 @@ project.save
 project.recreate_user_schemes
 Xcodeproj::XCScheme.share_scheme(project_path, "RunShelf")
 Xcodeproj::XCScheme.share_scheme(project_path, "RunShelfScheduler")
+Xcodeproj::XCScheme.share_scheme(project_path, "RunShelfCLI")
 Xcodeproj::XCScheme.share_scheme(project_path, "RunShelfTests")
 
 run_scheme_path = File.join(project_path, "xcshareddata", "xcschemes", "RunShelf.xcscheme")

@@ -1,115 +1,43 @@
 # Run Shelf
 
-Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Shell 脚本放进来，手动运行，按 cron 表达式定时运行，并查看每次运行的输出和失败原因。
+Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Shell 脚本放进来，手动运行，按 cron 表达式定时运行，并查看每次运行的输出、退出码和失败原因。
 
-它的重点不是做一套复杂的自动化平台，而是把个人电脑上的脚本管理做得清楚、可控、容易排查。任务、脚本、备注和历史记录都保存在本机文件里，不需要账号，也不会上传。
+它不是云端自动化平台，也不需要账号。任务、脚本、备注和运行历史都保存在本机文件里，不会上传。
 
 ## 功能
 
-- 文件化任务：每个任务都是一个目录，里面有 `task.json`、`run.sh`、`notes.md` 和运行历史。
-- 内置模板：快速创建常见的本地巡检、清理、备份类脚本。
-- Shell 编辑器：支持基础高亮，并在发现危险命令时给出提示。
-- 手动运行：记录 stdout、stderr、退出码、脚本快照、耗时和运行状态。
-- 停止运行：可以取消正在运行的任务，超时或取消时会清理整组子进程。
-- 定时调度：支持 5 段 cron，提供预览，并记录错过执行窗口的任务。
-- 后台调度：通过 `SMAppService` 管理后台辅助进程，主窗口关闭后也能继续检查任务。
-- 数据留在本机：Run Shelf 不上传任务定义、脚本内容、日志或运行历史。
+- 文件化任务：每个任务都是一个目录，包含 `task.json`、`run.sh`、`notes.md` 和运行历史。
+- 手动运行：记录 stdout、stderr、退出码、脚本快照、耗时和状态。
+- 定时调度：支持 5 段 cron，主窗口关闭后也能由后台辅助进程继续检查。
+- 停止运行：超时、取消或后台终止时会清理整组子进程。
+- 安全提示：编辑和 CLI 写入时会识别高风险命令。
+- Agent/CLI 操作：内置 `runshelf`，Codex/Claude 可以用 JSON 契约创建、修改、运行和查询任务。
 
 ## 系统要求
 
 ```text
 macOS 15 或更高版本
-Xcode 26 或更高版本（从源码构建时需要）
-Ruby + xcodeproj gem（重新生成 Xcode 工程时需要）
 ```
 
 Run Shelf 最低支持 macOS 15。macOS 26 上会自然使用系统提供的新视觉效果；macOS 15 和 16 保持同一套核心功能，使用系统当时可用的原生控件外观。
 
 ## 安装
 
-从 GitHub Release 下载最新版的 `RunShelf-<version>-macOS15.dmg`，打开后把 `Run Shelf.app` 拖到 `Applications`。
+从 GitHub Release 下载最新版 `RunShelf-<version>-macOS15.dmg`，打开后把 `Run Shelf.app` 拖到 `Applications`。
 
-后台调度默认不强制开启。第一次打开后，在设置里启用后台运行即可。
+第一次打开后，可以在设置里启用后台运行。后台运行不是必需项；不启用时，手动运行和任务编辑仍然可用。
 
-## 从源码构建
+## App 使用
 
-安装工程生成脚本需要的依赖：
-
-```bash
-gem install xcodeproj
-```
-
-新增或删除源码文件后，重新生成 Xcode 工程：
-
-```bash
-ruby scripts/generate_xcodeproj.rb
-```
-
-命令行构建：
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project RunShelf.xcodeproj \
-  -scheme RunShelf \
-  -configuration Debug \
-  -derivedDataPath .build/DerivedData \
-  CODE_SIGNING_ALLOWED=NO \
-  build
-```
-
-运行测试：
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild test \
-  -project RunShelf.xcodeproj \
-  -scheme RunShelf \
-  -configuration Debug \
-  -derivedDataPath .build/TestDerivedData \
-  CODE_SIGNING_ALLOWED=NO
-```
-
-启动调试版：
-
-```bash
-open ".build/DerivedData/Build/Products/Debug/Run Shelf.app"
-```
-
-## 发布打包
-
-发布包需要本机有 Developer ID Application 证书。脚本会生成 zip 和 DMG：
-
-```bash
-RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-scripts/package_release.sh 1.0.0
-```
-
-如果要公证，额外提供 `notarytool` 的钥匙串配置：
-
-```bash
-RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
-scripts/package_release.sh 1.0.0
-```
-
-产物会写到 `.build/release/RunShelf-<version>/`。配置 `RUN_SHELF_NOTARY_PROFILE` 后，脚本会公证 app 和 DMG，并把 ticket stapled 到产物里。
-
-完整发布流程见 [docs/release.md](docs/release.md)。
-
-## 数据位置
+1. 新建任务，填写名称、执行计划和脚本。
+2. 手动运行任务，确认 stdout、stderr 和退出码符合预期。
+3. 需要定时执行时启用任务，并在设置里开启后台运行。
+4. 运行失败时，从历史记录进入 stdout/stderr 排查。
 
 任务默认保存在：
 
 ```text
 ~/Library/Application Support/Run Shelf/tasks/
-```
-
-后台调度状态保存在：
-
-```text
-~/Library/Application Support/Run Shelf/scheduler-state.json
-~/Library/Application Support/Run Shelf/scheduler-heartbeat.json
-~/Library/Application Support/Run Shelf/scheduler.log
 ```
 
 每个任务目录大致如下：
@@ -122,29 +50,119 @@ runs/<run-id>/meta.json
 runs/<run-id>/stdout.log
 runs/<run-id>/stderr.log
 runs/<run-id>/run.sh.snapshot
+.run-claim
 ```
+
+`.run-claim` 是运行中的跨进程占位，用来避免 App、后台调度进程和 CLI 同时启动同一个 `concurrency=skip` 任务。
+
+## CLI 使用
+
+发布版 App 内置 CLI：
+
+```zsh
+/Applications/Run\ Shelf.app/Contents/Library/Helpers/runshelf
+```
+
+如果想在终端里直接输入 `runshelf`：
+
+```zsh
+/Applications/Run\ Shelf.app/Contents/Library/Helpers/runshelf install-cli --json
+```
+
+macOS 默认 zsh 不一定包含 `~/.local/bin`。如果 `command -v runshelf` 找不到，把下面这一行加入 `~/.zshrc`：
+
+```zsh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+常用命令：
+
+```zsh
+runshelf task list --json
+runshelf task show <id|slug> --json
+runshelf apply spec.json --dry-run --json
+runshelf apply spec.json --json
+runshelf apply spec.json --expected-revision <revisionToken> --json   # 修改已有任务
+runshelf run <id|slug> --wait --json
+runshelf run <id|slug> --detach --json
+runshelf run status <run-id> --json
+runshelf run cancel <run-id> --json
+runshelf run log <run-id> --stdout
+runshelf run log <run-id> --stderr
+runshelf doctor --json
+runshelf help agent
+```
+
+`apply` 写入的是 TaskSpec JSON，不是完整 `task.json`。创建任务时没有覆盖到的内部策略使用默认值；更新任务时没有覆盖到的内部策略会保留原值。
+
+最小 TaskSpec 示例：
+
+```json
+{
+  "slug": "daily-report",
+  "name": "每日报告",
+  "enabled": true,
+  "schedule": {
+    "type": "cron",
+    "expression": "0 9 * * *",
+    "timezone": "local"
+  },
+  "timeoutSeconds": 600,
+  "script": "#!/bin/zsh\nset -euo pipefail\n\nprintf 'ok\\n'\n",
+  "notes": "由 CLI 管理。"
+}
+```
+
+修改已有任务时，先 `task show` 读取 `revisionToken`，再带回 `apply --expected-revision`。如果 App 或另一个 CLI 在中间改过任务，CLI 会返回 `conflict`，避免静默覆盖。
+
+## 让 Codex/Claude 操作
+
+把下面这段发给 Codex/Claude，它就能按 Run Shelf 的 CLI 契约操作任务：
+
+```text
+请使用 Run Shelf 管理我的本地自动化任务。
+
+规则：
+1. 不要直接编辑 ~/Library/Application Support/Run Shelf/tasks/ 里的 task.json、run.sh、notes.md。
+2. 通过 runshelf CLI 操作；如果 shell 里没有 runshelf，先使用 /Applications/Run\ Shelf.app/Contents/Library/Helpers/runshelf。
+3. 先运行 runshelf help agent 读取约定，再运行 runshelf doctor --json 确认数据目录。
+4. 读任务用 runshelf task list --json 和 runshelf task show <id|slug> --json。
+5. 写任务用 TaskSpec JSON。创建任务先 runshelf apply spec.json --dry-run --json，再 runshelf apply spec.json --json。
+6. 修改已有任务必须先 task show 读取 result.revisionToken，再 runshelf apply spec.json --expected-revision <revisionToken> --json；遇到 conflict 要重新读取，不要强行覆盖。
+7. 运行任务用 runshelf run <id|slug> --wait --json；长任务用 runshelf run <id|slug> --detach --json，然后用 runshelf run status <run-id> --json 轮询。
+8. 需要停止后台运行时，用 runshelf run cancel <run-id> --json。
+9. 脚本命中 dangerous_command 时，默认不要加 --allow-dangerous，除非我明确确认。
+10. 选择任务优先用 id 或 slug，不要靠 name 猜。
+```
+
+更完整的 agent 操作说明见 [docs/agent-usage.md](docs/agent-usage.md)。
 
 ## 后台调度
 
-应用内嵌了一个后台辅助进程：
+应用内嵌后台辅助进程：
 
 ```text
 Run Shelf.app/Contents/Library/Helpers/RunShelfScheduler
 ```
 
-同时内嵌 `SMAppService` 使用的 LaunchAgent plist：
+启用后台运行后，辅助进程每 30 秒检查一次任务，按分钟粒度匹配 cron。超过补跑时间窗口的任务会记为 `stale`，主应用会读取心跳文件来显示后台状态。
+
+后台调度状态保存在：
 
 ```text
-Run Shelf.app/Contents/Library/LaunchAgents/com.aix4u.runshelf.scheduler.plist
+~/Library/Application Support/Run Shelf/scheduler-state.json
+~/Library/Application Support/Run Shelf/scheduler-heartbeat.json
+~/Library/Application Support/Run Shelf/scheduler.log
 ```
 
-启用后台运行后，辅助进程每 30 秒检查一次任务，按分钟粒度匹配 5 段 cron。超过补跑时间窗口的任务会记为 `stale`，主应用会读取心跳文件来显示后台状态。
+## 开发和发布
 
-## 项目文档
+开发者文档已经从使用说明里拆出去：
 
+- [docs/development.md](docs/development.md)：源码构建、测试、Xcode 工程生成和本地 CLI 冒烟。
+- [docs/release.md](docs/release.md)：签名、DMG、公证和 GitHub Release。
 - [docs/requirements.md](docs/requirements.md)：产品需求和实现约束。
 - [docs/roadmap.md](docs/roadmap.md)：路线图和暂缓事项。
-- [docs/release.md](docs/release.md)：发布前检查和打包流程。
 
 ## 许可证
 

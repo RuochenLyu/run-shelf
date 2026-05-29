@@ -1,0 +1,947 @@
+import Darwin
+import Foundation
+
+@main
+enum RunShelfCLI {
+    static func main() {
+        var context = CLIContext(arguments: Array(CommandLine.arguments.dropFirst()))
+        let exitCode: Int32
+        do {
+            exitCode = try context.run()
+        } catch let error as CLIExitError {
+            context.emitError(error)
+            exitCode = Int32(error.exitCode)
+        } catch let error as TaskRepositoryError {
+            let mapped = CLIExitError.from(error)
+            context.emitError(mapped)
+            exitCode = Int32(mapped.exitCode)
+        } catch let error as TaskRunClaimError {
+            let mapped = CLIExitError.conflict(error.localizedDescription)
+            context.emitError(mapped)
+            exitCode = Int32(mapped.exitCode)
+        } catch let error as TaskRunnerError {
+            let mapped = CLIExitError.from(error)
+            context.emitError(mapped)
+            exitCode = Int32(mapped.exitCode)
+        } catch {
+            context.emitError(.unexpected(error.localizedDescription))
+            exitCode = 1
+        }
+        exit(exitCode)
+    }
+}
+
+private struct CLIContext {
+    private var arguments: [String]
+    private let repository: TaskRepository
+    private let jsonOutput: Bool
+
+    init(arguments: [String]) {
+        var args = arguments
+        let envJSON = ProcessInfo.processInfo.environment["RUNSHELF_JSON"] == "1"
+        let json = args.removeAll("--json") || envJSON
+        self.arguments = args
+        self.jsonOutput = json
+        self.repository = TaskRepository()
+    }
+
+    mutating func run() throws -> Int32 {
+        guard let command = arguments.popFirst() else {
+            printGeneralHelp()
+            return 0
+        }
+
+        switch command {
+        case "task":
+            return try runTaskCommand()
+        case "apply":
+            return try runApply()
+        case "run":
+            return try runRunCommand()
+        case "doctor":
+            return try runDoctor()
+        case "install-cli":
+            return try runInstallCLI()
+        case "help":
+            return try runHelp()
+        case "schema":
+            return try runSchema()
+        case "__run-host":
+            return try runHost()
+        default:
+            throw CLIExitError.usage("未知命令：\(command)")
+        }
+    }
+
+    func emitError(_ error: CLIExitError) {
+        if jsonOutput {
+            emit(Envelope(ok: false, result: Optional<String>.none, error: ErrorPayload(code: error.code, message: error.message)))
+        } else {
+            FileHandle.standardError.write(Data(("runshelf: \(error.message)\n").utf8))
+        }
+    }
+
+    private mutating func runTaskCommand() throws -> Int32 {
+        guard let subcommand = arguments.popFirst() else {
+            throw CLIExitError.usage("task 需要子命令：list/show/delete")
+        }
+
+        switch subcommand {
+        case "list":
+            let tasks = try repository.loadTasks(includeRuns: true).map { TaskPayload(task: $0) }
+            emitOrPrint(tasks) {
+                tasks.map { "\($0.id)\t\($0.slug ?? "-")\t\($0.name)" }.joined(separator: "\n")
+            }
+            return 0
+        case "show":
+            let selector = try takeValue("任务 id 或 slug")
+            let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: true)
+            emitOrPrint(TaskDetailPayload(task: read.task, revision: read.revision)) {
+                formatTask(read.task, revision: read.revision)
+            }
+            return 0
+        case "delete":
+            let selector = try takeValue("任务 id 或 slug")
+            let id = try repository.deleteTask(selector: .idOrSlug(selector))
+            emitOrPrint(["deleted": id]) {
+                "已移到废纸篓：\(id)"
+            }
+            return 0
+        default:
+            throw CLIExitError.usage("未知 task 子命令：\(subcommand)")
+        }
+    }
+
+    private mutating func runApply() throws -> Int32 {
+        let dryRun = arguments.removeAll("--dry-run")
+        let allowDangerous = arguments.removeAll("--allow-dangerous")
+        let expectedRevision = try takeOptionalFlagValue("--expected-revision").map(TaskDefinitionRevision.init(token:))
+        let path = try takeValue("TaskSpec JSON 文件路径，或 -")
+        let spec = try readTaskSpec(path: path)
+        let selector: TaskRepositorySelector?
+        if let id = spec.id {
+            selector = .id(id)
+        } else if let slug = spec.slug {
+            selector = .slug(slug)
+        } else {
+            selector = nil
+        }
+
+        let existing: TaskRepositoryReadResult?
+        if let selector {
+            do {
+                existing = try repository.loadTask(selector: selector, includeRuns: true)
+            } catch TaskRepositoryError.notFound(_) {
+                existing = nil
+            }
+        } else {
+            existing = nil
+        }
+
+        _ = try repository.validate(spec: spec, creating: existing == nil)
+        let risks = DangerousCommandScanner.scan(spec.script ?? existing?.task.script ?? "")
+        try rejectDangerousCommandRisks(risks, allowDangerous: allowDangerous)
+        let action = existing == nil ? "create" : "update"
+        if dryRun {
+            let changes = applyChanges(spec: spec, existing: existing?.task)
+            let payload = ApplyPayload(
+                action: action,
+                dryRun: true,
+                task: existing.map { TaskPayload(task: $0.task) },
+                revision: existing?.revision,
+                revisionToken: existing?.revision.token,
+                changes: changes,
+                risks: risks.map(RiskPayload.init)
+            )
+            emitOrPrint(payload) {
+                formatApply(payload)
+            }
+            return 0
+        }
+
+        let result: TaskRepositoryWriteResult
+        if let existing, let selector {
+            result = try repository.updateTask(selector: selector, with: spec, expectedRevision: expectedRevision ?? existing.revision)
+        } else {
+            if expectedRevision != nil {
+                throw CLIExitError.conflict("--expected-revision 只能用于更新已有任务。")
+            }
+            result = try repository.createTask(from: spec)
+        }
+        let payload = ApplyPayload(
+            action: action,
+            dryRun: false,
+            task: TaskPayload(task: result.task),
+            revision: result.revision,
+            revisionToken: result.revision.token,
+            changes: applyChanges(spec: spec, existing: existing?.task),
+            risks: risks.map(RiskPayload.init)
+        )
+        emitOrPrint(payload) {
+            formatApply(payload)
+        }
+        return 0
+    }
+
+    private mutating func runRunCommand() throws -> Int32 {
+        guard let firstArgument = arguments.first else {
+            throw CLIExitError.usage("run 需要任务 id/slug，或 status/log 子命令")
+        }
+
+        switch firstArgument {
+        case "status":
+            _ = arguments.popFirst()
+            let runID = try takeValue("run id")
+            let status = try findRun(runID: runID)
+            emitOrPrint(status) {
+                formatRunStatus(status)
+            }
+            return 0
+        case "log":
+            _ = arguments.popFirst()
+            let runID = try takeValue("run id")
+            let stream = arguments.removeAll("--stderr") ? "stderr" : "stdout"
+            let status = try findRun(runID: runID)
+            let text = try readLog(status: status, stream: stream)
+            if jsonOutput {
+                emit(LogPayload(runId: runID, stream: stream, text: text))
+            } else {
+                print(text, terminator: "")
+            }
+            return 0
+        case "cancel", "stop":
+            _ = arguments.popFirst()
+            let runID = try takeValue("run id")
+            let payload = try cancelRun(runID: runID)
+            emitOrPrint(payload) {
+                "已发送终止信号：\(payload.runId)"
+            }
+            return 0
+        default:
+            let detach = arguments.removeAll("--detach")
+            _ = arguments.removeAll("--wait")
+            let allowDangerous = arguments.removeAll("--allow-dangerous")
+            let selector = try takeValue("任务 id 或 slug")
+            let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: true)
+            let risks = DangerousCommandScanner.scan(read.task.script)
+            try rejectDangerousCommandRisks(risks, allowDangerous: allowDangerous)
+            if detach {
+                let payload = try startDetached(task: read.task)
+                emitOrPrint(payload) {
+                    "已在后台启动：\(payload.runId)"
+                }
+                return 0
+            }
+
+            let record = try TaskRunner.run(task: read.task, trigger: .manual, host: "cli")
+            emitOrPrint(RunPayload(taskId: read.task.id, run: record)) {
+                "\(record.runId)\t\(record.status.rawValue)"
+            }
+            if record.status == .success {
+                return 0
+            }
+            return Int32(CLIExitError.runFailed("任务运行失败：\(record.status.rawValue)").exitCode)
+        }
+    }
+
+    private mutating func runDoctor() throws -> Int32 {
+        let loadResult = try repository.loadTasksWithIssues(includeRuns: false)
+        let heartbeat = readJSONFile(at: RunShelfPaths.schedulerHeartbeatURL(), as: SchedulerHeartbeat.self)
+        let payload = DoctorPayload(
+            appSupportDirectory: RunShelfPaths.appSupportDirectoryURL().path,
+            tasksDirectory: RunShelfPaths.tasksDirectoryURL().path,
+            taskCount: loadResult.tasks.count,
+            loadIssues: loadResult.issues,
+            schedulerHeartbeat: heartbeat,
+            path: ProcessInfo.processInfo.environment["PATH"] ?? ""
+        )
+        emitOrPrint(payload) {
+            """
+            App Support: \(payload.appSupportDirectory)
+            Tasks: \(payload.tasksDirectory)
+            任务数: \(payload.taskCount)
+            读取问题: \(payload.loadIssues.count)
+            PATH: \(payload.path)
+            """
+        }
+        return loadResult.issues.isEmpty ? 0 : 1
+    }
+
+    private mutating func runInstallCLI() throws -> Int32 {
+        let force = arguments.removeAll("--force")
+        let prefix = (try takeOptionalFlagValue("--prefix")) ?? "~/.local/bin"
+        let prefixURL = URL(fileURLWithPath: (prefix as NSString).expandingTildeInPath, isDirectory: true)
+        let destinationURL = prefixURL.appendingPathComponent("runshelf")
+        guard let executableURL = Bundle.main.executableURL else {
+            throw CLIExitError.unexpected("无法定位 runshelf 可执行文件。")
+        }
+
+        try FileManager.default.createDirectory(at: prefixURL, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            if force {
+                try FileManager.default.removeItem(at: destinationURL)
+            } else {
+                throw CLIExitError.conflict("目标已存在：\(destinationURL.path)。确认要覆盖时使用 --force。")
+            }
+        }
+        try FileManager.default.createSymbolicLink(at: destinationURL, withDestinationURL: executableURL)
+
+        let pathEntries = (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+        let payload = InstallCLIPayload(
+            path: destinationURL.path,
+            target: executableURL.path,
+            pathConfigured: pathEntries.contains(prefixURL.path)
+        )
+        emitOrPrint(payload) {
+            if payload.pathConfigured {
+                return "已安装：\(payload.path)"
+            }
+            return "已安装：\(payload.path)\n当前 PATH 还不包含 \(prefixURL.path)"
+        }
+        return 0
+    }
+
+    private mutating func runHelp() throws -> Int32 {
+        guard let topic = arguments.popFirst() else {
+            printGeneralHelp()
+            return 0
+        }
+        switch topic {
+        case "agent":
+            print(agentHelpText)
+            return 0
+        default:
+            throw CLIExitError.usage("未知帮助主题：\(topic)")
+        }
+    }
+
+    private mutating func runSchema() throws -> Int32 {
+        guard let name = arguments.popFirst() else {
+            throw CLIExitError.usage("schema 需要名称：task-spec 或 cli-result")
+        }
+        switch name {
+        case "task-spec":
+            print(taskSpecSchemaText)
+            return 0
+        case "cli-result":
+            print(cliResultSchemaText)
+            return 0
+        default:
+            throw CLIExitError.usage("未知 schema：\(name)")
+        }
+    }
+
+    private mutating func runHost() throws -> Int32 {
+        let taskID = try takeFlagValue("--task-id")
+        let runID = try takeFlagValue("--run-id")
+        let read = try repository.loadTask(selector: .id(taskID), includeRuns: true)
+        let record = try TaskRunner.run(
+            task: read.task,
+            trigger: .manual,
+            runId: runID,
+            host: "cli-detach",
+            claimMode: .existing
+        )
+        return record.status == .success ? 0 : 1
+    }
+
+    private mutating func startDetached(task: RunShelfTask) throws -> DetachedRunPayload {
+        let runID = TaskRunner.makeRunID(from: Date())
+        let lease = try TaskRunClaimManager.acquire(task: task, runID: runID, host: "cli-detach-launcher")
+        do {
+            let pid = try spawnDetachedHost(taskID: task.id, runID: runID)
+            try lease.update(processID: pid, host: "cli-detach")
+            return DetachedRunPayload(taskId: task.id, runId: runID, hostProcessID: pid)
+        } catch {
+            lease.release()
+            throw error
+        }
+    }
+
+    private func spawnDetachedHost(taskID: String, runID: String) throws -> pid_t {
+        guard let executableURL = Bundle.main.executableURL else {
+            throw CLIExitError.unexpected("无法定位 runshelf 可执行文件。")
+        }
+
+        var attributes: posix_spawnattr_t?
+        var fileActions: posix_spawn_file_actions_t?
+        guard posix_spawnattr_init(&attributes) == 0 else {
+            throw CLIExitError.unexpected("无法初始化后台进程属性。")
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+            throw CLIExitError.unexpected("无法初始化后台进程文件动作。")
+        }
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+
+        let flags = Int16(POSIX_SPAWN_SETSID)
+        guard posix_spawnattr_setflags(&attributes, flags) == 0 else {
+            throw CLIExitError.unexpected("无法设置后台进程组。")
+        }
+
+        let redirectResult = "/dev/null".withCString { devNull in
+            posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, devNull, O_RDONLY, 0) == 0 &&
+                posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, devNull, O_WRONLY, 0) == 0 &&
+                posix_spawn_file_actions_addopen(&fileActions, STDERR_FILENO, devNull, O_WRONLY, 0) == 0
+        }
+        guard redirectResult else {
+            throw CLIExitError.unexpected("无法重定向后台进程 stdio。")
+        }
+
+        let executablePath = strdup(executableURL.path)
+        let command = strdup("__run-host")
+        let taskFlag = strdup("--task-id")
+        let taskValue = strdup(taskID)
+        let runFlag = strdup("--run-id")
+        let runValue = strdup(runID)
+        guard let executablePath, let command, let taskFlag, let taskValue, let runFlag, let runValue else {
+            throw CLIExitError.unexpected("无法编码后台运行参数。")
+        }
+        defer {
+            free(executablePath)
+            free(command)
+            free(taskFlag)
+            free(taskValue)
+            free(runFlag)
+            free(runValue)
+        }
+
+        var argv: [UnsafeMutablePointer<CChar>?] = [
+            executablePath,
+            command,
+            taskFlag,
+            taskValue,
+            runFlag,
+            runValue,
+            nil
+        ]
+        var environment = ProcessInfo.processInfo.environment.map { key, value in
+            strdup("\(key)=\(value)")
+        }
+        environment.append(nil)
+        defer {
+            for entry in environment where entry != nil {
+                free(entry)
+            }
+        }
+
+        var pid = pid_t()
+        let result = argv.withUnsafeMutableBufferPointer { argvBuffer in
+            environment.withUnsafeMutableBufferPointer { environmentBuffer in
+                posix_spawn(
+                    &pid,
+                    executablePath,
+                    &fileActions,
+                    &attributes,
+                    argvBuffer.baseAddress,
+                    environmentBuffer.baseAddress
+                )
+            }
+        }
+        guard result == 0 else {
+            throw CLIExitError.unexpected("无法启动后台运行宿主：\(String(cString: strerror(result)))")
+        }
+        return pid
+    }
+
+    private func findRun(runID: String) throws -> RunStatusPayload {
+        let tasks = try repository.loadTasks(includeRuns: true)
+        for task in tasks {
+            if let run = task.runs.first(where: { $0.runId == runID }) {
+                let claim = TaskRunClaimManager.activeClaim(for: task)
+                return RunStatusPayload(
+                    task: TaskPayload(task: task),
+                    run: run,
+                    claim: claim?.runId == runID ? claim : nil
+                )
+            }
+            if let claim = TaskRunClaimManager.activeClaim(for: task), claim.runId == runID {
+                return RunStatusPayload(task: TaskPayload(task: task), run: nil, claim: claim)
+            }
+        }
+        throw CLIExitError.notFound("找不到运行记录：\(runID)")
+    }
+
+    private func cancelRun(runID: String) throws -> CancelRunPayload {
+        let tasks = try repository.loadTasks(includeRuns: false)
+        for task in tasks {
+            guard let claim = TaskRunClaimManager.activeClaim(for: task), claim.runId == runID else {
+                continue
+            }
+            let runURL = task.directoryURL
+                .appendingPathComponent("runs", isDirectory: true)
+                .appendingPathComponent(runID, isDirectory: true)
+            try? "cancelled by runshelf CLI\n".write(
+                to: runURL.appendingPathComponent("cancel-requested"),
+                atomically: true,
+                encoding: .utf8
+            )
+            if let processGroupID = claim.processGroupID, processGroupID > 0 {
+                guard kill(-processGroupID, SIGTERM) == 0 || errno == ESRCH else {
+                    throw CLIExitError.unexpected("无法终止进程组 \(processGroupID)：\(String(cString: strerror(errno)))")
+                }
+                return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: processGroupID)
+            }
+            guard kill(claim.processID, SIGTERM) == 0 || errno == ESRCH else {
+                throw CLIExitError.unexpected("无法终止进程 \(claim.processID)：\(String(cString: strerror(errno)))")
+            }
+            return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: nil)
+        }
+        throw CLIExitError.notFound("找不到运行中的任务：\(runID)")
+    }
+
+    private func readLog(status: RunStatusPayload, stream: String) throws -> String {
+        guard let run = status.run else {
+            throw CLIExitError.conflict("运行记录尚未写入日志文件。")
+        }
+        let runURL = RunShelfPaths.tasksDirectoryURL()
+            .appendingPathComponent(status.task.id, isDirectory: true)
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(run.runId, isDirectory: true)
+        let path = stream == "stderr" ? run.stderrPath : run.stdoutPath
+        return (try? String(contentsOf: runURL.appendingPathComponent(path), encoding: .utf8)) ?? ""
+    }
+
+    private mutating func readTaskSpec(path: String) throws -> TaskSpec {
+        let data: Data
+        if path == "-" {
+            data = FileHandle.standardInput.readDataToEndOfFile()
+        } else {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        }
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(TaskSpec.self, from: data)
+        } catch {
+            throw CLIExitError.validation("TaskSpec JSON 无法解析：\(error.localizedDescription)")
+        }
+    }
+
+    private func applyChanges(spec: TaskSpec, existing: RunShelfTask?) -> [ChangePayload] {
+        guard let existing else {
+            return [
+                ChangePayload(field: "task", before: nil, after: "create")
+            ]
+        }
+
+        var changes: [ChangePayload] = []
+        appendChange(&changes, field: "slug", before: existing.manifest.slug, after: spec.slug)
+        appendChange(&changes, field: "name", before: existing.manifest.name, after: spec.name)
+        appendChange(&changes, field: "description", before: existing.manifest.description, after: spec.description)
+        appendChange(&changes, field: "enabled", before: String(existing.manifest.enabled), after: spec.enabled.map(String.init))
+        appendChange(&changes, field: "schedule", before: existing.manifest.schedule.expression, after: spec.schedule?.expression)
+        appendChange(&changes, field: "timeoutSeconds", before: String(existing.manifest.runner.timeoutSeconds), after: spec.timeoutSeconds.map(String.init))
+        appendChange(&changes, field: "script", before: hashSummary(existing.script), after: spec.script.map(hashSummary))
+        appendChange(&changes, field: "notes", before: hashSummary(existing.notes), after: spec.notes.map(hashSummary))
+        return changes
+    }
+
+    private func appendChange(_ changes: inout [ChangePayload], field: String, before: String?, after: String?) {
+        guard let after, before != after else { return }
+        changes.append(ChangePayload(field: field, before: before, after: after))
+    }
+
+    private func hashSummary(_ value: String) -> String {
+        "\(value.count) chars"
+    }
+
+    private func rejectDangerousCommandRisks(_ risks: [CommandRisk], allowDangerous: Bool) throws {
+        guard !risks.isEmpty, !allowDangerous else { return }
+        let summary = risks.map { "\($0.pattern)：\($0.message)" }.joined(separator: "；")
+        throw CLIExitError.dangerous("脚本包含高风险命令，默认拒绝写入或运行。确认要执行时加 --allow-dangerous。\(summary)")
+    }
+
+    private mutating func takeValue(_ label: String) throws -> String {
+        guard let value = arguments.popFirst(), !value.hasPrefix("--") else {
+            throw CLIExitError.usage("缺少参数：\(label)")
+        }
+        return value
+    }
+
+    private mutating func takeFlagValue(_ flag: String) throws -> String {
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else {
+            throw CLIExitError.usage("缺少参数：\(flag)")
+        }
+        let value = arguments[index + 1]
+        arguments.remove(at: index + 1)
+        arguments.remove(at: index)
+        return value
+    }
+
+    private mutating func takeOptionalFlagValue(_ flag: String) throws -> String? {
+        guard let index = arguments.firstIndex(of: flag) else { return nil }
+        guard arguments.indices.contains(index + 1) else {
+            throw CLIExitError.usage("缺少参数：\(flag)")
+        }
+        let value = arguments[index + 1]
+        arguments.remove(at: index + 1)
+        arguments.remove(at: index)
+        return value
+    }
+
+    private func emitOrPrint<T: Encodable>(_ payload: T, text: () -> String) {
+        if jsonOutput {
+            emit(payload)
+        } else {
+            print(text())
+        }
+    }
+
+    private func emit<T: Encodable>(_ payload: T) {
+        emit(Envelope(ok: true, result: payload, error: Optional<ErrorPayload>.none))
+    }
+
+    private func emit<T: Encodable>(_ envelope: Envelope<T>) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = (try? encoder.encode(envelope)) ?? Data()
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
+    private func printGeneralHelp() {
+        print(
+            """
+            runshelf task list [--json]
+            runshelf task show <id|slug> [--json]
+            runshelf apply <task-spec.json|-> [--dry-run] [--expected-revision <token>] [--allow-dangerous] [--json]
+            runshelf run <id|slug> [--wait|--detach] [--allow-dangerous] [--json]
+            runshelf run status <run-id> [--json]
+            runshelf run cancel <run-id> [--json]
+            runshelf run log <run-id> [--stdout|--stderr]
+            runshelf doctor [--json]
+            runshelf install-cli [--prefix ~/.local/bin] [--force] [--json]
+            runshelf help agent
+            runshelf schema task-spec
+            """
+        )
+    }
+}
+
+private enum CLIExitError: Error {
+    case usage(String)
+    case validation(String)
+    case notFound(String)
+    case conflict(String)
+    case dangerous(String)
+    case running(String)
+    case runFailed(String)
+    case unexpected(String)
+
+    var exitCode: Int {
+        switch self {
+        case .usage: return 2
+        case .validation: return 4
+        case .notFound: return 3
+        case .conflict: return 5
+        case .dangerous: return 6
+        case .running: return 7
+        case .runFailed: return 8
+        case .unexpected: return 1
+        }
+    }
+
+    var code: String {
+        switch self {
+        case .usage: return "usage"
+        case .validation: return "validation"
+        case .notFound: return "not_found"
+        case .conflict: return "conflict"
+        case .dangerous: return "dangerous_command"
+        case .running: return "already_running"
+        case .runFailed: return "run_failed"
+        case .unexpected: return "unexpected"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .usage(let message),
+             .validation(let message),
+             .notFound(let message),
+             .conflict(let message),
+             .dangerous(let message),
+             .running(let message),
+             .runFailed(let message),
+             .unexpected(let message):
+            return message
+        }
+    }
+
+    static func from(_ error: TaskRepositoryError) -> CLIExitError {
+        switch error {
+        case .notFound(_):
+            return .notFound(error.localizedDescription)
+        case .ambiguous(_, _), .conflict(_):
+            return .conflict(error.localizedDescription)
+        case .invalidSlug(_), .invalidSchedule(_), .invalidTaskID(_), .invalidRevision(_), .missingRequiredField(_):
+            return .validation(error.localizedDescription)
+        case .taskDirectoryMissing(_):
+            return .notFound(error.localizedDescription)
+        }
+    }
+
+    static func from(_ error: TaskRunnerError) -> CLIExitError {
+        switch error {
+        case .runAlreadyActive(_):
+            return .running(error.localizedDescription)
+        case .missingScript(_):
+            return .validation(error.localizedDescription)
+        case .processDidNotStart(_):
+            return .unexpected(error.localizedDescription)
+        }
+    }
+}
+
+private struct Envelope<Result: Encodable>: Encodable {
+    var ok: Bool
+    var result: Result?
+    var error: ErrorPayload?
+}
+
+private struct ErrorPayload: Encodable {
+    var code: String
+    var message: String
+}
+
+private struct TaskPayload: Encodable {
+    var id: String
+    var slug: String?
+    var name: String
+    var description: String
+    var enabled: Bool
+    var schedule: TaskSchedule
+    var timeoutSeconds: Int
+    var updatedAt: Date
+    var latestRun: RunRecord?
+
+    init(task: RunShelfTask) {
+        self.id = task.id
+        self.slug = task.manifest.slug
+        self.name = task.manifest.name
+        self.description = task.manifest.description
+        self.enabled = task.manifest.enabled
+        self.schedule = task.manifest.schedule
+        self.timeoutSeconds = task.manifest.runner.timeoutSeconds
+        self.updatedAt = task.manifest.updatedAt
+        self.latestRun = task.latestRun
+    }
+}
+
+private struct TaskDetailPayload: Encodable {
+    var task: TaskPayload
+    var revision: TaskDefinitionRevision
+    var revisionToken: String
+    var script: String
+    var notes: String
+    var directoryPath: String
+
+    init(task: RunShelfTask, revision: TaskDefinitionRevision) {
+        self.task = TaskPayload(task: task)
+        self.revision = revision
+        self.revisionToken = revision.token
+        self.script = task.script
+        self.notes = task.notes
+        self.directoryPath = task.directoryURL.path
+    }
+}
+
+private struct ApplyPayload: Encodable {
+    var action: String
+    var dryRun: Bool
+    var task: TaskPayload?
+    var revision: TaskDefinitionRevision?
+    var revisionToken: String?
+    var changes: [ChangePayload]
+    var risks: [RiskPayload]
+}
+
+private struct ChangePayload: Encodable {
+    var field: String
+    var before: String?
+    var after: String?
+}
+
+private struct RiskPayload: Encodable {
+    var pattern: String
+    var message: String
+
+    init(_ risk: CommandRisk) {
+        self.pattern = risk.pattern
+        self.message = risk.message
+    }
+}
+
+private struct RunPayload: Encodable {
+    var taskId: String
+    var run: RunRecord
+}
+
+private struct DetachedRunPayload: Encodable {
+    var taskId: String
+    var runId: String
+    var hostProcessID: Int32
+}
+
+private struct RunStatusPayload: Encodable {
+    var task: TaskPayload
+    var run: RunRecord?
+    var claim: TaskRunClaim?
+}
+
+private struct CancelRunPayload: Encodable {
+    var taskId: String
+    var runId: String
+    var signal: Int32
+    var processID: Int32
+    var processGroupID: Int32?
+}
+
+private struct LogPayload: Encodable {
+    var runId: String
+    var stream: String
+    var text: String
+}
+
+private struct DoctorPayload: Encodable {
+    var appSupportDirectory: String
+    var tasksDirectory: String
+    var taskCount: Int
+    var loadIssues: [TaskLoadIssue]
+    var schedulerHeartbeat: SchedulerHeartbeat?
+    var path: String
+}
+
+private struct InstallCLIPayload: Encodable {
+    var path: String
+    var target: String
+    var pathConfigured: Bool
+}
+
+private func formatTask(_ task: RunShelfTask, revision: TaskDefinitionRevision) -> String {
+    """
+    \(task.manifest.name)
+    id: \(task.id)
+    slug: \(task.manifest.slug ?? "-")
+    enabled: \(task.manifest.enabled)
+    schedule: \(task.manifest.schedule.expression)
+    timeoutSeconds: \(task.manifest.runner.timeoutSeconds)
+    revision: \(revision.manifest?.size ?? 0)/\(revision.script?.size ?? 0)/\(revision.notes?.size ?? 0)
+    revisionToken: \(revision.token)
+    """
+}
+
+private func formatApply(_ payload: ApplyPayload) -> String {
+    let changes = payload.changes.isEmpty ? "无字段变化" : payload.changes.map { "\($0.field): \($0.before ?? "-") -> \($0.after ?? "-")" }.joined(separator: "\n")
+    let risks = payload.risks.isEmpty ? "未发现高风险命令" : payload.risks.map { "\($0.pattern)：\($0.message)" }.joined(separator: "\n")
+    return """
+    action: \(payload.action)
+    dryRun: \(payload.dryRun)
+    revisionToken: \(payload.revisionToken ?? "-")
+    \(changes)
+    \(risks)
+    """
+}
+
+private func formatRunStatus(_ payload: RunStatusPayload) -> String {
+    if let run = payload.run {
+        return "\(run.runId)\t\(payload.task.name)\t\(run.status.rawValue)"
+    }
+    if let claim = payload.claim {
+        return "\(claim.runId)\t\(payload.task.name)\trunning\tpid=\(claim.processID)"
+    }
+    return "\(payload.task.name)\tunknown"
+}
+
+private func readJSONFile<T: Decodable>(at url: URL, as type: T.Type) -> T? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return try? decoder.decode(T.self, from: data)
+}
+
+private extension Array where Element == String {
+    mutating func popFirst() -> String? {
+        isEmpty ? nil : removeFirst()
+    }
+
+    mutating func removeAll(_ value: String) -> Bool {
+        let oldCount = count
+        self = filter { $0 != value }
+        return oldCount != count
+    }
+}
+
+private let agentHelpText = """
+Run Shelf 的 agent 操作约定：
+
+1. 不要直接编辑 task.json、run.sh、notes.md。用 runshelf apply 写入，CLI 会做校验、CAS 冲突检测和原子写。
+2. 先读再改：runshelf task show <id|slug> --json。优先使用 id 或 slug，不要靠 name 选择任务。
+3. 修改任务时，把 show 返回的 revisionToken 带回 apply：runshelf apply spec.json --expected-revision <token> --json。
+4. 先 dry-run 再真正写入：runshelf apply spec.json --dry-run --json，然后 runshelf apply spec.json --expected-revision <token> --json。
+5. 长任务用 runshelf run <id|slug> --detach --json，拿到 runId 后用 runshelf run status <runId> --json 轮询；需要停止时用 runshelf run cancel <runId> --json。
+6. 脚本命中高风险命令时，apply/run 默认拒绝；确认要写入或运行时显式加 --allow-dangerous。
+7. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
+8. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
+9. 退出码契约：0=成功，1=未知错误，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
+10. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
+"""
+
+private let taskSpecSchemaText = """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runshelf.local/schemas/task-spec.schema.json",
+  "title": "Run Shelf TaskSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "description": "任务 UUID。创建时可省略；更新时可作为选择器。" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "enabled": { "type": "boolean" },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "cron" },
+        "expression": { "type": "string" },
+        "timezone": { "type": "string" }
+      },
+      "required": ["type", "expression", "timezone"]
+    },
+    "timeoutSeconds": { "type": "integer", "minimum": 0 },
+    "script": { "type": "string" },
+    "notes": { "type": "string" }
+  }
+}
+"""
+
+private let cliResultSchemaText = """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runshelf.local/schemas/cli-result.schema.json",
+  "title": "Run Shelf CLI Result",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ok"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "result": {},
+    "error": {
+      "type": ["object", "null"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["usage", "not_found", "validation", "conflict", "dangerous_command", "already_running", "run_failed", "unexpected"]
+        },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"]
+    }
+  }
+}
+"""

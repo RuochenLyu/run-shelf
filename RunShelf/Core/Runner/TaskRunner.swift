@@ -5,6 +5,7 @@ import Foundation
 enum TaskRunnerError: LocalizedError {
     case missingScript(URL)
     case processDidNotStart(String)
+    case runAlreadyActive(TaskRunClaim)
 
     var errorDescription: String? {
         switch self {
@@ -12,6 +13,8 @@ enum TaskRunnerError: LocalizedError {
             return "找不到脚本：\(url.path)"
         case .processDidNotStart(let message):
             return "脚本未能启动：\(message)"
+        case .runAlreadyActive(let claim):
+            return "任务正在运行：runId=\(claim.runId)，pid=\(claim.processID)"
         }
     }
 }
@@ -51,18 +54,46 @@ enum TaskRunner {
         task: RunShelfTask,
         trigger: RunTrigger,
         scheduledAt: Date? = nil,
+        runId requestedRunId: String? = nil,
+        host: String = "runner",
+        claimMode: TaskRunClaimMode = .acquire,
         cancellation: TaskRunCancellation? = nil,
         terminationGraceSeconds: TimeInterval = 5
     ) throws -> RunRecord {
         let fileManager = FileManager.default
         let startedAt = Date()
-        let runId = makeRunID(from: startedAt)
+        let runId = requestedRunId ?? makeRunID(from: startedAt)
         let runsURL = task.directoryURL.appendingPathComponent("runs", isDirectory: true)
         let runURL = runsURL.appendingPathComponent(runId, isDirectory: true)
         let snapshotURL = runURL.appendingPathComponent("run.sh.snapshot")
         let stdoutURL = runURL.appendingPathComponent("stdout.log")
         let stderrURL = runURL.appendingPathComponent("stderr.log")
         let metaURL = runURL.appendingPathComponent("meta.json")
+        let cancellationURL = runURL.appendingPathComponent("cancel-requested")
+
+        let claimLease: TaskRunClaimLease
+        do {
+            switch claimMode {
+            case .acquire:
+                claimLease = try TaskRunClaimManager.acquire(
+                    task: task,
+                    runID: runId,
+                    host: host,
+                    now: startedAt,
+                    fileManager: fileManager
+                )
+            case .existing:
+                claimLease = try TaskRunClaimManager.existing(
+                    task: task,
+                    runID: runId,
+                    fileManager: fileManager
+                )
+                try claimLease.update(processID: getpid(), host: host)
+            }
+        } catch TaskRunClaimError.alreadyRunning(let claim) {
+            throw TaskRunnerError.runAlreadyActive(claim)
+        }
+        defer { claimLease.release() }
 
         try fileManager.createDirectory(at: runURL, withIntermediateDirectories: true)
 
@@ -86,15 +117,66 @@ enum TaskRunner {
             try? stderrHandle.close()
         }
 
-        let execution = try runSnapshot(
-            snapshotURL: snapshotURL,
-            workingDirectoryURL: task.directoryURL,
-            stdoutHandle: stdoutHandle,
-            stderrHandle: stderrHandle,
-            timeoutSeconds: task.manifest.runner.timeoutSeconds,
-            cancellation: cancellation,
-            terminationGraceSeconds: terminationGraceSeconds
+        let scriptSha256 = try sha256Hex(for: snapshotURL)
+        var runningRecord = RunRecord(
+            runId: runId,
+            taskId: task.id,
+            trigger: trigger,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: scheduledAt,
+            startedAt: startedAt,
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: scriptSha256,
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil,
+            processID: getpid(),
+            processGroupID: nil
         )
+        try write(record: runningRecord, to: metaURL)
+
+        let execution: ExecutionResult
+        do {
+            execution = try runSnapshot(
+                snapshotURL: snapshotURL,
+                workingDirectoryURL: task.directoryURL,
+                stdoutHandle: stdoutHandle,
+                stderrHandle: stderrHandle,
+                timeoutSeconds: task.manifest.runner.timeoutSeconds,
+                cancellation: cancellation,
+                externalCancellationURL: cancellationURL,
+                terminationGraceSeconds: terminationGraceSeconds,
+                onProcessStarted: { processGroupID in
+                    try claimLease.update(processGroupID: processGroupID)
+                    runningRecord.processGroupID = processGroupID
+                    try write(record: runningRecord, to: metaURL)
+                }
+            )
+        } catch {
+            let endedAt = Date()
+            let record = RunRecord(
+                runId: runId,
+                taskId: task.id,
+                trigger: trigger,
+                status: .failed,
+                exitCode: nil,
+                scheduledAt: scheduledAt,
+                startedAt: startedAt,
+                endedAt: endedAt,
+                durationMs: Int(endedAt.timeIntervalSince(startedAt) * 1000),
+                scriptSha256: scriptSha256,
+                stdoutPath: "stdout.log",
+                stderrPath: "stderr.log",
+                message: error.localizedDescription,
+                processID: getpid(),
+                processGroupID: runningRecord.processGroupID
+            )
+            try write(record: record, to: metaURL)
+            RetentionCleaner.clean(taskDirectoryURL: task.directoryURL, policy: task.manifest.retention, preserving: record.runId)
+            return record
+        }
 
         let endedAt = Date()
         let status: TaskRunStatus
@@ -106,7 +188,6 @@ enum TaskRunner {
             status = execution.exitCode == 0 ? .success : .failed
         }
         let durationMs = Int(endedAt.timeIntervalSince(startedAt) * 1000)
-        let scriptSha256 = try sha256Hex(for: snapshotURL)
 
         let record = RunRecord(
             runId: runId,
@@ -121,7 +202,9 @@ enum TaskRunner {
             scriptSha256: scriptSha256,
             stdoutPath: "stdout.log",
             stderrPath: "stderr.log",
-            message: execution.message
+            message: execution.message,
+            processID: getpid(),
+            processGroupID: runningRecord.processGroupID
         )
 
         try write(record: record, to: metaURL)
@@ -173,7 +256,7 @@ enum TaskRunner {
         return record
     }
 
-    private static func makeRunID(from date: Date) -> String {
+    static func makeRunID(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .current
@@ -211,7 +294,9 @@ private extension TaskRunner {
         stderrHandle: FileHandle,
         timeoutSeconds: Int,
         cancellation: TaskRunCancellation?,
-        terminationGraceSeconds: TimeInterval
+        externalCancellationURL: URL?,
+        terminationGraceSeconds: TimeInterval,
+        onProcessStarted: ((pid_t) throws -> Void)? = nil
     ) throws -> ExecutionResult {
         let pid = try spawnProcessGroup(
             executableURL: snapshotURL,
@@ -219,6 +304,12 @@ private extension TaskRunner {
             stdoutHandle: stdoutHandle,
             stderrHandle: stderrHandle
         )
+        do {
+            try onProcessStarted?(pid)
+        } catch {
+            terminateProcessGroup(pid: pid, signal: SIGTERM)
+            throw error
+        }
         cancellation?.setCancellationHandler {
             terminateProcessGroup(pid: pid, signal: SIGTERM)
         }
@@ -240,6 +331,9 @@ private extension TaskRunner {
                 if !wasCancelled, cancellation?.isCancelled == true {
                     wasCancelled = true
                 }
+                if !wasCancelled, let externalCancellationURL, FileManager.default.fileExists(atPath: externalCancellationURL.path) {
+                    wasCancelled = true
+                }
                 if (didTimeout || wasCancelled), !sentKill {
                     terminateProcessGroup(pid: pid, signal: SIGKILL)
                 }
@@ -257,6 +351,13 @@ private extension TaskRunner {
                 wasCancelled = true
                 terminationRequestedAt = now
                 writeLine("Run Shelf：用户取消了运行，正在终止进程组。", to: stderrHandle)
+                terminateProcessGroup(pid: pid, signal: SIGTERM)
+            }
+
+            if !wasCancelled, let externalCancellationURL, FileManager.default.fileExists(atPath: externalCancellationURL.path) {
+                wasCancelled = true
+                terminationRequestedAt = now
+                writeLine("Run Shelf：CLI 请求取消运行，正在终止进程组。", to: stderrHandle)
                 terminateProcessGroup(pid: pid, signal: SIGTERM)
             }
 

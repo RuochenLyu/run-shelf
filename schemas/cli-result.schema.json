@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runshelf.local/schemas/cli-result.schema.json",
+  "title": "Run Shelf CLI Result",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "ok"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {},
+    "error": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "usage",
+            "not_found",
+            "validation",
+            "conflict",
+            "dangerous_command",
+            "already_running",
+            "run_failed",
+            "unexpected"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ]
+    }
+  }
+}

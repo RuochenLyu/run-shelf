@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A93730B8FDA516D2317F37AF"
+               BlueprintIdentifier = "4BF03DFFAF7D04A4C889C5C6"
                BuildableName = "Run Shelf.app"
                BlueprintName = "RunShelf"
                ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A93730B8FDA516D2317F37AF"
+            BlueprintIdentifier = "4BF03DFFAF7D04A4C889C5C6"
             BuildableName = "Run Shelf.app"
             BlueprintName = "RunShelf"
             ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -38,11 +38,10 @@
       </MacroExpansion>
       <Testables>
          <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
+            skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FC9760B0A561F45C562DDFE7"
+               BlueprintIdentifier = "8FE76C8D5556A3DB40F3C9C7"
                BuildableName = "RunShelfTests.xctest"
                BlueprintName = "RunShelfTests"
                ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -64,7 +63,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A93730B8FDA516D2317F37AF"
+            BlueprintIdentifier = "4BF03DFFAF7D04A4C889C5C6"
             BuildableName = "Run Shelf.app"
             BlueprintName = "RunShelf"
             ReferencedContainer = "container:RunShelf.xcodeproj">
@@ -81,7 +80,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A93730B8FDA516D2317F37AF"
+            BlueprintIdentifier = "4BF03DFFAF7D04A4C889C5C6"
             BuildableName = "Run Shelf.app"
             BlueprintName = "RunShelf"
             ReferencedContainer = "container:RunShelf.xcodeproj">

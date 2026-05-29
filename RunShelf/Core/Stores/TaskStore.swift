@@ -41,6 +41,7 @@ final class TaskStore: ObservableObject {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let diskLoader: TaskFileStore
+    private let repository: TaskRepository
 
     // 异步 refresh 的状态：
     // - generations: 每个任务的 epoch，每次 mutation 都 +1；
@@ -71,6 +72,7 @@ final class TaskStore: ObservableObject {
         self.decoder = decoder
 
         self.diskLoader = TaskFileStore(tasksDirectoryURL: tasksDirectoryURL, fileManager: fileManager)
+        self.repository = TaskRepository(tasksDirectoryURL: tasksDirectoryURL, fileManager: fileManager)
 
         loadTasks()
     }
@@ -312,7 +314,8 @@ final class TaskStore: ObservableObject {
 
         do {
             tasks[index].manifest.updatedAt = Date()
-            try writeTask(tasks[index])
+            let expectedRevision = signatureCache[id].map { TaskDefinitionRevision(signature: $0) }
+            try writeTask(tasks[index], expectedRevision: expectedRevision)
             tasks[index].isDirty = false
             // 写盘成功 → bump generation + 更新 signature cache，
             // 让正在跑的 detached scan apply 时能识别"内存版本已经领先于它看到的"
@@ -406,7 +409,9 @@ final class TaskStore: ObservableObject {
         runningStartedAt[id] = Date()
 
         Task.detached(priority: .userInitiated) {
-            let result = Result { try TaskRunner.run(task: task, trigger: .manual, cancellation: cancellation) }
+            let result = Result {
+                try TaskRunner.run(task: task, trigger: .manual, host: "app", cancellation: cancellation)
+            }
 
             await MainActor.run {
                 self.runningTaskIDs.remove(id)
@@ -453,7 +458,9 @@ final class TaskStore: ObservableObject {
     }
 
     func canRunTask(_ task: RunShelfTask) -> Bool {
-        !runningTaskIDs.contains(task.id) && canPersistTask(task)
+        !runningTaskIDs.contains(task.id) &&
+            TaskRunClaimManager.activeClaim(for: task) == nil &&
+            canPersistTask(task)
     }
 
     private func canPersistTask(_ task: RunShelfTask) -> Bool {
@@ -573,36 +580,8 @@ final class TaskStore: ObservableObject {
         return reloaded
     }
 
-    private func writeTask(_ task: RunShelfTask) throws {
-        // 不允许「静默 resurrect」被外部删掉的任务目录：
-        // makeTask 走 createTask 路径，会在调本函数前先 createDirectory，所以这里看得到目录；
-        // saveTask 走的是「写既有任务」路径，目录被外部 rm -rf 时这里就要让保存失败，
-        // 让用户看到 lastErrorMessage 而不是凭空把目录建出来。
-        guard fileManager.fileExists(atPath: task.directoryURL.path) else {
-            throw NSError(domain: "RunShelf", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "任务目录已不存在（可能被外部删除）：\(task.directoryURL.lastPathComponent)"
-            ])
-        }
-        try fileManager.createDirectory(at: task.directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
-
-        let manifestData = try encoder.encode(task.manifest)
-        try manifestData.write(to: task.directoryURL.appendingPathComponent("task.json"), options: [.atomic])
-
-        try task.script.write(
-            to: task.directoryURL.appendingPathComponent("run.sh"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try fileManager.setAttributes(
-            [.posixPermissions: NSNumber(value: Int16(0o755))],
-            ofItemAtPath: task.directoryURL.appendingPathComponent("run.sh").path
-        )
-
-        try task.notes.write(
-            to: task.directoryURL.appendingPathComponent("notes.md"),
-            atomically: true,
-            encoding: .utf8
-        )
+    private func writeTask(_ task: RunShelfTask, expectedRevision: TaskDefinitionRevision? = nil) throws {
+        try repository.writeTask(task, expectedRevision: expectedRevision)
     }
 
     private func refreshRuns(for id: String) {

@@ -1,6 +1,6 @@
 import Foundation
 
-struct TaskLoadIssue: Equatable {
+struct TaskLoadIssue: Codable, Equatable, Sendable {
     var directoryName: String
     var errorDescription: String
 
@@ -100,14 +100,58 @@ struct TaskFileStore {
         ) else {
             return []
         }
+        let claimTask = taskForRunClaim(at: taskDirectoryURL)
 
         return runDirectories.compactMap { runDirectory -> RunRecord? in
             guard isDirectory(runDirectory) else { return nil }
             let metaURL = runDirectory.appendingPathComponent("meta.json")
             guard let data = try? Data(contentsOf: metaURL) else { return nil }
-            return try? decoder.decode(RunRecord.self, from: data)
+            guard let record = try? decoder.decode(RunRecord.self, from: data) else { return nil }
+            return reconcileRunningRecord(record, metaURL: metaURL, claimTask: claimTask)
         }
         .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    private func reconcileRunningRecord(
+        _ record: RunRecord,
+        metaURL: URL,
+        claimTask: RunShelfTask?
+    ) -> RunRecord {
+        guard record.status == .running, let claimTask else { return record }
+        let activeClaim = TaskRunClaimManager.activeClaim(for: claimTask, fileManager: fileManager)
+        guard activeClaim?.runId != record.runId else { return record }
+
+        let endedAt = Date()
+        var stale = record
+        stale.status = .stale
+        stale.endedAt = endedAt
+        stale.durationMs = Int(endedAt.timeIntervalSince(record.startedAt) * 1000)
+        stale.message = stale.message ?? "运行宿主已不存在，本次运行已标记为 stale。"
+        try? writeRunRecord(stale, to: metaURL)
+        return stale
+    }
+
+    private func taskForRunClaim(at directoryURL: URL) -> RunShelfTask? {
+        guard let manifestData = try? Data(contentsOf: directoryURL.appendingPathComponent("task.json")),
+              let manifest = try? decoder.decode(TaskManifest.self, from: manifestData)
+        else {
+            return nil
+        }
+        return RunShelfTask(
+            manifest: manifest,
+            directoryURL: directoryURL,
+            script: "",
+            notes: "",
+            runs: [],
+            isDirty: false
+        )
+    }
+
+    private func writeRunRecord(_ record: RunRecord, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(record).write(to: url, options: [.atomic])
     }
 
     private func readText(at url: URL) -> String {

@@ -107,7 +107,8 @@ final class SchedulerEngine {
         }
 
         let allowsConcurrentRun = task.manifest.runner.concurrency == "allow"
-        if runningTaskIDs.contains(task.id), !allowsConcurrentRun {
+        if !allowsConcurrentRun,
+           (runningTaskIDs.contains(task.id) || TaskRunClaimManager.activeClaim(for: task) != nil) {
             writeSystemRecord(
                 task: task,
                 status: .skipped,
@@ -127,7 +128,12 @@ final class SchedulerEngine {
 
         DispatchQueue.global(qos: .utility).async {
             let result = Result {
-                try TaskRunner.run(task: task, trigger: .scheduled, scheduledAt: scheduledAt)
+                try TaskRunner.run(
+                    task: task,
+                    trigger: .scheduled,
+                    scheduledAt: scheduledAt,
+                    host: "scheduler"
+                )
             }
 
             self.queue.async {

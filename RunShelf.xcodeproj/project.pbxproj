@@ -7,107 +7,142 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		043B6E3CCB94EF3716BE737C /* RunShelfCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C127A669F488F0A5C2E24C1 /* RunShelfCoreTests.swift */; };
-		06FDBF2AEE613AC79D6175F5 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */; };
-		071E119ADCC621812AB3EA6E /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */; };
-		0A0DDA47A45F8C8DAD09CBEF /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F02CBBBFA3C3762648611A /* TaskStore.swift */; };
-		0B93D737F24DB9CBA58FE4D7 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */; };
-		0EAE86AC6CC57727F82D1B06 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 369A783F9960DE36C62AE1D3 /* Assets.xcassets */; };
-		166FD787521D31D770238E63 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
-		1AB9D8A65B5BD8F5CF6437C3 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36D2068EFDCA097CB98345AA /* Cocoa.framework */; };
-		1C9D84A89A5E9DCBB87EA20A /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */; };
-		2171A4214633546CDC7CBEA0 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */; };
-		289AFE672AEFEFB47E7D3B72 /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */; };
-		2B8702EFE0D4E1E3088A9C27 /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */; };
-		33328DD6E43E1D15984FA30B /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C54C102515E0E12C2498BF /* CronSchedule.swift */; };
-		33D3C719BFFC5988883B078A /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */; };
-		34A14A9BA3923BC711A2A1B7 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */; };
-		3617EAE8ECADA8A1C066D1AE /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */; };
-		3802CB57D4642323C8C9B065 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
-		393558C7F8DD5162FE9DEB07 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = BAB936E446C8998F3CFCC077 /* Localizable.xcstrings */; };
-		3D7B9D85594173BED2C6DBB2 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */; };
-		3DB7C2F2ACFE4490117FC286 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */; };
-		441EFCC9850E99B9CF9143D7 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */; };
-		471D3BCC49DE948E3E03FB78 /* NewTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D61D190282B957123EB404C /* NewTaskSheet.swift */; };
-		4C3B25028ED84FC7E0BBAEC6 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
-		4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */; };
-		4C51249D068DCACD265644C9 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C54C102515E0E12C2498BF /* CronSchedule.swift */; };
-		4E91FD5380752063D1946197 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */ = {isa = PBXBuildFile; fileRef = C17DE32A8BDE27EEC8D39BB8 /* com.aix4u.runshelf.scheduler.plist */; };
-		574BCDF91EAD6C4F1F67ECFF /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C295C901C0444A4DF9768E50 /* TaskModels.swift */; };
-		5BD1522F2A37CDD9464C7178 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 45BACA9087858ABEEFA6394C /* Cocoa.framework */; };
-		6116E1F9BC0631BB3F0E0472 /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */; };
-		65600F1E6741465ABD4FC410 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A309F739E837A412F349225 /* EmptyStateView.swift */; };
-		69B286762AFCF67E4368A12F /* RunShelfScheduler in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 2B67D3B78860C69DBAD290E1 /* RunShelfScheduler */; };
-		6BE2349F88EFF7D63AEC08E6 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
-		6DD1DDDE234079E0FD2877B6 /* ShellSyntaxHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D222E1C8207DA81C66BD2FC9 /* ShellSyntaxHighlighter.swift */; };
-		6EF0326A9AA552CA172A91E6 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 45BACA9087858ABEEFA6394C /* Cocoa.framework */; };
-		75A3425663B837DBAE31E1A0 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9E1372C2E4FB3B73E906F5 /* StatusBadge.swift */; };
-		7C5BAFC88CD5939332F8E30C /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */; };
-		7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */; };
-		7FE2E75D771240E63D659373 /* SchedulerServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */; };
-		85D867EFC1E4E209BF1B2F8A /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */; };
-		85D90E7CB7695CA389FFA994 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */; };
-		8810A15F751D0DDC78FB3019 /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */; };
-		8D4D4EE72C1BAB0B30E3076D /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */; };
-		9B34E2179B73ADF9E0C5A237 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */; };
-		9E52291B91611A54074EE23D /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F02CBBBFA3C3762648611A /* TaskStore.swift */; };
-		A053E975093BB516CE23663C /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */; };
-		A09B0D8767ECFDA952E94CD2 /* SchedulePreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */; };
-		A1B2C3D4E5F60718293A4B5D /* RunShelfWindowMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* RunShelfWindowMetrics.swift */; };
-		A33871A3D61908E5DF42A191 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A115BE875312135B7BDE3D /* TaskTemplate.swift */; };
-		A90BEDF53634189DC9255A58 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */; };
-		ABA5BD7B26D90B80E4FD4A12 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */; };
-		AE06EF7799204FB01A8E756A /* TaskInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 043EFA46EB17EA287D69428B /* TaskInspectorView.swift */; };
-		B359B00BF5C1A6A23CF083A4 /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */; };
-		B387C0CF57A1F337A583BF0C /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */; };
-		C1C46E5D4BDCAC819EDC6168 /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C295C901C0444A4DF9768E50 /* TaskModels.swift */; };
-		C4DAD539AF178493B5FCFC8C /* RunShelfApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */; };
-		C846E25E095780C0B235E946 /* TaskSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E827E905BC9D0A98F5A1452 /* TaskSidebarView.swift */; };
-		C855DD283DF7F9749A3F0224 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */; };
-		CAA597EBE7C71ED7A0F1F39E /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2313E9329AFABE63D17BA434 /* LogView.swift */; };
-		CCC9A1CFB6FCB999A317551C /* RunShelfSchedulerMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E279B833B3E11B6180811103 /* RunShelfSchedulerMain.swift */; };
-		D1D926FD9B950C280D980086 /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = DISKSCAN00000000000000002 /* DiskScan.swift */; };
-		D36C51B16C86814E41528E06 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1699BD6308DDC11488C4BD /* ContentView.swift */; };
-		DISKSCAN00000000000000001 /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = DISKSCAN00000000000000002 /* DiskScan.swift */; };
-		E7B4121D39D3E7B573309C9A /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A115BE875312135B7BDE3D /* TaskTemplate.swift */; };
-		E8EFA37ECFFDE0BE1205819C /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C295C901C0444A4DF9768E50 /* TaskModels.swift */; };
-		E94AE7BE29F8CA5457E74355 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A115BE875312135B7BDE3D /* TaskTemplate.swift */; };
-		EBCFDC5D04E63926F82B3E30 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C54C102515E0E12C2498BF /* CronSchedule.swift */; };
-		F6001C968A84787714504C71 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */; };
-		F7CF61906FDDE3DA9443A559 /* ShellScriptEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D7CBF5D31794E8D73811EC /* ShellScriptEditor.swift */; };
-		LOGLOADER0000000000000001 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = LOGLOADER0000000000000002 /* LogContentLoader.swift */; };
-		PERMGATE0000000000000001 /* PermissionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PERMGATE0000000000000002 /* PermissionGateView.swift */; };
+		0794E853D9EF0B26F8E6DDE6 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
+		099B302783A32D34DB9127FB /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
+		0D7A0B0E7A72DAE6F1E3A650 /* RunShelfApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1CF0D6068E0ABDB49AE133 /* RunShelfApp.swift */; };
+		0D7DB4FF2D41DF5688A507B2 /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
+		1781D79A58D3391CE0557F22 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
+		1855EC1D4B55B878C6BFEA49 /* runshelf in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 9F99A4459B3E0CFC684DD0B3 /* runshelf */; };
+		1AA9EEAA409DBD072B2864EF /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		1C839F31A529404D934FA038 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */; };
+		1EA84E2CEB05C52462F18CAE /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
+		1F9F4D6869EBD8DEE8E2D231 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */; };
+		230DA6F66458D75F4905F781 /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
+		23B803B55F7FC460E19286FD /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
+		266E8106D8193FB93A61A406 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AC9F5096A59E8E6DC907D3A /* Assets.xcassets */; };
+		26D77314F3337F1463F4115E /* RunShelfWindowMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE4947411DB009A669784D9 /* RunShelfWindowMetrics.swift */; };
+		2739D025A5E844E622BD8307 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
+		2A74006715ABA19165D1D2A2 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
+		2D87531C49AFFA12989B87A1 /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
+		2FA93B33E3B2BA4279C37757 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB7E409904F13A101E8263D /* EmptyStateView.swift */; };
+		300B8F1AE54B1A5FDBC8E5BF /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
+		30512AE3F46A04FFC446A150 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
+		3406875B3D5F8B494FB4F08B /* RunShelfCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F9E1A3FBD8E621ED3F539A /* RunShelfCoreTests.swift */; };
+		3BA9473C3021CDB6EDED9753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2C334F43702EBC476AAC3B /* LogView.swift */; };
+		3CBC3B85B70221C870B990F1 /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C162136D8417BC1B1C2785CF /* TaskStore.swift */; };
+		3E1FBCF714503281F20510D5 /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
+		3E3CF6D35E07BE31FCDB452B /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */; };
+		4A8BCB1056E8BD2DA07A9CC8 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */ = {isa = PBXBuildFile; fileRef = 2317B077198B8E42BB644421 /* com.aix4u.runshelf.scheduler.plist */; };
+		4B4102794FA242FBC4CF65C5 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
+		4E5DD84759850A1E186EB8C4 /* TaskRunClaim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */; };
+		4F8E1C73DCE6D7CAC93D0FD6 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C92DCE55EE119DAA6A06D93 /* TaskDetailView.swift */; };
+		5023BC770161BA77909DD32D /* TaskInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EBA73DEB9D70ED60150379 /* TaskInspectorView.swift */; };
+		5394BEA2DC9F59B1C14F6189 /* SchedulePreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31339AE0E828F66559374CDB /* SchedulePreferencesStore.swift */; };
+		54657B5543606149CDED4DCC /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
+		58643D31DDD96A4CB708D3AA /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE656CA65686562CB8B3F686 /* CronSchedule.swift */; };
+		58A32B048A9064DF1A99A527 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
+		5A1F6D7D68B9C9B3410B8BEE /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
+		5E159A1641D52F7949ED2D6C /* RunShelfSchedulerMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E2E29F514C153A615AE585 /* RunShelfSchedulerMain.swift */; };
+		6886CF7B6DDEEB61C6300810 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
+		6A3BD7297156A5E075AFF5BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		7509FF164A2389D508ED4AE2 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
+		77C8BF790699008A016456D3 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		79F4FA41C4021344406D314E /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
+		7A8010CB418ADFE9A53818C7 /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
+		7C0997566C53D068A819F5D7 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
+		7CD900A3C08EBFE16B1FC660 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
+		7DC47C7B5BBA04A86AB56ED2 /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
+		8384C0C0B1F6E63D3E6602BA /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */; };
+		87158FFDACF101FBF09A1830 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */; };
+		87E2520EDB9494AE48415AAE /* TaskRunClaim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */; };
+		89624059587899546D5C5D99 /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */; };
+		8AA56C284D61CAAE9A8F2A84 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
+		8C2FC184B16A7C05A99E6FBD /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
+		8EEF06B1AE89AA5373238E4C /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
+		963F27FCD7D4DFB7BE23B96F /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C162136D8417BC1B1C2785CF /* TaskStore.swift */; };
+		98D8B9BD592C4786E8BF028B /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
+		9C066BDA7D2B950D7E68FBF3 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
+		9D392B6FFB581C6894F07C99 /* TaskHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94817BF0B0F6D615D79BCDCF /* TaskHeaderView.swift */; };
+		9D8937A654A76F443ADB93DD /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */; };
+		9E5187AC3D05AD25924EBAE2 /* ScheduleEditorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86BFEB5CEA5CFF6DFF6F032C /* ScheduleEditorViews.swift */; };
+		A0A4721A32A6F856525920A0 /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
+		A27E4D4ED69EEF5DB36F2CB2 /* RunShelfCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 549746E19653346A4BC2A366 /* RunShelfCLI.swift */; };
+		A2D1D8BB7EAE6670C8FDCEE1 /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
+		A40EC96EA262B584541DF2E8 /* ShellScriptEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */; };
+		A8452E0C36DCCF832C69E461 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE656CA65686562CB8B3F686 /* CronSchedule.swift */; };
+		A8E6BC302156C103B83509C3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5298CDA73E6C315157B13AC4 /* Localizable.xcstrings */; };
+		AE55F8E6B49AA992D8E3B12D /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
+		B3165C131CB0A356AAEA12EE /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
+		B660B99159863F51CA0DBA81 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
+		BB72A47B080FDC8AD620353D /* TaskSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */; };
+		BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 1ECAE2DF384BA2504D2F2996 /* RunShelfScheduler */; };
+		BD625596363E7F13A6C9B103 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
+		BEE45E7943C62DA61AAD4B45 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
+		C316CE8D739BDACEA35DCB69 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		C4D4C605C0F61C30E96E5255 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E80042EBE33D25C47FE4F4 /* LogContentLoader.swift */; };
+		CBD9EA10B61D12EE407EBF86 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 984DC5B795E8535D98006C66 /* SettingsView.swift */; };
+		CD77A00ACBCA1BD608E6C472 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
+		CDA7EDD753F1358EFFBA5F60 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE656CA65686562CB8B3F686 /* CronSchedule.swift */; };
+		CE645E83F18F9CED795B2313 /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
+		CEDD435D4462919AA55D441D /* RunShelfNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */; };
+		D11BFD1FF9849886986F8B25 /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
+		D5CCFDBBBCA66C0289327551 /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
+		DA0F9018DB1157714DA8BAD9 /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
+		DAA18667BBD28235025477B4 /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
+		DBD0C87B104E121A23C81D56 /* TaskRunClaim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */; };
+		DBF67FDDC568216C841CB135 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59BC3E468E3F0CAAD084D73D /* ContentView.swift */; };
+		E06557909D056F8194F913D5 /* SchedulerServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FC047EC6FA7EF416BC87FC /* SchedulerServiceController.swift */; };
+		E35E4D20951688DA147BEEE1 /* ShellSyntaxHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CFB8D9EA3AF04DBD937D93 /* ShellSyntaxHighlighter.swift */; };
+		E90831CE5F3A349C03597652 /* TaskRunClaim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */; };
+		EAE00F141F1DD4D7B28CE012 /* NewTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD46BB536AC778D3331E198 /* NewTaskSheet.swift */; };
+		F1A509EA4C9F181C84631E4B /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		F3DCF9E11D97B503E8A549DB /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
+		F66174AAAC9032E1E918E4D0 /* PermissionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */; };
+		F6765F7C3A9969242BF33857 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		F7C6D55257F32446754ACB6F /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6452E5D8F27F04BD9200CF39 /* StatusBadge.swift */; };
+		FA219ACBEE9397481347B43E /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		FA2598C5F88A3EB552B7F996 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE656CA65686562CB8B3F686 /* CronSchedule.swift */; };
+		FAB0C19310A48336AEC75FD5 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		FC1D80FAFB4B9E02A065EB63 /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		DBD9C408008008A43639EC48 /* PBXContainerItemProxy */ = {
+		51E3736DF4D44E18FCB3014B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 7A8129E50617F8EFAC4F152E /* Project object */;
+			containerPortal = DAD62E2215CDA36B387D27BD /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = CBEF32C491DD33ED98815C98;
+			remoteGlobalIDString = 9FAD8257F0F212B3AA006C2B;
+			remoteInfo = RunShelfCLI;
+		};
+		F205605A6F9F3FF170005BB7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAD62E2215CDA36B387D27BD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C3F774E5343D7EE6C3AC6728;
 			remoteInfo = RunShelfScheduler;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		39457F604C6EB48C655CB198 /* Embed Helpers */ = {
+		311FFE7B162B3DCD914760DA /* Embed Helpers */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = Contents/Library/Helpers;
 			dstSubfolderSpec = 1;
 			files = (
-				69B286762AFCF67E4368A12F /* RunShelfScheduler in Embed Helpers */,
+				BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed Helpers */,
+				1855EC1D4B55B878C6BFEA49 /* runshelf in Embed Helpers */,
 			);
 			name = "Embed Helpers";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		EE8EFE227D92F59DF2D0A3F0 /* Embed LaunchAgents */ = {
+		FE255D79774CE3BE6A795A11 /* Embed LaunchAgents */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = Contents/Library/LaunchAgents;
 			dstSubfolderSpec = 1;
 			files = (
-				4E91FD5380752063D1946197 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */,
+				4A8BCB1056E8BD2DA07A9CC8 /* com.aix4u.runshelf.scheduler.plist in Embed LaunchAgents */,
 			);
 			name = "Embed LaunchAgents";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -115,242 +150,101 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		043EFA46EB17EA287D69428B /* TaskInspectorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskInspectorView.swift; sourceTree = "<group>"; };
-		1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
-		1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerServiceController.swift; sourceTree = "<group>"; };
-		2313E9329AFABE63D17BA434 /* LogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
-		24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
-		2B67D3B78860C69DBAD290E1 /* RunShelfScheduler */ = {isa = PBXFileReference; includeInIndex = 0; path = RunShelfScheduler; sourceTree = BUILT_PRODUCTS_DIR; };
-		2C127A669F488F0A5C2E24C1 /* RunShelfCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCoreTests.swift; sourceTree = "<group>"; };
-		2D61D190282B957123EB404C /* NewTaskSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskSheet.swift; sourceTree = "<group>"; };
-		318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleEditorViews.swift; sourceTree = "<group>"; };
-		369A783F9960DE36C62AE1D3 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		36D2068EFDCA097CB98345AA /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		45BACA9087858ABEEFA6394C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskHeaderView.swift; sourceTree = "<group>"; };
-		51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifications.swift; sourceTree = "<group>"; };
-		5A1699BD6308DDC11488C4BD /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfApp.swift; sourceTree = "<group>"; };
-		70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifier.swift; sourceTree = "<group>"; };
-		76D7CBF5D31794E8D73811EC /* ShellScriptEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShellScriptEditor.swift; sourceTree = "<group>"; };
-		79C54C102515E0E12C2498BF /* CronSchedule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CronSchedule.swift; sourceTree = "<group>"; };
-		7E827E905BC9D0A98F5A1452 /* TaskSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSidebarView.swift; sourceTree = "<group>"; };
-		89A115BE875312135B7BDE3D /* TaskTemplate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskTemplate.swift; sourceTree = "<group>"; };
-		8A309F739E837A412F349225 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
-		93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunner.swift; sourceTree = "<group>"; };
-		95F02CBBBFA3C3762648611A /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
-		9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskFileStore.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B5C /* RunShelfWindowMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfWindowMetrics.swift; sourceTree = "<group>"; };
-		A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfPaths.swift; sourceTree = "<group>"; };
-		B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
-		BAB936E446C8998F3CFCC077 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSettings.swift; sourceTree = "<group>"; };
-		C17DE32A8BDE27EEC8D39BB8 /* com.aix4u.runshelf.scheduler.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = com.aix4u.runshelf.scheduler.plist; sourceTree = "<group>"; };
-		C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerEngine.swift; sourceTree = "<group>"; };
-		C295C901C0444A4DF9768E50 /* TaskModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModels.swift; sourceTree = "<group>"; };
-		C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfFormatters.swift; sourceTree = "<group>"; };
-		D222E1C8207DA81C66BD2FC9 /* ShellSyntaxHighlighter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShellSyntaxHighlighter.swift; sourceTree = "<group>"; };
-		D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulePreferencesStore.swift; sourceTree = "<group>"; };
-		D9D8263DFE2846C8B52AFB5B /* RunShelfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunShelfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		DISKSCAN00000000000000002 /* DiskScan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskScan.swift; sourceTree = "<group>"; };
-		E279B833B3E11B6180811103 /* RunShelfSchedulerMain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSchedulerMain.swift; sourceTree = "<group>"; };
-		F121801C5DF8571238520A54 /* Run Shelf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Run Shelf.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		FB9E1372C2E4FB3B73E906F5 /* StatusBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
-		LOGLOADER0000000000000002 /* LogContentLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogContentLoader.swift; sourceTree = "<group>"; };
-		PERMGATE0000000000000002 /* PermissionGateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionGateView.swift; sourceTree = "<group>"; };
+		05786979DB3D9C03DFAA713C /* RunShelfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunShelfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		067F767051595225FF9F76EB /* Run Shelf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Run Shelf.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifications.swift; sourceTree = "<group>"; };
+		1ECAE2DF384BA2504D2F2996 /* RunShelfScheduler */ = {isa = PBXFileReference; includeInIndex = 0; path = RunShelfScheduler; sourceTree = BUILT_PRODUCTS_DIR; };
+		21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskFileStore.swift; sourceTree = "<group>"; };
+		2317B077198B8E42BB644421 /* com.aix4u.runshelf.scheduler.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = com.aix4u.runshelf.scheduler.plist; sourceTree = "<group>"; };
+		31339AE0E828F66559374CDB /* SchedulePreferencesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulePreferencesStore.swift; sourceTree = "<group>"; };
+		3AC9F5096A59E8E6DC907D3A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3C92DCE55EE119DAA6A06D93 /* TaskDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		3FE4947411DB009A669784D9 /* RunShelfWindowMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfWindowMetrics.swift; sourceTree = "<group>"; };
+		422D77868507607C464331F5 /* DiskScan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskScan.swift; sourceTree = "<group>"; };
+		46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfPaths.swift; sourceTree = "<group>"; };
+		475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifier.swift; sourceTree = "<group>"; };
+		48C3A343F84517F7482F4D0E /* TaskRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRepository.swift; sourceTree = "<group>"; };
+		5298CDA73E6C315157B13AC4 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		549746E19653346A4BC2A366 /* RunShelfCLI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCLI.swift; sourceTree = "<group>"; };
+		57A2C65AFBF104A3791C7403 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		59BC3E468E3F0CAAD084D73D /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		5E512CAC6415985DF1537634 /* SchedulerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerEngine.swift; sourceTree = "<group>"; };
+		6452E5D8F27F04BD9200CF39 /* StatusBadge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		69CFB8D9EA3AF04DBD937D93 /* ShellSyntaxHighlighter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShellSyntaxHighlighter.swift; sourceTree = "<group>"; };
+		73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfFormatters.swift; sourceTree = "<group>"; };
+		73EBA73DEB9D70ED60150379 /* TaskInspectorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskInspectorView.swift; sourceTree = "<group>"; };
+		7A2C334F43702EBC476AAC3B /* LogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunClaim.swift; sourceTree = "<group>"; };
+		83E2E29F514C153A615AE585 /* RunShelfSchedulerMain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSchedulerMain.swift; sourceTree = "<group>"; };
+		86BFEB5CEA5CFF6DFF6F032C /* ScheduleEditorViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleEditorViews.swift; sourceTree = "<group>"; };
+		8A1CF0D6068E0ABDB49AE133 /* RunShelfApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfApp.swift; sourceTree = "<group>"; };
+		92D8232C07B77CA687B0C916 /* TaskTemplate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskTemplate.swift; sourceTree = "<group>"; };
+		94817BF0B0F6D615D79BCDCF /* TaskHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskHeaderView.swift; sourceTree = "<group>"; };
+		97FC047EC6FA7EF416BC87FC /* SchedulerServiceController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerServiceController.swift; sourceTree = "<group>"; };
+		984DC5B795E8535D98006C66 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSettings.swift; sourceTree = "<group>"; };
+		9F99A4459B3E0CFC684DD0B3 /* runshelf */ = {isa = PBXFileReference; includeInIndex = 0; path = runshelf; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE656CA65686562CB8B3F686 /* CronSchedule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CronSchedule.swift; sourceTree = "<group>"; };
+		B1E80042EBE33D25C47FE4F4 /* LogContentLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogContentLoader.swift; sourceTree = "<group>"; };
+		C162136D8417BC1B1C2785CF /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
+		C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
+		CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
+		D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSidebarView.swift; sourceTree = "<group>"; };
+		D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionGateView.swift; sourceTree = "<group>"; };
+		DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShellScriptEditor.swift; sourceTree = "<group>"; };
+		DAB7E409904F13A101E8263D /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		DCD46BB536AC778D3331E198 /* NewTaskSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskSheet.swift; sourceTree = "<group>"; };
+		E40FC34752E7412D02760C9B /* TaskRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunner.swift; sourceTree = "<group>"; };
+		F4F9E1A3FBD8E621ED3F539A /* RunShelfCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCoreTests.swift; sourceTree = "<group>"; };
+		F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		383F6393C508D610DB4F5D40 /* Frameworks */ = {
+		0746FDA5B3B4F42AEF6DD7C6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1AB9D8A65B5BD8F5CF6437C3 /* Cocoa.framework in Frameworks */,
+				C316CE8D739BDACEA35DCB69 /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5603C44F96D04C2800700B12 /* Frameworks */ = {
+		1985BBEBAF236CA2DE497E57 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6EF0326A9AA552CA172A91E6 /* Cocoa.framework in Frameworks */,
+				6A3BD7297156A5E075AFF5BD /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DC78CE6A69601BFF5C3222DB /* Frameworks */ = {
+		D0533EBB5A216F254DDF0E3D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5BD1522F2A37CDD9464C7178 /* Cocoa.framework in Frameworks */,
+				77C8BF790699008A016456D3 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E37432A9C382432381F01DEC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA219ACBEE9397481347B43E /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0162CB82BD6B78F234CE140F /* Views */ = {
+		028910FEAC561BD5DF9B06D6 /* SchedulerProcess */ = {
 			isa = PBXGroup;
 			children = (
-				5A1699BD6308DDC11488C4BD /* ContentView.swift */,
-				8A309F739E837A412F349225 /* EmptyStateView.swift */,
-				2D61D190282B957123EB404C /* NewTaskSheet.swift */,
-				51E2F6BF6A3B2A12D03B46D1 /* SettingsView.swift */,
-				FB9E1372C2E4FB3B73E906F5 /* StatusBadge.swift */,
-				24AF2D6AE7A153E282DF245D /* TaskDetailView.swift */,
-				043EFA46EB17EA287D69428B /* TaskInspectorView.swift */,
-				7E827E905BC9D0A98F5A1452 /* TaskSidebarView.swift */,
-				2313E9329AFABE63D17BA434 /* LogView.swift */,
-				318158D151DEFF430FF57F7E /* ScheduleEditorViews.swift */,
-				4C08A67B38A1ADA5658D119C /* TaskHeaderView.swift */,
-				PERMGATE0000000000000002 /* PermissionGateView.swift */,
-				LOGLOADER0000000000000002 /* LogContentLoader.swift */,
-			);
-			name = Views;
-			path = Views;
-			sourceTree = "<group>";
-		};
-		07E1411566EB8ADE3BAB52CF /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				B61E9A0BEB1D0D35E13B63C4 /* Cron */,
-				AD8DA8FC20D0E1CBF3E46EA4 /* Formatting */,
-				F1B631EE3AD4CE1CBCADBDD9 /* Notifications */,
-				BD41C297AFCDCA9E5B1B0B03 /* Runner */,
-				182036880DFB6E70CE11EE10 /* Safety */,
-				41404EB64018F32DBD58EED1 /* Scheduler */,
-				DE5F8965121CEE53D9463EB7 /* Settings */,
-				0F4D48352A79E5FF0E4115F8 /* Storage */,
-				F19C16B1A2D66E6ADB4369D5 /* Stores */,
-				E82438840CFE17DD137ADE98 /* TaskModel */,
-				F6226F0603F6D918BC8F753B /* Templates */,
-				58AD2ABFA6967752F9754BC4 /* RunShelfNotifications.swift */,
-			);
-			name = Core;
-			path = Core;
-			sourceTree = "<group>";
-		};
-		0B92D1C9C7344A2042336C07 /* OS X */ = {
-			isa = PBXGroup;
-			children = (
-				36D2068EFDCA097CB98345AA /* Cocoa.framework */,
-			);
-			name = "OS X";
-			sourceTree = "<group>";
-		};
-		0F4D48352A79E5FF0E4115F8 /* Storage */ = {
-			isa = PBXGroup;
-			children = (
-				A6CB8F785F6130ED00E622E9 /* RunShelfPaths.swift */,
-				9612A92337BF8D5CD6DBDE99 /* TaskFileStore.swift */,
-				DISKSCAN00000000000000002 /* DiskScan.swift */,
-			);
-			name = Storage;
-			path = Storage;
-			sourceTree = "<group>";
-		};
-		11C25D861DA281DF9FC06F09 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				D9D8263DFE2846C8B52AFB5B /* RunShelfTests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		16129295AFC320AA98BFD2B9 /* RunShelf */ = {
-			isa = PBXGroup;
-			children = (
-				509FB9AE891ACF1F5F60DB13 /* App */,
-				07E1411566EB8ADE3BAB52CF /* Core */,
-				1C4B37E0F5CBCD72BB6172FD /* Editor */,
-				99F1E06FC88707C751DFE626 /* Resources */,
-				672C89CF3C0B2D6DAB6BAF26 /* RunShelfApp.swift */,
-				5401F57C249D5D117DDA19D6 /* SchedulerProcess */,
-				B6E4D81090852B87213E9494 /* Support */,
-			);
-			name = RunShelf;
-			path = RunShelf;
-			sourceTree = "<group>";
-		};
-		182036880DFB6E70CE11EE10 /* Safety */ = {
-			isa = PBXGroup;
-			children = (
-				B8014BDB2BFA19EDE0AF1977 /* DangerousCommandScanner.swift */,
-			);
-			name = Safety;
-			path = Safety;
-			sourceTree = "<group>";
-		};
-		1C4B37E0F5CBCD72BB6172FD /* Editor */ = {
-			isa = PBXGroup;
-			children = (
-				76D7CBF5D31794E8D73811EC /* ShellScriptEditor.swift */,
-				D222E1C8207DA81C66BD2FC9 /* ShellSyntaxHighlighter.swift */,
-			);
-			name = Editor;
-			path = Editor;
-			sourceTree = "<group>";
-		};
-		353B94E61C3C72374D9C72C2 = {
-			isa = PBXGroup;
-			children = (
-				16129295AFC320AA98BFD2B9 /* RunShelf */,
-				11C25D861DA281DF9FC06F09 /* Products */,
-				D55C97F90CA2586327681E3D /* Frameworks */,
-				F3BD018A097CB2CA8C495F0B /* RunShelfTests */,
-			);
-			sourceTree = "<group>";
-		};
-		41404EB64018F32DBD58EED1 /* Scheduler */ = {
-			isa = PBXGroup;
-			children = (
-				C233B468E8631CC3C2576F23 /* SchedulerEngine.swift */,
-			);
-			name = Scheduler;
-			path = Scheduler;
-			sourceTree = "<group>";
-		};
-		509FB9AE891ACF1F5F60DB13 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				AF38E1D413ECC34BC5599518 /* Models */,
-				A1B2C3D4E5F60718293A4B5C /* RunShelfWindowMetrics.swift */,
-				F5C4ECDD7CC5EAE0A5AAAE26 /* Services */,
-				0162CB82BD6B78F234CE140F /* Views */,
-			);
-			name = App;
-			path = App;
-			sourceTree = "<group>";
-		};
-		5401F57C249D5D117DDA19D6 /* SchedulerProcess */ = {
-			isa = PBXGroup;
-			children = (
-				E279B833B3E11B6180811103 /* RunShelfSchedulerMain.swift */,
+				83E2E29F514C153A615AE585 /* RunShelfSchedulerMain.swift */,
 			);
 			name = SchedulerProcess;
 			path = SchedulerProcess;
 			sourceTree = "<group>";
 		};
-		99F1E06FC88707C751DFE626 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				369A783F9960DE36C62AE1D3 /* Assets.xcassets */,
-				BAB936E446C8998F3CFCC077 /* Localizable.xcstrings */,
-			);
-			name = Resources;
-			path = Resources;
-			sourceTree = "<group>";
-		};
-		AD8DA8FC20D0E1CBF3E46EA4 /* Formatting */ = {
-			isa = PBXGroup;
-			children = (
-				C777AB4C79C06F0AD561EDA0 /* RunShelfFormatters.swift */,
-			);
-			name = Formatting;
-			path = Formatting;
-			sourceTree = "<group>";
-		};
-		AF38E1D413ECC34BC5599518 /* Models */ = {
+		0325195D3C17CDE576E95DB2 /* Models */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -358,153 +252,275 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		B61E9A0BEB1D0D35E13B63C4 /* Cron */ = {
+		0D2E6F1A921D0F2B5AA4BBA7 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
-				79C54C102515E0E12C2498BF /* CronSchedule.swift */,
+				422D77868507607C464331F5 /* DiskScan.swift */,
+				46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */,
+				21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */,
+				48C3A343F84517F7482F4D0E /* TaskRepository.swift */,
 			);
-			name = Cron;
-			path = Cron;
+			name = Storage;
+			path = Storage;
 			sourceTree = "<group>";
 		};
-		B6E4D81090852B87213E9494 /* Support */ = {
+		0DDBDCA343AFB7E8DF1BA744 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				C17DE32A8BDE27EEC8D39BB8 /* com.aix4u.runshelf.scheduler.plist */,
-			);
-			name = Support;
-			path = Support;
-			sourceTree = "<group>";
-		};
-		BD41C297AFCDCA9E5B1B0B03 /* Runner */ = {
-			isa = PBXGroup;
-			children = (
-				1B1B7170DF2F78BA95EF6F04 /* RetentionCleaner.swift */,
-				93AE9551D0AC520CD9EC55FA /* TaskRunner.swift */,
-			);
-			name = Runner;
-			path = Runner;
-			sourceTree = "<group>";
-		};
-		D55C97F90CA2586327681E3D /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				0B92D1C9C7344A2042336C07 /* OS X */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		DE5F8965121CEE53D9463EB7 /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				BCECACF165C2F84C0229EE8B /* RunShelfSettings.swift */,
-			);
-			name = Settings;
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		E82438840CFE17DD137ADE98 /* TaskModel */ = {
-			isa = PBXGroup;
-			children = (
-				C295C901C0444A4DF9768E50 /* TaskModels.swift */,
-			);
-			name = TaskModel;
-			path = TaskModel;
-			sourceTree = "<group>";
-		};
-		F19C16B1A2D66E6ADB4369D5 /* Stores */ = {
-			isa = PBXGroup;
-			children = (
-				95F02CBBBFA3C3762648611A /* TaskStore.swift */,
-			);
-			name = Stores;
-			path = Stores;
-			sourceTree = "<group>";
-		};
-		F1B631EE3AD4CE1CBCADBDD9 /* Notifications */ = {
-			isa = PBXGroup;
-			children = (
-				70F82162E18E9789F1370DB2 /* RunShelfNotifier.swift */,
-			);
-			name = Notifications;
-			path = Notifications;
-			sourceTree = "<group>";
-		};
-		F3BD018A097CB2CA8C495F0B /* RunShelfTests */ = {
-			isa = PBXGroup;
-			children = (
-				2C127A669F488F0A5C2E24C1 /* RunShelfCoreTests.swift */,
-			);
-			name = RunShelfTests;
-			path = RunShelfTests;
-			sourceTree = "<group>";
-		};
-		F5C4ECDD7CC5EAE0A5AAAE26 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				1C7199935F7EEDAB40CE9C8D /* SchedulerServiceController.swift */,
-				D79E7A0C5ABD498FF7A4D6A0 /* SchedulePreferencesStore.swift */,
+				31339AE0E828F66559374CDB /* SchedulePreferencesStore.swift */,
+				97FC047EC6FA7EF416BC87FC /* SchedulerServiceController.swift */,
 			);
 			name = Services;
 			path = Services;
 			sourceTree = "<group>";
 		};
-		F6226F0603F6D918BC8F753B /* Templates */ = {
+		1187E64F847DAFF3643A6980 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				89A115BE875312135B7BDE3D /* TaskTemplate.swift */,
+				894B34768883D6505A196BA7 /* Cron */,
+				355B8CFB985FC9814502B9C2 /* Formatting */,
+				53AADD8D687363375C48E3F1 /* Notifications */,
+				0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */,
+				262202DA1DA0F41BB3151236 /* Runner */,
+				ED00EED782B3F64203EAF6A4 /* Safety */,
+				3DF3D27D674A4C9C803C71C5 /* Scheduler */,
+				A6C374BC9305BEC5DFF7474E /* Settings */,
+				0D2E6F1A921D0F2B5AA4BBA7 /* Storage */,
+				FD07AD08C205078D94278B25 /* Stores */,
+				63DC107D43A92BBB57CE1556 /* TaskModel */,
+				44B133214AFD64E5476ACD98 /* Templates */,
+			);
+			name = Core;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		15C21AA7A8918746F600D75A /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				59BC3E468E3F0CAAD084D73D /* ContentView.swift */,
+				DAB7E409904F13A101E8263D /* EmptyStateView.swift */,
+				B1E80042EBE33D25C47FE4F4 /* LogContentLoader.swift */,
+				7A2C334F43702EBC476AAC3B /* LogView.swift */,
+				DCD46BB536AC778D3331E198 /* NewTaskSheet.swift */,
+				D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */,
+				86BFEB5CEA5CFF6DFF6F032C /* ScheduleEditorViews.swift */,
+				984DC5B795E8535D98006C66 /* SettingsView.swift */,
+				6452E5D8F27F04BD9200CF39 /* StatusBadge.swift */,
+				3C92DCE55EE119DAA6A06D93 /* TaskDetailView.swift */,
+				94817BF0B0F6D615D79BCDCF /* TaskHeaderView.swift */,
+				73EBA73DEB9D70ED60150379 /* TaskInspectorView.swift */,
+				D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */,
+			);
+			name = Views;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		1AAEC27DE0EE08200CEE159C /* RunShelf */ = {
+			isa = PBXGroup;
+			children = (
+				406690CABD6600F2702B45F6 /* App */,
+				9B532C4AB83BD1F7A1C15114 /* CLI */,
+				1187E64F847DAFF3643A6980 /* Core */,
+				3E2C5773CD8AF105DCDDC274 /* Editor */,
+				D7628CB8902B400CC87F7D72 /* Resources */,
+				8A1CF0D6068E0ABDB49AE133 /* RunShelfApp.swift */,
+				028910FEAC561BD5DF9B06D6 /* SchedulerProcess */,
+				45AAF47E55389D163A7329F6 /* Support */,
+			);
+			name = RunShelf;
+			path = RunShelf;
+			sourceTree = "<group>";
+		};
+		262202DA1DA0F41BB3151236 /* Runner */ = {
+			isa = PBXGroup;
+			children = (
+				CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */,
+				7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */,
+				E40FC34752E7412D02760C9B /* TaskRunner.swift */,
+			);
+			name = Runner;
+			path = Runner;
+			sourceTree = "<group>";
+		};
+		355B8CFB985FC9814502B9C2 /* Formatting */ = {
+			isa = PBXGroup;
+			children = (
+				73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */,
+			);
+			name = Formatting;
+			path = Formatting;
+			sourceTree = "<group>";
+		};
+		3DF3D27D674A4C9C803C71C5 /* Scheduler */ = {
+			isa = PBXGroup;
+			children = (
+				5E512CAC6415985DF1537634 /* SchedulerEngine.swift */,
+			);
+			name = Scheduler;
+			path = Scheduler;
+			sourceTree = "<group>";
+		};
+		3E2C5773CD8AF105DCDDC274 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */,
+				69CFB8D9EA3AF04DBD937D93 /* ShellSyntaxHighlighter.swift */,
+			);
+			name = Editor;
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		406690CABD6600F2702B45F6 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0325195D3C17CDE576E95DB2 /* Models */,
+				3FE4947411DB009A669784D9 /* RunShelfWindowMetrics.swift */,
+				0DDBDCA343AFB7E8DF1BA744 /* Services */,
+				15C21AA7A8918746F600D75A /* Views */,
+			);
+			name = App;
+			path = App;
+			sourceTree = "<group>";
+		};
+		44B133214AFD64E5476ACD98 /* Templates */ = {
+			isa = PBXGroup;
+			children = (
+				92D8232C07B77CA687B0C916 /* TaskTemplate.swift */,
 			);
 			name = Templates;
 			path = Templates;
 			sourceTree = "<group>";
 		};
+		45AAF47E55389D163A7329F6 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				2317B077198B8E42BB644421 /* com.aix4u.runshelf.scheduler.plist */,
+			);
+			name = Support;
+			path = Support;
+			sourceTree = "<group>";
+		};
+		53AADD8D687363375C48E3F1 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */,
+			);
+			name = Notifications;
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		63DC107D43A92BBB57CE1556 /* TaskModel */ = {
+			isa = PBXGroup;
+			children = (
+				F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */,
+			);
+			name = TaskModel;
+			path = TaskModel;
+			sourceTree = "<group>";
+		};
+		74D3144936AC6BC8606005B2 = {
+			isa = PBXGroup;
+			children = (
+				1AAEC27DE0EE08200CEE159C /* RunShelf */,
+				A03DEC973F90783680A8DAB6 /* RunShelfTests */,
+			);
+			sourceTree = "<group>";
+		};
+		894B34768883D6505A196BA7 /* Cron */ = {
+			isa = PBXGroup;
+			children = (
+				AE656CA65686562CB8B3F686 /* CronSchedule.swift */,
+			);
+			name = Cron;
+			path = Cron;
+			sourceTree = "<group>";
+		};
+		9B532C4AB83BD1F7A1C15114 /* CLI */ = {
+			isa = PBXGroup;
+			children = (
+				549746E19653346A4BC2A366 /* RunShelfCLI.swift */,
+			);
+			name = CLI;
+			path = CLI;
+			sourceTree = "<group>";
+		};
+		A03DEC973F90783680A8DAB6 /* RunShelfTests */ = {
+			isa = PBXGroup;
+			children = (
+				F4F9E1A3FBD8E621ED3F539A /* RunShelfCoreTests.swift */,
+			);
+			name = RunShelfTests;
+			path = RunShelfTests;
+			sourceTree = "<group>";
+		};
+		A6C374BC9305BEC5DFF7474E /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */,
+			);
+			name = Settings;
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		D7628CB8902B400CC87F7D72 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				3AC9F5096A59E8E6DC907D3A /* Assets.xcassets */,
+				5298CDA73E6C315157B13AC4 /* Localizable.xcstrings */,
+			);
+			name = Resources;
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		ED00EED782B3F64203EAF6A4 /* Safety */ = {
+			isa = PBXGroup;
+			children = (
+				C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */,
+			);
+			name = Safety;
+			path = Safety;
+			sourceTree = "<group>";
+		};
+		FD07AD08C205078D94278B25 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				C162136D8417BC1B1C2785CF /* TaskStore.swift */,
+			);
+			name = Stores;
+			path = Stores;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A93730B8FDA516D2317F37AF /* RunShelf */ = {
+		4BF03DFFAF7D04A4C889C5C6 /* RunShelf */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8775127054F1CB0C4F77F1B1 /* Build configuration list for PBXNativeTarget "RunShelf" */;
+			buildConfigurationList = 99790EB8BBA838E89E2EC841 /* Build configuration list for PBXNativeTarget "RunShelf" */;
 			buildPhases = (
-				0871CEED3CCE656F6E3E98EE /* Sources */,
-				5603C44F96D04C2800700B12 /* Frameworks */,
-				91B762E9645E3253CE3EFEDF /* Resources */,
-				39457F604C6EB48C655CB198 /* Embed Helpers */,
-				EE8EFE227D92F59DF2D0A3F0 /* Embed LaunchAgents */,
-				LPROJSTUB000000000000001 /* Ensure zh-Hans.lproj */,
+				32C34012C9FB4234D20EB1BB /* Sources */,
+				1985BBEBAF236CA2DE497E57 /* Frameworks */,
+				89021FE1B44F51F49589A329 /* Resources */,
+				311FFE7B162B3DCD914760DA /* Embed Helpers */,
+				FE255D79774CE3BE6A795A11 /* Embed LaunchAgents */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				E04548F9CC90A66613A2AC1A /* PBXTargetDependency */,
+				31C749AF4E852F0646DBD3CE /* PBXTargetDependency */,
+				621D5188A4636DD78F17F69C /* PBXTargetDependency */,
 			);
 			name = RunShelf;
 			productName = RunShelf;
-			productReference = F121801C5DF8571238520A54 /* Run Shelf.app */;
+			productReference = 067F767051595225FF9F76EB /* Run Shelf.app */;
 			productType = "com.apple.product-type.application";
 		};
-		CBEF32C491DD33ED98815C98 /* RunShelfScheduler */ = {
+		8FE76C8D5556A3DB40F3C9C7 /* RunShelfTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 154786A9E164BD59BE668F1F /* Build configuration list for PBXNativeTarget "RunShelfScheduler" */;
+			buildConfigurationList = DC0621A968BF1265971505FA /* Build configuration list for PBXNativeTarget "RunShelfTests" */;
 			buildPhases = (
-				A2886A7B74B78598DF4DD408 /* Sources */,
-				DC78CE6A69601BFF5C3222DB /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = RunShelfScheduler;
-			productName = RunShelfScheduler;
-			productReference = 2B67D3B78860C69DBAD290E1 /* RunShelfScheduler */;
-			productType = "com.apple.product-type.tool";
-		};
-		FC9760B0A561F45C562DDFE7 /* RunShelfTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 58F70CD9BA3FD60AE4E3CC15 /* Build configuration list for PBXNativeTarget "RunShelfTests" */;
-			buildPhases = (
-				DA7EC4EF0EDD8A0BB072D95C /* Sources */,
-				383F6393C508D610DB4F5D40 /* Frameworks */,
-				FA9BAC8361C10C42A76D2D8E /* Resources */,
+				FD906FAEA3F824F2563E35F2 /* Sources */,
+				D0533EBB5A216F254DDF0E3D /* Frameworks */,
+				3656528640184263B4198149 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -512,180 +528,250 @@
 			);
 			name = RunShelfTests;
 			productName = RunShelfTests;
-			productReference = D9D8263DFE2846C8B52AFB5B /* RunShelfTests.xctest */;
+			productReference = 05786979DB3D9C03DFAA713C /* RunShelfTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		9FAD8257F0F212B3AA006C2B /* RunShelfCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8F00E797943AB2FE9825583D /* Build configuration list for PBXNativeTarget "RunShelfCLI" */;
+			buildPhases = (
+				1F19B2C291237992F1D47A5B /* Sources */,
+				E37432A9C382432381F01DEC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RunShelfCLI;
+			productName = RunShelfCLI;
+			productReference = 9F99A4459B3E0CFC684DD0B3 /* runshelf */;
+			productType = "com.apple.product-type.tool";
+		};
+		C3F774E5343D7EE6C3AC6728 /* RunShelfScheduler */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6732958DFA2D43A1EBC894FD /* Build configuration list for PBXNativeTarget "RunShelfScheduler" */;
+			buildPhases = (
+				61CB25090BBD86D2A5A0101A /* Sources */,
+				0746FDA5B3B4F42AEF6DD7C6 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RunShelfScheduler;
+			productName = RunShelfScheduler;
+			productReference = 1ECAE2DF384BA2504D2F2996 /* RunShelfScheduler */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		7A8129E50617F8EFAC4F152E /* Project object */ = {
+		DAD62E2215CDA36B387D27BD /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = CA1460462AE3ABA26EDF7B14 /* Build configuration list for PBXProject "RunShelf" */;
+			buildConfigurationList = 4F110B10F55CD145EB249687 /* Build configuration list for PBXProject "RunShelf" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = "zh-Hans";
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				"zh-Hans",
 				en,
 				Base,
 			);
-			mainGroup = 353B94E61C3C72374D9C72C2;
+			mainGroup = 74D3144936AC6BC8606005B2;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 11C25D861DA281DF9FC06F09 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A93730B8FDA516D2317F37AF /* RunShelf */,
-				CBEF32C491DD33ED98815C98 /* RunShelfScheduler */,
-				FC9760B0A561F45C562DDFE7 /* RunShelfTests */,
+				4BF03DFFAF7D04A4C889C5C6 /* RunShelf */,
+				C3F774E5343D7EE6C3AC6728 /* RunShelfScheduler */,
+				9FAD8257F0F212B3AA006C2B /* RunShelfCLI */,
+				8FE76C8D5556A3DB40F3C9C7 /* RunShelfTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		91B762E9645E3253CE3EFEDF /* Resources */ = {
+		3656528640184263B4198149 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0EAE86AC6CC57727F82D1B06 /* Assets.xcassets in Resources */,
-				393558C7F8DD5162FE9DEB07 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		FA9BAC8361C10C42A76D2D8E /* Resources */ = {
+		89021FE1B44F51F49589A329 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				266E8106D8193FB93A61A406 /* Assets.xcassets in Resources */,
+				A8E6BC302156C103B83509C3 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		LPROJSTUB000000000000001 /* Ensure zh-Hans.lproj */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Ensure zh-Hans.lproj";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# 让 macOS 系统注入的菜单（File/Edit/Settings 等）使用简体中文。\n# 即使没有 .strings 翻译文件，bundle 里有空的 zh-Hans.lproj 也能让系统选中文。\nset -e\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/zh-Hans.lproj\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
-		0871CEED3CCE656F6E3E98EE /* Sources */ = {
+		1F19B2C291237992F1D47A5B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7FE2E75D771240E63D659373 /* SchedulerServiceController.swift in Sources */,
-				A09B0D8767ECFDA952E94CD2 /* SchedulePreferencesStore.swift in Sources */,
-				D36C51B16C86814E41528E06 /* ContentView.swift in Sources */,
-				65600F1E6741465ABD4FC410 /* EmptyStateView.swift in Sources */,
-				471D3BCC49DE948E3E03FB78 /* NewTaskSheet.swift in Sources */,
-				85D90E7CB7695CA389FFA994 /* SettingsView.swift in Sources */,
-				75A3425663B837DBAE31E1A0 /* StatusBadge.swift in Sources */,
-				1C9D84A89A5E9DCBB87EA20A /* TaskDetailView.swift in Sources */,
-				AE06EF7799204FB01A8E756A /* TaskInspectorView.swift in Sources */,
-				C846E25E095780C0B235E946 /* TaskSidebarView.swift in Sources */,
-				EBCFDC5D04E63926F82B3E30 /* CronSchedule.swift in Sources */,
-				3DB7C2F2ACFE4490117FC286 /* RunShelfFormatters.swift in Sources */,
-				071E119ADCC621812AB3EA6E /* RunShelfNotifier.swift in Sources */,
-				C855DD283DF7F9749A3F0224 /* RetentionCleaner.swift in Sources */,
-				06FDBF2AEE613AC79D6175F5 /* TaskRunner.swift in Sources */,
-				8D4D4EE72C1BAB0B30E3076D /* DangerousCommandScanner.swift in Sources */,
-				7C5BAFC88CD5939332F8E30C /* SchedulerEngine.swift in Sources */,
-				9B34E2179B73ADF9E0C5A237 /* RunShelfSettings.swift in Sources */,
-				3617EAE8ECADA8A1C066D1AE /* RunShelfPaths.swift in Sources */,
-				2171A4214633546CDC7CBEA0 /* TaskFileStore.swift in Sources */,
-				DISKSCAN00000000000000001 /* DiskScan.swift in Sources */,
-				9E52291B91611A54074EE23D /* TaskStore.swift in Sources */,
-				33D3C719BFFC5988883B078A /* RunShelfNotifications.swift in Sources */,
-				E8EFA37ECFFDE0BE1205819C /* TaskModels.swift in Sources */,
-				E7B4121D39D3E7B573309C9A /* TaskTemplate.swift in Sources */,
-				F7CF61906FDDE3DA9443A559 /* ShellScriptEditor.swift in Sources */,
-				6DD1DDDE234079E0FD2877B6 /* ShellSyntaxHighlighter.swift in Sources */,
-				C4DAD539AF178493B5FCFC8C /* RunShelfApp.swift in Sources */,
-				A1B2C3D4E5F60718293A4B5D /* RunShelfWindowMetrics.swift in Sources */,
-				CAA597EBE7C71ED7A0F1F39E /* LogView.swift in Sources */,
-				7D59EAA984D5DB793895FD72 /* ScheduleEditorViews.swift in Sources */,
-				4C3B695003D57BD3FEB58BCB /* TaskHeaderView.swift in Sources */,
-				PERMGATE0000000000000001 /* PermissionGateView.swift in Sources */,
-				LOGLOADER0000000000000001 /* LogContentLoader.swift in Sources */,
+				A27E4D4ED69EEF5DB36F2CB2 /* RunShelfCLI.swift in Sources */,
+				58643D31DDD96A4CB708D3AA /* CronSchedule.swift in Sources */,
+				98D8B9BD592C4786E8BF028B /* RunShelfFormatters.swift in Sources */,
+				4B4102794FA242FBC4CF65C5 /* RunShelfNotifier.swift in Sources */,
+				8384C0C0B1F6E63D3E6602BA /* RunShelfNotifications.swift in Sources */,
+				1F9F4D6869EBD8DEE8E2D231 /* RetentionCleaner.swift in Sources */,
+				87E2520EDB9494AE48415AAE /* TaskRunClaim.swift in Sources */,
+				CD77A00ACBCA1BD608E6C472 /* TaskRunner.swift in Sources */,
+				3E1FBCF714503281F20510D5 /* DangerousCommandScanner.swift in Sources */,
+				7CD900A3C08EBFE16B1FC660 /* SchedulerEngine.swift in Sources */,
+				B660B99159863F51CA0DBA81 /* RunShelfSettings.swift in Sources */,
+				A2D1D8BB7EAE6670C8FDCEE1 /* DiskScan.swift in Sources */,
+				8C2FC184B16A7C05A99E6FBD /* RunShelfPaths.swift in Sources */,
+				1AA9EEAA409DBD072B2864EF /* TaskFileStore.swift in Sources */,
+				54657B5543606149CDED4DCC /* TaskRepository.swift in Sources */,
+				D5CCFDBBBCA66C0289327551 /* TaskModels.swift in Sources */,
+				2A74006715ABA19165D1D2A2 /* TaskTemplate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A2886A7B74B78598DF4DD408 /* Sources */ = {
+		32C34012C9FB4234D20EB1BB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4C51249D068DCACD265644C9 /* CronSchedule.swift in Sources */,
-				3D7B9D85594173BED2C6DBB2 /* RunShelfFormatters.swift in Sources */,
-				85D867EFC1E4E209BF1B2F8A /* RunShelfNotifier.swift in Sources */,
-				A90BEDF53634189DC9255A58 /* RetentionCleaner.swift in Sources */,
-				F6001C968A84787714504C71 /* TaskRunner.swift in Sources */,
-				6116E1F9BC0631BB3F0E0472 /* DangerousCommandScanner.swift in Sources */,
-				166FD787521D31D770238E63 /* SchedulerEngine.swift in Sources */,
-				4C3B25028ED84FC7E0BBAEC6 /* RunShelfSettings.swift in Sources */,
-				289AFE672AEFEFB47E7D3B72 /* RunShelfPaths.swift in Sources */,
-				34A14A9BA3923BC711A2A1B7 /* TaskFileStore.swift in Sources */,
-				574BCDF91EAD6C4F1F67ECFF /* TaskModels.swift in Sources */,
-				A33871A3D61908E5DF42A191 /* TaskTemplate.swift in Sources */,
-				CCC9A1CFB6FCB999A317551C /* RunShelfSchedulerMain.swift in Sources */,
+				26D77314F3337F1463F4115E /* RunShelfWindowMetrics.swift in Sources */,
+				5394BEA2DC9F59B1C14F6189 /* SchedulePreferencesStore.swift in Sources */,
+				E06557909D056F8194F913D5 /* SchedulerServiceController.swift in Sources */,
+				DBF67FDDC568216C841CB135 /* ContentView.swift in Sources */,
+				2FA93B33E3B2BA4279C37757 /* EmptyStateView.swift in Sources */,
+				C4D4C605C0F61C30E96E5255 /* LogContentLoader.swift in Sources */,
+				3BA9473C3021CDB6EDED9753 /* LogView.swift in Sources */,
+				EAE00F141F1DD4D7B28CE012 /* NewTaskSheet.swift in Sources */,
+				F66174AAAC9032E1E918E4D0 /* PermissionGateView.swift in Sources */,
+				9E5187AC3D05AD25924EBAE2 /* ScheduleEditorViews.swift in Sources */,
+				CBD9EA10B61D12EE407EBF86 /* SettingsView.swift in Sources */,
+				F7C6D55257F32446754ACB6F /* StatusBadge.swift in Sources */,
+				4F8E1C73DCE6D7CAC93D0FD6 /* TaskDetailView.swift in Sources */,
+				9D392B6FFB581C6894F07C99 /* TaskHeaderView.swift in Sources */,
+				5023BC770161BA77909DD32D /* TaskInspectorView.swift in Sources */,
+				BB72A47B080FDC8AD620353D /* TaskSidebarView.swift in Sources */,
+				A8452E0C36DCCF832C69E461 /* CronSchedule.swift in Sources */,
+				7A8010CB418ADFE9A53818C7 /* RunShelfFormatters.swift in Sources */,
+				0794E853D9EF0B26F8E6DDE6 /* RunShelfNotifier.swift in Sources */,
+				CEDD435D4462919AA55D441D /* RunShelfNotifications.swift in Sources */,
+				87158FFDACF101FBF09A1830 /* RetentionCleaner.swift in Sources */,
+				4E5DD84759850A1E186EB8C4 /* TaskRunClaim.swift in Sources */,
+				5A1F6D7D68B9C9B3410B8BEE /* TaskRunner.swift in Sources */,
+				DAA18667BBD28235025477B4 /* DangerousCommandScanner.swift in Sources */,
+				9C066BDA7D2B950D7E68FBF3 /* SchedulerEngine.swift in Sources */,
+				7C0997566C53D068A819F5D7 /* RunShelfSettings.swift in Sources */,
+				099B302783A32D34DB9127FB /* DiskScan.swift in Sources */,
+				A0A4721A32A6F856525920A0 /* RunShelfPaths.swift in Sources */,
+				F1A509EA4C9F181C84631E4B /* TaskFileStore.swift in Sources */,
+				0D7DB4FF2D41DF5688A507B2 /* TaskRepository.swift in Sources */,
+				3CBC3B85B70221C870B990F1 /* TaskStore.swift in Sources */,
+				230DA6F66458D75F4905F781 /* TaskModels.swift in Sources */,
+				BEE45E7943C62DA61AAD4B45 /* TaskTemplate.swift in Sources */,
+				A40EC96EA262B584541DF2E8 /* ShellScriptEditor.swift in Sources */,
+				E35E4D20951688DA147BEEE1 /* ShellSyntaxHighlighter.swift in Sources */,
+				0D7A0B0E7A72DAE6F1E3A650 /* RunShelfApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DA7EC4EF0EDD8A0BB072D95C /* Sources */ = {
+		61CB25090BBD86D2A5A0101A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				33328DD6E43E1D15984FA30B /* CronSchedule.swift in Sources */,
-				0B93D737F24DB9CBA58FE4D7 /* RunShelfFormatters.swift in Sources */,
-				B387C0CF57A1F337A583BF0C /* RunShelfNotifier.swift in Sources */,
-				2B8702EFE0D4E1E3088A9C27 /* RunShelfNotifications.swift in Sources */,
-				ABA5BD7B26D90B80E4FD4A12 /* RetentionCleaner.swift in Sources */,
-				441EFCC9850E99B9CF9143D7 /* TaskRunner.swift in Sources */,
-				B359B00BF5C1A6A23CF083A4 /* DangerousCommandScanner.swift in Sources */,
-				3802CB57D4642323C8C9B065 /* SchedulerEngine.swift in Sources */,
-				6BE2349F88EFF7D63AEC08E6 /* RunShelfSettings.swift in Sources */,
-				D1D926FD9B950C280D980086 /* DiskScan.swift in Sources */,
-				8810A15F751D0DDC78FB3019 /* RunShelfPaths.swift in Sources */,
-				A053E975093BB516CE23663C /* TaskFileStore.swift in Sources */,
-				0A0DDA47A45F8C8DAD09CBEF /* TaskStore.swift in Sources */,
-				C1C46E5D4BDCAC819EDC6168 /* TaskModels.swift in Sources */,
-				E94AE7BE29F8CA5457E74355 /* TaskTemplate.swift in Sources */,
-				043B6E3CCB94EF3716BE737C /* RunShelfCoreTests.swift in Sources */,
+				CDA7EDD753F1358EFFBA5F60 /* CronSchedule.swift in Sources */,
+				58A32B048A9064DF1A99A527 /* RunShelfFormatters.swift in Sources */,
+				2739D025A5E844E622BD8307 /* RunShelfNotifier.swift in Sources */,
+				3E3CF6D35E07BE31FCDB452B /* RunShelfNotifications.swift in Sources */,
+				9D8937A654A76F443ADB93DD /* RetentionCleaner.swift in Sources */,
+				E90831CE5F3A349C03597652 /* TaskRunClaim.swift in Sources */,
+				1EA84E2CEB05C52462F18CAE /* TaskRunner.swift in Sources */,
+				8EEF06B1AE89AA5373238E4C /* DangerousCommandScanner.swift in Sources */,
+				6886CF7B6DDEEB61C6300810 /* SchedulerEngine.swift in Sources */,
+				30512AE3F46A04FFC446A150 /* RunShelfSettings.swift in Sources */,
+				AE55F8E6B49AA992D8E3B12D /* DiskScan.swift in Sources */,
+				D11BFD1FF9849886986F8B25 /* RunShelfPaths.swift in Sources */,
+				FAB0C19310A48336AEC75FD5 /* TaskFileStore.swift in Sources */,
+				CE645E83F18F9CED795B2313 /* TaskRepository.swift in Sources */,
+				2D87531C49AFFA12989B87A1 /* TaskModels.swift in Sources */,
+				8AA56C284D61CAAE9A8F2A84 /* TaskTemplate.swift in Sources */,
+				5E159A1641D52F7949ED2D6C /* RunShelfSchedulerMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD906FAEA3F824F2563E35F2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA2598C5F88A3EB552B7F996 /* CronSchedule.swift in Sources */,
+				79F4FA41C4021344406D314E /* RunShelfFormatters.swift in Sources */,
+				300B8F1AE54B1A5FDBC8E5BF /* RunShelfNotifier.swift in Sources */,
+				89624059587899546D5C5D99 /* RunShelfNotifications.swift in Sources */,
+				1C839F31A529404D934FA038 /* RetentionCleaner.swift in Sources */,
+				DBD0C87B104E121A23C81D56 /* TaskRunClaim.swift in Sources */,
+				1781D79A58D3391CE0557F22 /* TaskRunner.swift in Sources */,
+				DA0F9018DB1157714DA8BAD9 /* DangerousCommandScanner.swift in Sources */,
+				F3DCF9E11D97B503E8A549DB /* SchedulerEngine.swift in Sources */,
+				BD625596363E7F13A6C9B103 /* RunShelfSettings.swift in Sources */,
+				7DC47C7B5BBA04A86AB56ED2 /* DiskScan.swift in Sources */,
+				B3165C131CB0A356AAEA12EE /* RunShelfPaths.swift in Sources */,
+				F6765F7C3A9969242BF33857 /* TaskFileStore.swift in Sources */,
+				FC1D80FAFB4B9E02A065EB63 /* TaskRepository.swift in Sources */,
+				963F27FCD7D4DFB7BE23B96F /* TaskStore.swift in Sources */,
+				23B803B55F7FC460E19286FD /* TaskModels.swift in Sources */,
+				7509FF164A2389D508ED4AE2 /* TaskTemplate.swift in Sources */,
+				3406875B3D5F8B494FB4F08B /* RunShelfCoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		E04548F9CC90A66613A2AC1A /* PBXTargetDependency */ = {
+		31C749AF4E852F0646DBD3CE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = RunShelfScheduler;
-			target = CBEF32C491DD33ED98815C98 /* RunShelfScheduler */;
-			targetProxy = DBD9C408008008A43639EC48 /* PBXContainerItemProxy */;
+			target = C3F774E5343D7EE6C3AC6728 /* RunShelfScheduler */;
+			targetProxy = F205605A6F9F3FF170005BB7 /* PBXContainerItemProxy */;
+		};
+		621D5188A4636DD78F17F69C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RunShelfCLI;
+			target = 9FAD8257F0F212B3AA006C2B /* RunShelfCLI */;
+			targetProxy = 51E3736DF4D44E18FCB3014B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		0605BED41CE780C519EBE115 /* Release */ = {
+		50A871BDA9F5E7CCDBBC9E74 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Run Shelf";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
+				PRODUCT_NAME = "Run Shelf";
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		7024F4BE4F17881321F5E3D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
@@ -702,81 +788,7 @@
 			};
 			name = Release;
 		};
-		19EF4E028D9F47C729EE774F /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		8A3F7D61F564C6F85A039804 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.scheduler;
-				PRODUCT_NAME = RunShelfScheduler;
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		B37E47999FA6F0C4F8A81D7D /* Debug */ = {
+		7C4772870BEC895E2D3ABA46 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -840,7 +852,41 @@
 			};
 			name = Debug;
 		};
-		BBFFBE0FCC97D09825539831 /* Debug */ = {
+		AEDCE2DE5509F68E77D30808 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.cli;
+				PRODUCT_NAME = runshelf;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C05D96557B91DF2FFD3BB26D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.scheduler;
+				PRODUCT_NAME = RunShelfScheduler;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C2E996EA85334370CF7A9F2C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -854,62 +900,113 @@
 			};
 			name = Debug;
 		};
-		CB8976B50D20E42E04721C95 /* Debug */ = {
+		C65BD32F279A01B29CE616E5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Run Shelf";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @loader_path/Frameworks @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
-				PRODUCT_NAME = "Run Shelf";
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				SKIP_INSTALL = NO;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		D5F4EEC181B7A91944607AC5 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Run Shelf";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
-				PRODUCT_NAME = "Run Shelf";
-				SDKROOT = macosx;
-				SKIP_INSTALL = NO;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
-		E37AD90C5A27578E41955CFC /* Release */ = {
+		DD6E87418B801CE4658DC852 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @loader_path/Frameworks @executable_path/../Frameworks";
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.tests;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2E68E2CA605B2D4036F6FE5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Run Shelf";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf;
+				PRODUCT_NAME = "Run Shelf";
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FB344075D67C8F49EAE0785D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aix4u.runshelf.cli;
+				PRODUCT_NAME = runshelf;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -917,43 +1014,52 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		154786A9E164BD59BE668F1F /* Build configuration list for PBXNativeTarget "RunShelfScheduler" */ = {
+		4F110B10F55CD145EB249687 /* Build configuration list for PBXProject "RunShelf" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0605BED41CE780C519EBE115 /* Release */,
-				8A3F7D61F564C6F85A039804 /* Debug */,
+				7C4772870BEC895E2D3ABA46 /* Debug */,
+				DD6E87418B801CE4658DC852 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		58F70CD9BA3FD60AE4E3CC15 /* Build configuration list for PBXNativeTarget "RunShelfTests" */ = {
+		6732958DFA2D43A1EBC894FD /* Build configuration list for PBXNativeTarget "RunShelfScheduler" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E37AD90C5A27578E41955CFC /* Release */,
-				BBFFBE0FCC97D09825539831 /* Debug */,
+				7024F4BE4F17881321F5E3D1 /* Release */,
+				C05D96557B91DF2FFD3BB26D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8775127054F1CB0C4F77F1B1 /* Build configuration list for PBXNativeTarget "RunShelf" */ = {
+		8F00E797943AB2FE9825583D /* Build configuration list for PBXNativeTarget "RunShelfCLI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D5F4EEC181B7A91944607AC5 /* Release */,
-				CB8976B50D20E42E04721C95 /* Debug */,
+				FB344075D67C8F49EAE0785D /* Release */,
+				AEDCE2DE5509F68E77D30808 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CA1460462AE3ABA26EDF7B14 /* Build configuration list for PBXProject "RunShelf" */ = {
+		99790EB8BBA838E89E2EC841 /* Build configuration list for PBXNativeTarget "RunShelf" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B37E47999FA6F0C4F8A81D7D /* Debug */,
-				19EF4E028D9F47C729EE774F /* Release */,
+				50A871BDA9F5E7CCDBBC9E74 /* Release */,
+				E2E68E2CA605B2D4036F6FE5 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DC0621A968BF1265971505FA /* Build configuration list for PBXNativeTarget "RunShelfTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C65BD32F279A01B29CE616E5 /* Release */,
+				C2E996EA85334370CF7A9F2C /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 7A8129E50617F8EFAC4F152E /* Project object */;
+	rootObject = DAD62E2215CDA36B387D27BD /* Project object */;
 }

@@ -101,6 +101,7 @@ struct RetentionPolicy: Codable, Equatable, Sendable {
 struct TaskManifest: Codable, Identifiable, Equatable, Sendable {
     var schemaVersion: Int
     var id: String
+    var slug: String? = nil
     var name: String
     var description: String
     var enabled: Bool
@@ -113,6 +114,7 @@ struct TaskManifest: Codable, Identifiable, Equatable, Sendable {
 
     static func create(
         id: String = UUID().uuidString,
+        slug: String? = nil,
         name: String,
         description: String,
         enabled: Bool,
@@ -123,6 +125,7 @@ struct TaskManifest: Codable, Identifiable, Equatable, Sendable {
         return TaskManifest(
             schemaVersion: 1,
             id: id,
+            slug: slug,
             name: name,
             description: description,
             enabled: enabled,
@@ -150,6 +153,8 @@ struct RunRecord: Codable, Identifiable, Equatable, Sendable {
     var stdoutPath: String
     var stderrPath: String
     var message: String?
+    var processID: Int32? = nil
+    var processGroupID: Int32? = nil
 
     var id: String { runId }
 }

@@ -56,6 +56,8 @@ RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 scripts/package_release.sh 1.0.0
 ```
 
+脚本会分别签名内嵌的 `RunShelfScheduler` 和 `runshelf` helper，再签名主 App。
+
 如需公证，额外提供 `notarytool` 的钥匙串配置：
 
 ```bash

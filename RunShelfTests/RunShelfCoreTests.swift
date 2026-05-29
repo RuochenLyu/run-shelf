@@ -131,6 +131,157 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(record.message, "用户取消了运行")
     }
 
+    func testTaskRunnerClaimBlocksSecondConcurrentRun() throws {
+        let root = try makeTemporaryDirectory()
+        let task = try makeTask(
+            root: root,
+            id: "claim-task",
+            script: "#!/bin/zsh\nsleep 30\n",
+            timeoutSeconds: 0
+        )
+        let cancellation = TaskRunCancellation()
+        let finished = expectation(description: "first run finishes after cancellation")
+        let lock = NSLock()
+        var firstResult: Result<RunRecord, Error>?
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let runResult = Result {
+                try TaskRunner.run(
+                    task: task,
+                    trigger: .manual,
+                    cancellation: cancellation,
+                    terminationGraceSeconds: 0.2
+                )
+            }
+            lock.withLock {
+                firstResult = runResult
+            }
+            finished.fulfill()
+        }
+
+        try waitForClaim(task: task)
+        XCTAssertThrowsError(try TaskRunner.run(task: task, trigger: .manual)) { error in
+            guard case TaskRunnerError.runAlreadyActive = error else {
+                XCTFail("expected runAlreadyActive, got \(error)")
+                return
+            }
+        }
+
+        cancellation.cancel()
+        wait(for: [finished], timeout: 3)
+        let record = try XCTUnwrap(lock.withLock { firstResult }?.get())
+        XCTAssertEqual(record.status, .cancelled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: TaskRunClaimManager.claimDirectoryURL(for: task).path))
+    }
+
+    func testTaskRepositoryUpdatePreservesInternalRunnerPolicy() throws {
+        let root = try makeTemporaryDirectory()
+        let repository = TaskRepository(tasksDirectoryURL: root)
+        let created = try repository.createTask(from: TaskSpec(
+            slug: "agent-task",
+            name: "Agent Task",
+            enabled: true,
+            script: "#!/bin/zsh\necho ok\n"
+        ))
+
+        var task = created.task
+        task.manifest.runner.concurrency = "allow"
+        try repository.writeTask(task, expectedRevision: created.revision)
+
+        let updated = try repository.updateTask(
+            selector: .slug("agent-task"),
+            with: TaskSpec(name: "Agent Task Renamed")
+        )
+
+        XCTAssertEqual(updated.task.manifest.name, "Agent Task Renamed")
+        XCTAssertEqual(updated.task.manifest.runner.concurrency, "allow")
+        XCTAssertThrowsError(try repository.createTask(from: TaskSpec(
+            slug: "agent-task",
+            name: "Other Task",
+            script: "#!/bin/zsh\necho other\n"
+        )))
+    }
+
+    func testTaskDefinitionRevisionTokenRoundTripsAndDetectsConflict() throws {
+        let root = try makeTemporaryDirectory()
+        let repository = TaskRepository(tasksDirectoryURL: root)
+        let created = try repository.createTask(from: TaskSpec(
+            slug: "revision-task",
+            name: "Revision Task",
+            script: "#!/bin/zsh\necho before\n"
+        ))
+        let decodedRevision = try TaskDefinitionRevision(token: created.revision.token)
+        XCTAssertEqual(decodedRevision, created.revision)
+
+        let updated = try repository.updateTask(
+            selector: .slug("revision-task"),
+            with: TaskSpec(description: "agent update"),
+            expectedRevision: decodedRevision
+        )
+        XCTAssertEqual(updated.task.manifest.description, "agent update")
+
+        Thread.sleep(forTimeInterval: 0.02)
+        try "#!/bin/zsh\necho outside\n".write(
+            to: updated.task.directoryURL.appendingPathComponent("run.sh"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        XCTAssertThrowsError(try repository.updateTask(
+            selector: .slug("revision-task"),
+            with: TaskSpec(notes: "stale write"),
+            expectedRevision: updated.revision
+        )) { error in
+            guard case TaskRepositoryError.conflict = error else {
+                XCTFail("expected conflict, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testTaskFileStoreMarksOrphanRunningRunStale() throws {
+        let root = try makeTemporaryDirectory()
+        try writeTaskDirectory(
+            root: root,
+            id: "orphan-task",
+            name: "Orphan",
+            enabled: true,
+            scheduleExpression: "0 9 * * *",
+            script: "#!/bin/zsh\necho orphan\n"
+        )
+        let taskDirectoryURL = root.appendingPathComponent("orphan-task", isDirectory: true)
+        let runURL = taskDirectoryURL.appendingPathComponent("runs/orphan-run", isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+        let startedAt = Date().addingTimeInterval(-60)
+        let runningRecord = RunRecord(
+            runId: "orphan-run",
+            taskId: "orphan-task",
+            trigger: .manual,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: nil,
+            startedAt: startedAt,
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: "",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil,
+            processID: 123_456,
+            processGroupID: nil
+        )
+        let metaURL = runURL.appendingPathComponent("meta.json")
+        try writeRunRecord(runningRecord, to: metaURL)
+
+        let task = try TaskFileStore(tasksDirectoryURL: root).loadTask(at: taskDirectoryURL, includeRuns: true)
+
+        let record = try XCTUnwrap(task.runs.first)
+        XCTAssertEqual(record.status, .stale)
+        XCTAssertNotNil(record.endedAt)
+        XCTAssertEqual(record.message, "运行宿主已不存在，本次运行已标记为 stale。")
+        XCTAssertEqual(try decodeRunRecord(at: metaURL).status, .stale)
+    }
+
     func testSchedulerWritesStaleRecordForExpiredMissedRun() throws {
         let appSupportURL = try makeTemporaryDirectory()
         let tasksURL = appSupportURL.appendingPathComponent("tasks", isDirectory: true)
@@ -271,6 +422,19 @@ final class RunShelfCoreTests: XCTestCase {
         throw CocoaError(.fileNoSuchFile)
     }
 
+    private func waitForClaim(task: RunShelfTask) throws {
+        let claimURL = TaskRunClaimManager.claimDirectoryURL(for: task).appendingPathComponent("claim.json")
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if FileManager.default.fileExists(atPath: claimURL.path) {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTFail("timed out waiting for run claim under \(task.directoryURL.path)")
+        throw CocoaError(.fileNoSuchFile)
+    }
+
     private func findFirstRunMeta(root: URL) -> URL? {
         guard let directories = try? FileManager.default.contentsOfDirectory(
             at: root,
@@ -287,6 +451,13 @@ final class RunShelfCoreTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(RunRecord.self, from: Data(contentsOf: url))
+    }
+
+    private func writeRunRecord(_ record: RunRecord, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(record).write(to: url, options: [.atomic])
     }
 
     private func readPID(at url: URL) throws -> pid_t {
