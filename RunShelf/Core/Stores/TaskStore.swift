@@ -380,7 +380,7 @@ final class TaskStore: ObservableObject {
 
     func runTask(id: String) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-        guard !runningTaskIDs.contains(id) else { return }
+        guard canRunTask(tasks[index]) else { return }
 
         if tasks[index].isDirty {
             // 有 app 内未保存的草稿，先保存再跑（保留原 auto-save 行为）

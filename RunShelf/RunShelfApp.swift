@@ -1,13 +1,16 @@
 import SwiftUI
+import AppKit
 
 @main
 struct RunShelfApp: App {
     @StateObject private var schedulerController: SchedulerServiceController
+    @StateObject private var taskStore: TaskStore
     @State private var isGateActive: Bool
 
     init() {
         let controller = SchedulerServiceController()
         _schedulerController = StateObject(wrappedValue: controller)
+        _taskStore = StateObject(wrappedValue: TaskStore())
         // 一次性快照：仅在 app 启动时决定是否拦截。
         // 之后无论 serviceStatus 怎么变（Settings 里 unregister、系统设置关掉登录项），
         // 本会话不再回到 Gate；下次启动重新判断。
@@ -15,7 +18,7 @@ struct RunShelfApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("Run Shelf", id: "main") {
             Group {
                 if isGateActive {
                     PermissionGateView {
@@ -32,6 +35,7 @@ struct RunShelfApp: App {
                 }
             }
             .environmentObject(schedulerController)
+            .environmentObject(taskStore)
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -49,7 +53,29 @@ struct RunShelfApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(isGateActive)
+
+                Divider()
+
+                // Window scene 默认不提供 Close；手动接回 Cmd+W。
+                // 关掉后从菜单栏「打开 Run Shelf」可以再开。
+                Button("关闭窗口") {
+                    NSApp.keyWindow?.performClose(nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command])
             }
+        }
+
+        MenuBarExtra {
+            MenuBarContent(
+                taskStore: taskStore,
+                schedulerController: schedulerController,
+                isGateActive: isGateActive
+            )
+        } label: {
+            MenuBarLabel(
+                taskStore: taskStore,
+                schedulerController: schedulerController
+            )
         }
 
         Settings {
@@ -72,4 +98,97 @@ private extension RunShelfApp {
 extension Notification.Name {
     static let saveSelectedTaskFromMenu = Notification.Name("RunShelf.saveSelectedTaskFromMenu")
     static let runSelectedTaskFromMenu = Notification.Name("RunShelf.runSelectedTaskFromMenu")
+}
+
+private struct MenuBarLabel: View {
+    @ObservedObject var taskStore: TaskStore
+    @ObservedObject var schedulerController: SchedulerServiceController
+
+    var body: some View {
+        // 未授权优先级最高（用 badge 提示用户回主窗口）
+        if !schedulerController.isAuthorized {
+            Image(systemName: "tray.full.badge.minus")
+        } else if !taskStore.runningTaskIDs.isEmpty {
+            Image(systemName: "tray.full")
+                .symbolEffect(.pulse, options: .repeating)
+        } else {
+            Image(systemName: "tray.full")
+        }
+    }
+}
+
+private struct MenuBarContent: View {
+    @ObservedObject var taskStore: TaskStore
+    @ObservedObject var schedulerController: SchedulerServiceController
+    var isGateActive: Bool
+
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        if isGateActive {
+            Button("打开 Run Shelf 完成授权") { activateMainWindow() }
+            Divider()
+            Button("退出 Run Shelf") { NSApp.terminate(nil) }
+        } else {
+            runMenu
+            Divider()
+            Button("打开 Run Shelf") { activateMainWindow() }
+                .keyboardShortcut("o", modifiers: [.command])
+            Divider()
+            Button("退出 Run Shelf") { NSApp.terminate(nil) }
+        }
+    }
+
+    @ViewBuilder
+    private var runMenu: some View {
+        Menu("立即运行") {
+            let tasks = taskStore.sortedTasks
+            let runnableIDs = Set(tasks.filter { taskStore.canRunTask($0) }.map(\.id))
+
+            if tasks.isEmpty {
+                Text("暂无任务")
+            } else {
+                RunTaskMenuItems(
+                    tasks: tasks,
+                    runningIDs: taskStore.runningTaskIDs,
+                    runnableIDs: runnableIDs,
+                    onRun: { taskStore.runTask(id: $0) }
+                )
+            }
+        }
+    }
+
+    private func activateMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        // 主窗口可能已关闭；openWindow 对已存在的同 id 窗口会拿到前台，对不存在的会新建。
+        openWindow(id: "main")
+    }
+}
+
+private struct RunTaskMenuItems: View {
+    let tasks: [RunShelfTask]
+    let runningIDs: Set<String>
+    let runnableIDs: Set<String>
+    let onRun: (String) -> Void
+
+    var body: some View {
+        ForEach(tasks) { task in
+            taskRow(for: task)
+        }
+    }
+
+    @ViewBuilder
+    private func taskRow(for task: RunShelfTask) -> some View {
+        let isRunning = runningIDs.contains(task.id)
+        Button {
+            onRun(task.id)
+        } label: {
+            if isRunning {
+                Text("\(task.manifest.name)（运行中）")
+            } else {
+                Text(task.manifest.name)
+            }
+        }
+        .disabled(!runnableIDs.contains(task.id))
+    }
 }

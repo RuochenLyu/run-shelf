@@ -4,7 +4,7 @@ struct ContentView: View {
     private let inspectorWidth: CGFloat = 300
     private let collapsedSidebarTitleInset: CGFloat = 128
 
-    @StateObject private var store = TaskStore()
+    @EnvironmentObject private var store: TaskStore
     @StateObject private var schedulePrefs = SchedulePreferencesStore()
     @State private var isShowingNewTask = false
     @State private var isShowingDeleteConfirmation = false
