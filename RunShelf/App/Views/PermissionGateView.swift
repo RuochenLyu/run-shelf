@@ -89,9 +89,8 @@ struct PermissionGateView: View {
             )
         }
 
-        // 所有 ≠ enabled 的状态统一一种引导：去系统设置开开关。
-        // .requiresApproval（已注册）直接跳设置；其他情况（.notRegistered / .notFound）
-        // 先调 register 再跳。register 失败的细节通过 lastErrorMessage 在按钮下方显示。
+        // 首次启用时先向 macOS 注册后台调度组件。
+        // 已签名、公证的构建通常会直接启用；只有 macOS 返回 requiresApproval 时才跳系统设置。
         let action: () -> Void = {
             if controller.serviceStatus == .requiresApproval {
                 controller.openLoginItemsSettings()
@@ -104,9 +103,9 @@ struct PermissionGateView: View {
         return GateState(
             iconName: "clock.badge.checkmark",
             iconColor: .accentColor,
-            title: "让 Run Shelf 在后台运行",
-            subtitle: "关闭应用后，定时任务仍能按时执行。\n在「登录项与扩展」中启用 Run Shelf 即可。",
-            primaryLabel: "打开系统设置",
+            title: "启用后台定时运行",
+            subtitle: "Run Shelf 需要注册后台调度组件，关闭窗口后才能继续按计划运行任务。\n点击后多数情况下会直接完成；如果 macOS 需要你确认，会自动打开「登录项与扩展」。",
+            primaryLabel: "启用后台运行",
             primaryAction: action,
             hidesQuitButton: false
         )

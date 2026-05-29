@@ -126,7 +126,7 @@ private struct MenuBarContent: View {
 
     var body: some View {
         if isGateActive {
-            Button("打开 Run Shelf 完成授权") { activateMainWindow() }
+            Button("打开 Run Shelf 启用后台运行") { activateMainWindow() }
             Divider()
             Button("退出 Run Shelf") { NSApp.terminate(nil) }
         } else {

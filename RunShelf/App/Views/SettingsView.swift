@@ -138,7 +138,7 @@ struct SettingsView: View {
         case .enabled:
             return nil
         case .notRegistered, .notFound:
-            return "关闭 Run Shelf 后任务将不会按计划运行。"
+            return "点击启用后会注册后台调度组件。多数情况下会直接完成；如需确认，macOS 会要求你前往系统设置。"
         case .requiresApproval:
             return "请在系统设置中开启 Run Shelf 的登录项。"
         @unknown default:
@@ -148,7 +148,8 @@ struct SettingsView: View {
 
     private var schedulerActionLabel: String {
         switch controller.serviceStatus {
-        case .enabled, .requiresApproval: return "打开系统设置"
+        case .enabled: return "管理登录项"
+        case .requiresApproval: return "前往系统设置"
         case .notRegistered, .notFound: return "启用后台运行"
         @unknown default: return "重试"
         }
