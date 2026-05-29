@@ -1,7 +1,13 @@
 import AppKit
 import Foundation
 
+let sourceURL = URL(fileURLWithPath: "scripts/assets/run-shelf-app-icon-source.png")
 let iconDirectory = URL(fileURLWithPath: "RunShelf/Resources/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
+
+guard let sourceImage = NSImage(contentsOf: sourceURL) else {
+    fatalError("Unable to load app icon source at \(sourceURL.path)")
+}
+
 try FileManager.default.createDirectory(at: iconDirectory, withIntermediateDirectories: true)
 
 let outputs: [(String, CGFloat)] = [
@@ -18,14 +24,14 @@ let outputs: [(String, CGFloat)] = [
 ]
 
 for (filename, pixels) in outputs {
-    let bitmap = drawIcon(size: pixels)
+    let bitmap = renderIcon(from: sourceImage, size: pixels)
     guard let png = bitmap.representation(using: .png, properties: [:]) else {
         fatalError("Unable to render \(filename)")
     }
     try png.write(to: iconDirectory.appendingPathComponent(filename))
 }
 
-func drawIcon(size: CGFloat) -> NSBitmapImageRep {
+func renderIcon(from sourceImage: NSImage, size: CGFloat) -> NSBitmapImageRep {
     let bitmap = NSBitmapImageRep(
         bitmapDataPlanes: nil,
         pixelsWide: Int(size),
@@ -43,38 +49,16 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
 
-    let scale = size / 1024
-    func rect(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) -> NSRect {
-        NSRect(x: x * scale, y: y * scale, width: width * scale, height: height * scale)
+    guard let context = NSGraphicsContext.current?.cgContext else {
+        fatalError("Unable to create graphics context")
     }
-    func radius(_ value: CGFloat) -> CGFloat { value * scale }
 
-    NSColor(red: 0.10, green: 0.11, blue: 0.13, alpha: 1).setFill()
-    NSBezierPath(roundedRect: rect(64, 64, 896, 896), xRadius: radius(190), yRadius: radius(190)).fill()
+    let canvas = NSRect(x: 0, y: 0, width: size, height: size)
+    context.clear(canvas)
+    context.interpolationQuality = .high
 
-    NSColor(red: 0.14, green: 0.16, blue: 0.19, alpha: 1).setFill()
-    NSBezierPath(roundedRect: rect(150, 164, 724, 696), xRadius: radius(68), yRadius: radius(68)).fill()
-
-    NSColor(red: 0.20, green: 0.71, blue: 0.39, alpha: 1).setFill()
-    NSBezierPath(roundedRect: rect(220, 698, 584, 70), xRadius: radius(35), yRadius: radius(35)).fill()
-
-    NSColor(red: 0.94, green: 0.97, blue: 0.94, alpha: 1).setFill()
-    let play = NSBezierPath()
-    play.move(to: NSPoint(x: 422 * scale, y: 360 * scale))
-    play.line(to: NSPoint(x: 422 * scale, y: 608 * scale))
-    play.line(to: NSPoint(x: 638 * scale, y: 484 * scale))
-    play.close()
-    play.fill()
-
-    NSColor(red: 0.60, green: 0.66, blue: 0.70, alpha: 1).setStroke()
-    let prompt = NSBezierPath()
-    prompt.lineWidth = max(8 * scale, 1)
-    prompt.move(to: NSPoint(x: 248 * scale, y: 284 * scale))
-    prompt.line(to: NSPoint(x: 334 * scale, y: 332 * scale))
-    prompt.line(to: NSPoint(x: 248 * scale, y: 380 * scale))
-    prompt.stroke()
-
-    NSBezierPath(roundedRect: rect(378, 284, 248, 24), xRadius: radius(12), yRadius: radius(12)).fill()
+    NSBezierPath(roundedRect: canvas, xRadius: size * 0.22, yRadius: size * 0.22).addClip()
+    sourceImage.draw(in: canvas, from: NSRect(origin: .zero, size: sourceImage.size), operation: .sourceOver, fraction: 1)
 
     NSGraphicsContext.restoreGraphicsState()
     return bitmap
