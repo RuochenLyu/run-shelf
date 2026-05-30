@@ -3,6 +3,14 @@ set -euo pipefail
 
 VERSION="${1:-1.0.0}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -f "$ROOT_DIR/.release.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/.release.env"
+  set +a
+fi
+
 DERIVED_DATA="$ROOT_DIR/.build/ReleaseDerivedData"
 DIST_ROOT="$ROOT_DIR/.build/release"
 DIST_DIR="$DIST_ROOT/RunShelf-$VERSION"
@@ -17,6 +25,10 @@ DMG_STAGE_DIR="$DIST_DIR/dmg-stage"
 
 SIGN_IDENTITY="${RUN_SHELF_SIGN_IDENTITY:-}"
 NOTARY_PROFILE="${RUN_SHELF_NOTARY_PROFILE:-}"
+SKIP_NOTARY="${RUN_SHELF_SKIP_NOTARY:-0}"
+if [[ "$SKIP_NOTARY" == "1" ]]; then
+  NOTARY_PROFILE=""
+fi
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export DEVELOPER_DIR
 export COPYFILE_DISABLE=1
@@ -62,6 +74,12 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
   exit 64
 fi
 
+if [[ -z "$NOTARY_PROFILE" && "$SKIP_NOTARY" != "1" ]]; then
+  echo "RUN_SHELF_NOTARY_PROFILE is required for release packaging." >&2
+  echo "For local signed-only packaging, set RUN_SHELF_SKIP_NOTARY=1 explicitly." >&2
+  exit 64
+fi
+
 mkdir -p "$DIST_DIR"
 rm -rf "$DERIVED_DATA" "$DIST_DIR"/*
 
@@ -99,7 +117,7 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   spctl --assess --type execute --verbose=2 "$APP_PATH"
   rm -f "$PRE_NOTARY_ZIP"
 else
-  echo "RUN_SHELF_NOTARY_PROFILE is not set; produced artifacts will be signed but not notarized." >&2
+  echo "RUN_SHELF_SKIP_NOTARY=1; produced artifacts will be signed but not notarized." >&2
 fi
 
 ditto -c -k --keepParent --norsrc --noextattr "$APP_PATH" "$ZIP_PATH"

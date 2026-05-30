@@ -4,3 +4,4 @@ xcuserdata/
 *.xcuserstate
 .DS_Store
 .codex/
+.release.env

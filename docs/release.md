@@ -5,7 +5,7 @@
 ```text
 最低系统：macOS 15
 推荐系统：macOS 26 或更高版本
-发布形式：Developer ID 签名 DMG + zip，可选公证
+发布形式：Developer ID 签名并公证的 DMG + zip
 架构：universal x86_64 + arm64
 ```
 
@@ -47,32 +47,81 @@ xcodebuild test \
 8. 重新打开 App 后，能读到后台写入的历史记录。
 ```
 
-## 打包
+## 本机发布配置
 
-脚本需要本机有 Developer ID Application 证书。默认会生成 zip 和带 `Applications` 快捷方式的 DMG：
-
-```bash
-RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-scripts/package_release.sh 1.0.0
-```
-
-脚本会分别签名内嵌的 `RunShelfScheduler` 和 `runshelf` helper，再签名主 App。
-
-如需公证，额外提供 `notarytool` 的钥匙串配置：
+正式发布不手敲签名身份和 notarytool profile。把仓库里的示例复制成本机配置：
 
 ```bash
-RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-RUN_SHELF_NOTARY_PROFILE="your-notary-profile" \
-scripts/package_release.sh 1.0.0
+cp .release.env.example .release.env
 ```
+
+`.release.env` 不进 git，只保存本机发布参数：
+
+```bash
+RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Ruochen Lyu (B4BJ3QY8T2)"
+RUN_SHELF_NOTARY_PROFILE="silent-switch-notary"
+```
+
+如果换电脑，先在钥匙串里保存 notarytool 凭据。profile 名称要和 `.release.env` 一致：
+
+```bash
+xcrun notarytool store-credentials "silent-switch-notary" \
+  --apple-id "APPLE_ID" \
+  --team-id "B4BJ3QY8T2"
+```
+
+正式发布必须公证。只做本地签名包时才显式跳过：
+
+```bash
+RUN_SHELF_SKIP_NOTARY=1 scripts/package_release.sh 1.0.0
+```
+
+## 标准发布
+
+先提交代码，然后准备 release notes 文件，例如：
+
+```bash
+cat > /tmp/runshelf-1.1.2-notes.md <<'EOF'
+修复……
+
+校验：
+- xcodebuild test 通过
+- App 与 DMG 均已 Developer ID 签名、公证并 staple
+EOF
+```
+
+一条命令完成测试、构建、签名、公证、staple、校验、tag、push 和 GitHub Release：
+
+```bash
+scripts/release.sh 1.1.2 --notes-file /tmp/runshelf-1.1.2-notes.md
+```
+
+这个脚本会拒绝脏工作区、重复 tag、重复 release。成功后会上传四个资产：
+
+```text
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg.sha256
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.zip
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.zip.sha256
+```
+
+## 只打包不发布
+
+需要只生成产物、不创建 tag 和 GitHub Release 时，直接运行：
+
+```bash
+scripts/package_release.sh 1.1.2
+```
+
+脚本会跑测试，构建 Release，分别签名内嵌的 `RunShelfScheduler` 和 `runshelf` helper，再签名主 App，提交 Apple 公证并 staple App 和 DMG。
 
 产物位置：
 
 ```text
-.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
-.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg.sha256
-.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip
-.build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip.sha256
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg.sha256
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.zip
+.build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.zip.sha256
 ```
 
 ## 校验产物
@@ -84,32 +133,12 @@ codesign --verify --deep --strict --verbose=2 \
 vtool -show-build \
   ".build/ReleaseDerivedData/Build/Products/Release/Run Shelf.app/Contents/MacOS/Run Shelf"
 
-unzip -l .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip | \
-  rg '(^|/)\\._|__MACOSX' && exit 1 || true
+unzip -l .build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.zip | \
+  rg '(^|/)\._|__MACOSX' && exit 1 || true
 
-hdiutil verify .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
-```
-
-如果做了公证，再跑：
-
-```bash
 spctl --assess --type execute --verbose=2 \
   ".build/ReleaseDerivedData/Build/Products/Release/Run Shelf.app"
 
 spctl --assess --type open --context context:primary-signature --verbose=2 \
-  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg
-```
-
-## GitHub Release
-
-```bash
-git tag v1.0.0
-git push origin main v1.0.0
-gh release create v1.0.0 \
-  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg \
-  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.dmg.sha256 \
-  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip \
-  .build/release/RunShelf-1.0.0/RunShelf-1.0.0-macOS15.zip.sha256 \
-  --title "Run Shelf 1.0.0" \
-  --notes-file CHANGELOG.md
+  .build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg
 ```
