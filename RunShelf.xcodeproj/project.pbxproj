@@ -75,7 +75,7 @@
 		B3165C131CB0A356AAEA12EE /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
 		B660B99159863F51CA0DBA81 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
 		BB72A47B080FDC8AD620353D /* TaskSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */; };
-		BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 1ECAE2DF384BA2504D2F2996 /* RunShelfScheduler */; };
+		BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed LaunchServices */ = {isa = PBXBuildFile; fileRef = 1ECAE2DF384BA2504D2F2996 /* RunShelfScheduler */; };
 		BD625596363E7F13A6C9B103 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
 		BEE45E7943C62DA61AAD4B45 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
 		C316CE8D739BDACEA35DCB69 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
@@ -130,10 +130,20 @@
 			dstPath = Contents/Library/Helpers;
 			dstSubfolderSpec = 1;
 			files = (
-				BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed Helpers */,
 				1855EC1D4B55B878C6BFEA49 /* runshelf in Embed Helpers */,
 			);
 			name = "Embed Helpers";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8E5C294AF16B4B10A94EE2CC /* Embed LaunchServices */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchServices;
+			dstSubfolderSpec = 1;
+			files = (
+				BCD6D9D1C210D5D79E68CEAC /* RunShelfScheduler in Embed LaunchServices */,
+			);
+			name = "Embed LaunchServices";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		FE255D79774CE3BE6A795A11 /* Embed LaunchAgents */ = {
@@ -500,6 +510,7 @@
 				32C34012C9FB4234D20EB1BB /* Sources */,
 				1985BBEBAF236CA2DE497E57 /* Frameworks */,
 				89021FE1B44F51F49589A329 /* Resources */,
+				8E5C294AF16B4B10A94EE2CC /* Embed LaunchServices */,
 				311FFE7B162B3DCD914760DA /* Embed Helpers */,
 				FE255D79774CE3BE6A795A11 /* Embed LaunchAgents */,
 			);

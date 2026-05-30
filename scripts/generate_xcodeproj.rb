@@ -93,10 +93,14 @@ add_files(test_group, "RunShelfTests", app_target, scheduler_target, cli_target,
 app_target.add_dependency(scheduler_target)
 app_target.add_dependency(cli_target)
 
+scheduler_phase = app_target.new_copy_files_build_phase("Embed LaunchServices")
+scheduler_phase.symbol_dst_subfolder_spec = :wrapper
+scheduler_phase.dst_path = "Contents/Library/LaunchServices"
+scheduler_phase.add_file_reference(scheduler_target.product_reference)
+
 helpers_phase = app_target.new_copy_files_build_phase("Embed Helpers")
 helpers_phase.symbol_dst_subfolder_spec = :wrapper
 helpers_phase.dst_path = "Contents/Library/Helpers"
-helpers_phase.add_file_reference(scheduler_target.product_reference)
 helpers_phase.add_file_reference(cli_target.product_reference)
 
 launch_agents_phase = app_target.new_copy_files_build_phase("Embed LaunchAgents")

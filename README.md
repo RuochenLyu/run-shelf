@@ -142,7 +142,7 @@ runshelf help agent
 应用内嵌后台辅助进程：
 
 ```text
-Run Shelf.app/Contents/Library/Helpers/RunShelfScheduler
+Run Shelf.app/Contents/Library/LaunchServices/RunShelfScheduler
 ```
 
 启用后台运行后，辅助进程每 30 秒检查一次任务，按分钟粒度匹配 cron。超过补跑时间窗口的任务会记为 `stale`，主应用会读取心跳文件来显示后台状态。

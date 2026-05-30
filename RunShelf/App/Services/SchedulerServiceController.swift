@@ -12,8 +12,11 @@ final class SchedulerServiceController: ObservableObject {
     @Published var lastErrorMessage: String?
 
     private let service = SMAppService.agent(plistName: "com.aix4u.runshelf.scheduler.plist")
+    private let registrationSignatureKey = "schedulerRegistrationSignature"
     private let decoder: JSONDecoder
     private var isRequestingNotificationAuthorization = false
+    private var isRepairingRegistration = false
+    private var attemptedRegistrationRepairSignature: String?
 
     init() {
         let decoder = JSONDecoder()
@@ -30,6 +33,7 @@ final class SchedulerServiceController: ObservableObject {
     func refreshAuthorization() {
         serviceStatus = service.status
         embeddedSchedulerAvailable = isEmbeddedSchedulerAvailable()
+        repairRegistrationIfNeeded()
     }
 
     /// 主窗口/Settings 用的诊断刷新：通知权限 + 心跳
@@ -74,6 +78,7 @@ final class SchedulerServiceController: ObservableObject {
 
         do {
             try service.register()
+            markCurrentRegistrationSignature()
             refreshAuthorization()
         } catch {
             registrationErrorResponse = handleServiceRegistrationError(error)
@@ -89,6 +94,7 @@ final class SchedulerServiceController: ObservableObject {
         lastErrorMessage = nil
         do {
             try service.register()
+            markCurrentRegistrationSignature()
             refresh()
         } catch {
             _ = handleServiceRegistrationError(error)
@@ -100,6 +106,7 @@ final class SchedulerServiceController: ObservableObject {
         lastErrorMessage = nil
         do {
             try service.unregister()
+            UserDefaults.standard.removeObject(forKey: registrationSignatureKey)
             refresh()
         } catch {
             _ = handleServiceRegistrationError(error)
@@ -178,13 +185,76 @@ final class SchedulerServiceController: ObservableObject {
     }
 
     private func isEmbeddedSchedulerAvailable() -> Bool {
-        let bundleURL = Bundle.main.bundleURL
-        let helperURL = bundleURL
-            .appendingPathComponent("Contents/Library/Helpers/RunShelfScheduler")
-        let plistURL = bundleURL
-            .appendingPathComponent("Contents/Library/LaunchAgents/com.aix4u.runshelf.scheduler.plist")
+        let helperURL = embeddedSchedulerURL()
+        let plistURL = embeddedSchedulerPlistURL()
         return FileManager.default.fileExists(atPath: helperURL.path)
             && FileManager.default.fileExists(atPath: plistURL.path)
+    }
+
+    private func repairRegistrationIfNeeded() {
+        guard serviceStatus == .enabled else { return }
+        guard embeddedSchedulerAvailable else { return }
+        guard !isRepairingRegistration else { return }
+        guard let signature = currentRegistrationSignature() else { return }
+        guard UserDefaults.standard.string(forKey: registrationSignatureKey) != signature else { return }
+        guard attemptedRegistrationRepairSignature != signature else { return }
+
+        isRepairingRegistration = true
+        attemptedRegistrationRepairSignature = signature
+        service.unregister { [weak self] error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    self.lastErrorMessage = "后台调度刷新失败：\(error.localizedDescription)。"
+                    self.isRepairingRegistration = false
+                    self.refreshAuthorization()
+                    return
+                }
+
+                do {
+                    try self.service.register()
+                    UserDefaults.standard.set(signature, forKey: self.registrationSignatureKey)
+                    self.lastErrorMessage = nil
+                } catch {
+                    _ = self.handleServiceRegistrationError(error)
+                }
+
+                self.isRepairingRegistration = false
+                self.refreshAuthorization()
+            }
+        }
+    }
+
+    private func markCurrentRegistrationSignature() {
+        guard let signature = currentRegistrationSignature() else { return }
+        UserDefaults.standard.set(signature, forKey: registrationSignatureKey)
+    }
+
+    private func currentRegistrationSignature() -> String? {
+        guard let helperSignature = fileSignature(for: embeddedSchedulerURL()) else { return nil }
+        guard let plistSignature = fileSignature(for: embeddedSchedulerPlistURL()) else { return nil }
+        return [
+            "bundleProgram=Contents/Library/LaunchServices/RunShelfScheduler",
+            helperSignature,
+            plistSignature
+        ].joined(separator: "|")
+    }
+
+    private func fileSignature(for url: URL) -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
+        guard let size = attributes[.size] as? NSNumber else { return nil }
+        guard let modifiedAt = attributes[.modificationDate] as? Date else { return nil }
+        return "\(url.path):\(size.int64Value):\(modifiedAt.timeIntervalSince1970)"
+    }
+
+    private func embeddedSchedulerURL() -> URL {
+        Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/LaunchServices/RunShelfScheduler")
+    }
+
+    private func embeddedSchedulerPlistURL() -> URL {
+        Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/LaunchAgents/com.aix4u.runshelf.scheduler.plist")
     }
 }
 
@@ -192,4 +262,3 @@ private enum RegistrationErrorResponse {
     case stayOnGate
     case openSettings
 }
-

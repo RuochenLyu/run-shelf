@@ -5,7 +5,7 @@
     <key>Label</key>
     <string>com.aix4u.runshelf.scheduler</string>
     <key>BundleProgram</key>
-    <string>Contents/Library/Helpers/RunShelfScheduler</string>
+    <string>Contents/Library/LaunchServices/RunShelfScheduler</string>
     <key>ProgramArguments</key>
     <array>
         <string>RunShelfScheduler</string>
