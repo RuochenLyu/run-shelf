@@ -4,10 +4,12 @@ set -euo pipefail
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  scripts/release.sh <version> --notes-file <path>
+  scripts/release.sh <version> [--notes-file <path>]
 
 Example:
-  scripts/release.sh 1.1.2 --notes-file /tmp/runshelf-1.1.2-notes.md
+  scripts/release.sh 1.1.2
+
+By default, release notes are read from docs/releases/v<version>.md.
 USAGE
 }
 
@@ -47,13 +49,20 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 64
 fi
 
-if [[ -z "$NOTES_FILE" || ! -f "$NOTES_FILE" ]]; then
-  echo "--notes-file is required and must point to an existing file." >&2
-  exit 64
-fi
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+if [[ -z "$NOTES_FILE" ]]; then
+  NOTES_FILE="$ROOT_DIR/docs/releases/v$VERSION.md"
+elif [[ "$NOTES_FILE" != /* ]]; then
+  NOTES_FILE="$ROOT_DIR/$NOTES_FILE"
+fi
+
+if [[ ! -f "$NOTES_FILE" ]]; then
+  echo "Release notes file not found: $NOTES_FILE" >&2
+  echo "Create docs/releases/v$VERSION.md, or pass --notes-file <path>." >&2
+  exit 64
+fi
 
 if [[ -f "$ROOT_DIR/.release.env" ]]; then
   set -a

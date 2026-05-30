@@ -78,10 +78,16 @@ RUN_SHELF_SKIP_NOTARY=1 scripts/package_release.sh 1.0.0
 
 ## 标准发布
 
-先提交代码，然后准备 release notes 文件，例如：
+先提交代码，然后准备 release notes 文件，路径固定为：
+
+```text
+docs/releases/v1.1.2.md
+```
+
+示例：
 
 ```bash
-cat > /tmp/runshelf-1.1.2-notes.md <<'EOF'
+cat > docs/releases/v1.1.2.md <<'EOF'
 修复……
 
 校验：
@@ -93,10 +99,10 @@ EOF
 一条命令完成测试、构建、签名、公证、staple、校验、tag、push 和 GitHub Release：
 
 ```bash
-scripts/release.sh 1.1.2 --notes-file /tmp/runshelf-1.1.2-notes.md
+scripts/release.sh 1.1.2
 ```
 
-这个脚本会拒绝脏工作区、重复 tag、重复 release。成功后会上传四个资产：
+脚本默认读取 `docs/releases/v1.1.2.md`。它会拒绝脏工作区、重复 tag、重复 release。成功后会上传四个资产：
 
 ```text
 .build/release/RunShelf-1.1.2/RunShelf-1.1.2-macOS15.dmg
