@@ -1,4 +1,77 @@
+import Darwin
 import Foundation
+
+enum TaskDefinitionFileLock {
+    enum Mode {
+        case shared
+        case exclusive
+
+        var operation: Int32 {
+            switch self {
+            case .shared: return LOCK_SH
+            case .exclusive: return LOCK_EX
+            }
+        }
+    }
+
+    static func withLock<T>(
+        tasksDirectoryURL: URL,
+        taskID: String,
+        mode: Mode,
+        fileManager: FileManager = .default,
+        _ body: () throws -> T
+    ) throws -> T {
+        guard UUID(uuidString: taskID) != nil else {
+            throw TaskRepositoryError.invalidTaskID(taskID)
+        }
+        let locksURL = try stableLocksDirectory(
+            tasksDirectoryURL: tasksDirectoryURL,
+            fileManager: fileManager
+        )
+        let lockURL = locksURL.appendingPathComponent("task-\(taskID).lock")
+        return try withFileLock(at: lockURL, operation: mode.operation, body)
+    }
+}
+
+enum TaskRepositoryFileLock {
+    static func withExclusiveLock<T>(
+        tasksDirectoryURL: URL,
+        fileManager: FileManager = .default,
+        _ body: () throws -> T
+    ) throws -> T {
+        let locksURL = try stableLocksDirectory(
+            tasksDirectoryURL: tasksDirectoryURL,
+            fileManager: fileManager
+        )
+        return try withFileLock(
+            at: locksURL.appendingPathComponent("repository.lock"),
+            operation: LOCK_EX,
+            body
+        )
+    }
+}
+
+private func stableLocksDirectory(tasksDirectoryURL: URL, fileManager: FileManager) throws -> URL {
+    try fileManager.createDirectory(at: tasksDirectoryURL, withIntermediateDirectories: true)
+    let locksURL = tasksDirectoryURL.appendingPathComponent(".locks", isDirectory: true)
+    try fileManager.createDirectory(at: locksURL, withIntermediateDirectories: true)
+    try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locksURL.path)
+    return locksURL
+}
+
+private func withFileLock<T>(at lockURL: URL, operation: Int32, _ body: () throws -> T) throws -> T {
+        let descriptor = open(lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC, mode_t(0o600))
+        guard descriptor >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { close(descriptor) }
+
+        guard flock(descriptor, operation) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { flock(descriptor, LOCK_UN) }
+        return try body()
+}
 
 struct TaskDefinitionRevision: Codable, Equatable, Sendable {
     var manifest: FileRevision?
@@ -76,6 +149,54 @@ struct TaskSpec: Codable, Equatable, Sendable {
     var timeoutSeconds: Int? = nil
     var script: String? = nil
     var notes: String? = nil
+
+    init(
+        id: String? = nil,
+        slug: String? = nil,
+        name: String? = nil,
+        description: String? = nil,
+        enabled: Bool? = nil,
+        schedule: TaskSchedule? = nil,
+        timeoutSeconds: Int? = nil,
+        script: String? = nil,
+        notes: String? = nil
+    ) {
+        self.id = id
+        self.slug = slug
+        self.name = name
+        self.description = description
+        self.enabled = enabled
+        self.schedule = schedule
+        self.timeoutSeconds = timeoutSeconds
+        self.script = script
+        self.notes = notes
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case slug
+        case name
+        case description
+        case enabled
+        case schedule
+        case timeoutSeconds
+        case script
+        case notes
+    }
+
+    init(from decoder: Decoder) throws {
+        try rejectUnknownKeys(in: decoder, allowed: Set(CodingKeys.allCases.map(\.rawValue)))
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        slug = try container.decodeIfPresent(String.self, forKey: .slug)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        schedule = try container.decodeIfPresent(TaskSchedule.self, forKey: .schedule)
+        timeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .timeoutSeconds)
+        script = try container.decodeIfPresent(String.self, forKey: .script)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+    }
 }
 
 struct TaskRepositoryReadResult: Sendable {
@@ -105,6 +226,8 @@ enum TaskRepositoryError: LocalizedError, Equatable {
     case invalidRevision(String)
     case missingRequiredField(String)
     case taskDirectoryMissing(String)
+    case taskIdentityMismatch(directoryName: String, manifestID: String)
+    case taskRunning(String, [String])
 
     var errorDescription: String? {
         switch self {
@@ -126,6 +249,10 @@ enum TaskRepositoryError: LocalizedError, Equatable {
             return "缺少必填字段：\(field)"
         case .taskDirectoryMissing(let taskID):
             return "任务目录已不存在：\(taskID)"
+        case .taskIdentityMismatch(let directoryName, let manifestID):
+            return "任务目录与 manifest 身份不一致：目录=\(directoryName)，manifest.id=\(manifestID)"
+        case .taskRunning(let taskID, let runIDs):
+            return "运行中的任务不能删除：\(taskID)，runId=\(runIDs.joined(separator: ", "))"
         }
     }
 }
@@ -153,9 +280,27 @@ struct TaskRepository {
         try loader.loadTasksWithIssues(includeRuns: includeRuns)
     }
 
+    func loadTasksWithLatestRun() throws -> [RunShelfTask] {
+        try loader.loadTasks(includeRuns: false).map { task in
+            var task = task
+            task.runs = loader.loadLatestRun(for: task.directoryURL).map { [$0] } ?? []
+            return task
+        }
+    }
+
     func loadTask(selector: TaskRepositorySelector, includeRuns: Bool = true) throws -> TaskRepositoryReadResult {
         let task = try resolve(selector: selector, includeRuns: includeRuns)
         return try loadTaskConsistently(at: task.directoryURL, includeRuns: includeRuns)
+    }
+
+    func loadTaskWithLatestRun(selector: TaskRepositorySelector) throws -> TaskRepositoryReadResult {
+        var read = try loadTask(selector: selector, includeRuns: false)
+        read.task.runs = loader.loadLatestRun(for: read.task.directoryURL).map { [$0] } ?? []
+        return read
+    }
+
+    func loadRun(task: RunShelfTask, runID: String) throws -> RunRecord? {
+        try loader.loadRun(for: task.directoryURL, runID: runID)
     }
 
     func loadTaskConsistently(
@@ -176,40 +321,56 @@ struct TaskRepository {
     }
 
     func createTask(from spec: TaskSpec) throws -> TaskRepositoryWriteResult {
-        let id = try normalizedTaskID(spec.id ?? UUID().uuidString)
-        let directoryURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
-        guard !fileManager.fileExists(atPath: directoryURL.path) else {
-            throw TaskRepositoryError.conflict("任务目录已存在：\(id)")
-        }
+        try TaskRepositoryFileLock.withExclusiveLock(
+            tasksDirectoryURL: tasksDirectoryURL,
+            fileManager: fileManager
+        ) {
+            let id = try normalizedTaskID(spec.id ?? UUID().uuidString)
+            let directoryURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
+            guard !fileManager.fileExists(atPath: directoryURL.path) else {
+                throw TaskRepositoryError.conflict("任务目录已存在：\(id)")
+            }
 
-        let name = try nonEmpty(spec.name, field: "name")
-        let slug = try normalizedSlug(spec.slug)
-        if let slug {
-            try ensureUniqueSlug(slug, excludingID: nil)
-        }
-        let schedule = try validatedSchedule(spec.schedule ?? .defaultDaily)
-        var manifest = TaskManifest.create(
-            id: id,
-            slug: slug,
-            name: name,
-            description: spec.description ?? "",
-            enabled: spec.enabled ?? true,
-            schedule: schedule
-        )
-        manifest.runner.timeoutSeconds = max(spec.timeoutSeconds ?? manifest.runner.timeoutSeconds, 0)
+            let name = try nonEmpty(spec.name, field: "name")
+            let slug = try normalizedSlug(spec.slug)
+            if let slug {
+                try ensureUniqueSlugWhileRepositoryLocked(slug, excludingID: nil)
+            }
+            let schedule = try validatedSchedule(spec.schedule ?? .defaultDaily)
+            var manifest = TaskManifest.create(
+                id: id,
+                slug: slug,
+                name: name,
+                description: spec.description ?? "",
+                enabled: spec.enabled ?? true,
+                schedule: schedule
+            )
+            manifest.runner.timeoutSeconds = max(spec.timeoutSeconds ?? manifest.runner.timeoutSeconds, 0)
 
-        let task = RunShelfTask(
-            manifest: manifest,
-            directoryURL: directoryURL,
-            script: normalizedScript(spec.script),
-            notes: spec.notes ?? "",
-            runs: [],
-            isDirty: false
-        )
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
-        try writeTask(task, expectedRevision: nil)
-        let read = try loadTaskConsistently(at: directoryURL)
-        return TaskRepositoryWriteResult(task: read.task, revision: read.revision)
+            let task = RunShelfTask(
+                manifest: manifest,
+                directoryURL: directoryURL,
+                script: normalizedScript(spec.script),
+                notes: spec.notes ?? "",
+                runs: [],
+                isDirty: false
+            )
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
+            do {
+                let revision = try TaskDefinitionFileLock.withLock(
+                    tasksDirectoryURL: tasksDirectoryURL,
+                    taskID: id,
+                    mode: .exclusive,
+                    fileManager: fileManager
+                ) {
+                    try writeTaskWhileLocked(task, expectedRevision: nil, isCreating: true)
+                }
+                return TaskRepositoryWriteResult(task: task, revision: revision)
+            } catch {
+                try? fileManager.removeItem(at: directoryURL)
+                throw error
+            }
+        }
     }
 
     func updateTask(
@@ -225,9 +386,6 @@ struct TaskRepository {
         }
         if spec.slug != nil {
             let slug = try normalizedSlug(spec.slug)
-            if let slug {
-                try ensureUniqueSlug(slug, excludingID: task.id)
-            }
             task.manifest.slug = slug
         }
         if let name = spec.name {
@@ -254,72 +412,63 @@ struct TaskRepository {
         task.manifest.updatedAt = Date()
         task.isDirty = false
 
-        try writeTask(task, expectedRevision: expectedRevision ?? read.revision)
-        let updated = try loadTaskConsistently(at: task.directoryURL)
-        return TaskRepositoryWriteResult(task: updated.task, revision: updated.revision)
+        let revision = try writeTask(task, expectedRevision: expectedRevision ?? read.revision)
+        return TaskRepositoryWriteResult(task: task, revision: revision)
     }
 
-    func writeTask(_ task: RunShelfTask, expectedRevision: TaskDefinitionRevision? = nil) throws {
-        guard fileManager.fileExists(atPath: task.directoryURL.path) else {
-            throw TaskRepositoryError.taskDirectoryMissing(task.id)
-        }
-
-        if task.directoryURL.lastPathComponent != task.id {
-            throw TaskRepositoryError.invalidTaskID(task.id)
-        }
-
-        if let expectedRevision {
-            let currentRevision = TaskDefinitionRevision.capture(for: task.directoryURL)
-            guard currentRevision == expectedRevision else {
-                throw TaskRepositoryError.conflict("任务文件已被其他进程修改，请重新读取后再保存。")
+    @discardableResult
+    func writeTask(_ task: RunShelfTask, expectedRevision: TaskDefinitionRevision? = nil) throws -> TaskDefinitionRevision {
+        try TaskRepositoryFileLock.withExclusiveLock(
+            tasksDirectoryURL: tasksDirectoryURL,
+            fileManager: fileManager
+        ) {
+            if let slug = task.manifest.slug {
+                _ = try normalizedSlug(slug)
+                try ensureUniqueSlugWhileRepositoryLocked(slug, excludingID: task.id)
+            }
+            return try TaskDefinitionFileLock.withLock(
+                tasksDirectoryURL: tasksDirectoryURL,
+                taskID: task.id,
+                mode: .exclusive,
+                fileManager: fileManager
+            ) {
+                try writeTaskWhileLocked(task, expectedRevision: expectedRevision, isCreating: false)
             }
         }
-
-        _ = try validatedSchedule(task.manifest.schedule)
-        if let slug = task.manifest.slug {
-            _ = try normalizedSlug(slug)
-        }
-
-        try fileManager.createDirectory(
-            at: task.directoryURL.appendingPathComponent("runs", isDirectory: true),
-            withIntermediateDirectories: true
-        )
-
-        let manifestData = try encoder.encode(task.manifest)
-        try manifestData.write(to: task.directoryURL.appendingPathComponent("task.json"), options: [.atomic])
-
-        let scriptURL = task.directoryURL.appendingPathComponent("run.sh")
-        try TaskFileStore.normalizedTemplateScript(task.script).write(
-            to: scriptURL,
-            atomically: true,
-            encoding: .utf8
-        )
-        try fileManager.setAttributes(
-            [.posixPermissions: NSNumber(value: Int16(0o755))],
-            ofItemAtPath: scriptURL.path
-        )
-
-        try task.notes.write(
-            to: task.directoryURL.appendingPathComponent("notes.md"),
-            atomically: true,
-            encoding: .utf8
-        )
     }
 
     func deleteTask(selector: TaskRepositorySelector) throws -> String {
-        let read = try loadTask(selector: selector, includeRuns: false)
-        let task = read.task
+        try TaskRepositoryFileLock.withExclusiveLock(
+            tasksDirectoryURL: tasksDirectoryURL,
+            fileManager: fileManager
+        ) {
+            let task = try resolve(selector: selector, includeRuns: false)
+            return try TaskDefinitionFileLock.withLock(
+                tasksDirectoryURL: tasksDirectoryURL,
+                taskID: task.id,
+                mode: .exclusive,
+                fileManager: fileManager
+            ) {
+                try revalidateTaskRootWhileLocked(task)
+                let activeRunIDs = TaskRunClaimManager.activeClaims(for: task, fileManager: fileManager)
+                    .map(\.runId)
+                    .sorted()
+                if !activeRunIDs.isEmpty {
+                    throw TaskRepositoryError.taskRunning(task.id, activeRunIDs)
+                }
 
-        do {
-            var resultingURL: NSURL?
-            try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
-        } catch {
-            let trashURL = tasksDirectoryURL.appendingPathComponent("trash", isDirectory: true)
-            try fileManager.createDirectory(at: trashURL, withIntermediateDirectories: true)
-            let destination = trashURL.appendingPathComponent(task.id + "-" + UUID().uuidString, isDirectory: true)
-            try fileManager.moveItem(at: task.directoryURL, to: destination)
+                do {
+                    var resultingURL: NSURL?
+                    try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
+                } catch {
+                    let trashURL = tasksDirectoryURL.appendingPathComponent("trash", isDirectory: true)
+                    try fileManager.createDirectory(at: trashURL, withIntermediateDirectories: true)
+                    let destination = trashURL.appendingPathComponent(task.id + "-" + UUID().uuidString, isDirectory: true)
+                    try fileManager.moveItem(at: task.directoryURL, to: destination)
+                }
+                return task.id
+            }
         }
-        return task.id
     }
 
     func resolve(selector: TaskRepositorySelector, includeRuns: Bool = true) throws -> RunShelfTask {
@@ -374,7 +523,75 @@ struct TaskRepository {
         return matches[0]
     }
 
-    private func ensureUniqueSlug(_ slug: String, excludingID: String?) throws {
+    private func writeTaskWhileLocked(
+        _ task: RunShelfTask,
+        expectedRevision: TaskDefinitionRevision?,
+        isCreating: Bool
+    ) throws -> TaskDefinitionRevision {
+        guard fileManager.fileExists(atPath: task.directoryURL.path) else {
+            throw TaskRepositoryError.taskDirectoryMissing(task.id)
+        }
+        guard task.directoryURL.lastPathComponent == task.id else {
+            throw TaskRepositoryError.invalidTaskID(task.id)
+        }
+        _ = try validatedSchedule(task.manifest.schedule)
+        if !isCreating {
+            try revalidateTaskRootWhileLocked(task)
+        }
+        if let expectedRevision {
+            let currentRevision = TaskDefinitionRevision.capture(for: task.directoryURL)
+            guard currentRevision == expectedRevision else {
+                throw TaskRepositoryError.conflict("任务文件已被其他进程修改，请重新读取后再保存。")
+            }
+        }
+
+        let runsURL = task.directoryURL.appendingPathComponent("runs", isDirectory: true)
+        if !fileManager.fileExists(atPath: runsURL.path) {
+            try fileManager.createDirectory(at: runsURL, withIntermediateDirectories: false)
+        }
+
+        let manifestData = try encoder.encode(task.manifest)
+        try manifestData.write(to: task.directoryURL.appendingPathComponent("task.json"), options: [.atomic])
+
+        let scriptURL = task.directoryURL.appendingPathComponent("run.sh")
+        try TaskFileStore.normalizedTemplateScript(task.script).write(
+            to: scriptURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try fileManager.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o755))],
+            ofItemAtPath: scriptURL.path
+        )
+        try task.notes.write(
+            to: task.directoryURL.appendingPathComponent("notes.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try? fileManager.removeItem(at: task.directoryURL.appendingPathComponent(".definition-lock"))
+        return TaskDefinitionRevision.capture(for: task.directoryURL)
+    }
+
+    private func revalidateTaskRootWhileLocked(_ task: RunShelfTask) throws {
+        guard fileManager.fileExists(atPath: task.directoryURL.path) else {
+            throw TaskRepositoryError.taskDirectoryMissing(task.id)
+        }
+        guard task.directoryURL.lastPathComponent == task.id else {
+            throw TaskRepositoryError.invalidTaskID(task.id)
+        }
+        let data = try Data(contentsOf: task.directoryURL.appendingPathComponent("task.json"))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(TaskManifest.self, from: data)
+        guard manifest.id == task.id else {
+            throw TaskRepositoryError.taskIdentityMismatch(
+                directoryName: task.id,
+                manifestID: manifest.id
+            )
+        }
+    }
+
+    private func ensureUniqueSlugWhileRepositoryLocked(_ slug: String, excludingID: String?) throws {
         let matches = try loader.loadTasks(includeRuns: false).filter { task in
             task.manifest.slug == slug && task.id != excludingID
         }

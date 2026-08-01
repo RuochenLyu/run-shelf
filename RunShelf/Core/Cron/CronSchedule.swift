@@ -96,6 +96,43 @@ struct CronSchedule: Equatable {
         return candidateRuns(after: startMinute, through: endMinute, limit: limit, calendar: calendar)
     }
 
+    func latestMatchingRun(after start: Date, through end: Date, calendar inputCalendar: Calendar = .current) -> Date? {
+        guard start < end else { return nil }
+
+        var calendar = inputCalendar
+        calendar.timeZone = .current
+
+        let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
+        let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
+        let firstDay = calendar.startOfDay(for: startMinute)
+        var cursorDay = calendar.startOfDay(for: endMinute)
+        let sortedHours = hours.values.sorted(by: >)
+        let sortedMinutes = minutes.values.sorted(by: >)
+
+        while cursorDay >= firstDay {
+            if dayMatches(cursorDay, calendar: calendar) {
+                for hour in sortedHours {
+                    for minute in sortedMinutes {
+                        guard let candidate = date(on: cursorDay, hour: hour, minute: minute, calendar: calendar),
+                              candidate >= startMinute,
+                              candidate <= endMinute
+                        else {
+                            continue
+                        }
+                        return candidate
+                    }
+                }
+            }
+
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursorDay) else {
+                break
+            }
+            cursorDay = previousDay
+        }
+
+        return nil
+    }
+
     private func candidateRuns(after start: Date, through limitDate: Date, limit: Int, calendar: Calendar) -> [Date] {
         guard limit > 0 else { return [] }
 

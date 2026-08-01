@@ -2,10 +2,11 @@ import SwiftUI
 
 struct TaskSidebarView: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject var selection: TaskSelectionState
     @State private var editingTaskID: String? = nil
 
     var body: some View {
-        List(selection: $store.selectedTaskID) {
+        List(selection: $selection.selectedTaskID) {
             ForEach(store.sortedTasks) { task in
                 TaskSidebarRow(
                     task: task,

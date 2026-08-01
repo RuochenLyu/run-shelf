@@ -19,6 +19,7 @@ enum TaskDetailTab: String, Hashable, CaseIterable, Identifiable {
 
 struct TaskDetailView: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject var selection: TaskSelectionState
     let taskID: String
     var titleLeadingInset: CGFloat = 0
 
@@ -33,7 +34,7 @@ struct TaskDetailView: View {
                 Divider()
                 content(for: task)
             }
-            .onChange(of: store.selectedRunID) { _, newValue in
+            .onChange(of: selection.selectedRunID) { _, newValue in
                 if newValue != nil {
                     selectedTab = .log
                 }
@@ -68,7 +69,7 @@ struct TaskDetailView: View {
         case .notes:
             notesTab
         case .log:
-            LogView(store: store, task: task)
+            LogView(store: store, selection: selection, task: task)
         }
     }
 

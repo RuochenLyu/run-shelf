@@ -72,6 +72,7 @@ if [[ -f "$ROOT_DIR/.release.env" ]]; then
 fi
 
 TAG="v$VERSION"
+RELEASE_BRANCH="${RUN_SHELF_RELEASE_BRANCH:-main}"
 DIST_DIR="$ROOT_DIR/.build/release/RunShelf-$VERSION"
 DMG_PATH="$DIST_DIR/RunShelf-$VERSION-macOS15.dmg"
 ZIP_PATH="$DIST_DIR/RunShelf-$VERSION-macOS15.zip"
@@ -79,6 +80,21 @@ ZIP_PATH="$DIST_DIR/RunShelf-$VERSION-macOS15.zip"
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working tree is dirty. Commit or stash changes before releasing." >&2
   git status --short >&2
+  exit 65
+fi
+
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "$CURRENT_BRANCH" != "$RELEASE_BRANCH" ]]; then
+  echo "Release must run from $RELEASE_BRANCH, current branch: $CURRENT_BRANCH" >&2
+  exit 65
+fi
+git fetch --quiet origin "$RELEASE_BRANCH" --tags
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$RELEASE_BRANCH")" ]]; then
+  echo "HEAD must exactly match origin/$RELEASE_BRANCH before release." >&2
+  exit 65
+fi
+if ! git ls-files --error-unmatch "$NOTES_FILE" >/dev/null 2>&1 || ! git diff --quiet HEAD -- "$NOTES_FILE"; then
+  echo "Release notes must be tracked in HEAD: $NOTES_FILE" >&2
   exit 65
 fi
 
@@ -116,7 +132,6 @@ plutil -extract BundleProgram raw \
   rg -qx 'Contents/Library/LaunchServices/RunShelfScheduler'
 
 git tag -a "$TAG" -m "Run Shelf $VERSION"
-git push origin main
 git push origin "$TAG"
 
 gh release create "$TAG" \

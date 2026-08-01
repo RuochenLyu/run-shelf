@@ -50,10 +50,10 @@ runs/<run-id>/meta.json
 runs/<run-id>/stdout.log
 runs/<run-id>/stderr.log
 runs/<run-id>/run.sh.snapshot
-.run-claim
+.run-claim/<run-id>/claim.json
 ```
 
-`.run-claim` 是运行中的跨进程占位，用来避免 App、后台调度进程和 CLI 同时启动同一个 `concurrency=skip` 任务。
+`.run-claim` 是跨进程运行登记目录：`concurrency=skip` 同时只允许一个活动 claim，`concurrency=allow` 则按 run id 保存多个 claim。App、后台调度进程和 CLI 共用这套登记来查询、取消和回收运行。
 
 ## CLI 使用
 
@@ -89,11 +89,14 @@ runshelf run status <run-id> --json
 runshelf run cancel <run-id> --json
 runshelf run log <run-id> --stdout
 runshelf run log <run-id> --stderr
+runshelf run log <run-id> --bytes 262144 --json
+runshelf run log <run-id> --full
 runshelf doctor --json
 runshelf help agent
 ```
 
 `apply` 写入的是 TaskSpec JSON，不是完整 `task.json`。创建任务时没有覆盖到的内部策略使用默认值；更新任务时没有覆盖到的内部策略会保留原值。
+未知字段会直接返回校验错误；当前时区只支持字面值 `local`。日志默认只返回最后 1 MiB，JSON 调用方应检查 `truncated`，只有显式 `--full` 才读取完整文件。
 
 最小 TaskSpec 示例：
 

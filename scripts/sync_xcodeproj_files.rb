@@ -1,127 +1,98 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Incrementally syncs Swift files into the existing RunShelf.xcodeproj.
-#
-# Unlike scripts/generate_xcodeproj.rb (which rebuilds the project from
-# scratch and reshuffles every UUID), this script opens the existing
-# project, adds any Swift file on disk that is not yet referenced, and
-# leaves untouched entries alone. The diff therefore contains only the
-# new file references / build files / group children — no UUID churn.
-#
-# Use this when you add a Swift source file. Run scripts/generate_xcodeproj.rb
-# only when you need to (re)create the .xcodeproj from scratch.
+# Incrementally reconciles Swift file references and target membership without
+# regenerating project UUIDs. Pass --check for a read-only CI/review gate.
 
-require "fileutils"
 require "pathname"
 require "xcodeproj"
+require_relative "xcodeproj_sources"
 
-PROJECT_PATH = "RunShelf.xcodeproj"
-APP_TARGET_NAME = "RunShelf"
-SCHEDULER_TARGET_NAME = "RunShelfScheduler"
-CLI_TARGET_NAME = "RunShelfCLI"
-TEST_TARGET_NAME = "RunShelfTests"
+check_only = ARGV.delete("--check")
+abort "Usage: bundle exec ruby scripts/sync_xcodeproj_files.rb [--check]" unless ARGV.empty?
 
-def app_source?(relative_path)
-  return false unless File.extname(relative_path) == ".swift"
-  return false unless relative_path.start_with?("RunShelf/")
-  !relative_path.start_with?("RunShelf/SchedulerProcess/") &&
-    !relative_path.start_with?("RunShelf/CLI/")
+project = Xcodeproj::Project.open(RunShelfProjectSources::PROJECT_PATH)
+targets = RunShelfProjectSources::TARGET_NAMES.transform_values do |name|
+  project.targets.find { |target| target.name == name } || abort("Target not found: #{name}")
 end
 
-def scheduler_source?(relative_path)
-  return false unless File.extname(relative_path) == ".swift"
-  return true if relative_path.start_with?("RunShelf/SchedulerProcess/")
-  return false unless relative_path.start_with?("RunShelf/Core/")
-  !relative_path.start_with?("RunShelf/Core/Stores/")
-end
+def referenced_swift_paths(project)
+  project.files.each_with_object({}) do |file_ref, paths|
+    next unless file_ref.path&.end_with?(".swift")
 
-def cli_source?(relative_path)
-  return false unless File.extname(relative_path) == ".swift"
-  return true if relative_path.start_with?("RunShelf/CLI/")
-  return false unless relative_path.start_with?("RunShelf/Core/")
-  !relative_path.start_with?("RunShelf/Core/Stores/")
-end
+    real_path = file_ref.real_path.to_s
+    next unless real_path.start_with?(Dir.pwd + "/")
 
-def test_source?(relative_path)
-  return false unless File.extname(relative_path) == ".swift"
-  relative_path.start_with?("RunShelf/Core/") || relative_path.start_with?("RunShelfTests/")
-end
-
-def collect_disk_swift_paths
-  (Dir.glob("RunShelf/**/*.swift") + Dir.glob("RunShelfTests/**/*.swift")).sort
-end
-
-def collect_referenced_paths(project)
-  paths = {}
-  project.files.each do |file_ref|
-    next unless file_ref.path
-    next unless file_ref.path.end_with?(".swift")
-    # build a path relative to repo root
-    real = file_ref.real_path.to_s
-    next unless real.start_with?(Dir.pwd + "/")
-    rel = real.sub(Dir.pwd + "/", "")
-    paths[rel] = file_ref
+    paths[real_path.delete_prefix(Dir.pwd + "/")] = file_ref
   end
-  paths
 end
 
 def ensure_group(project, segments)
-  # segments is e.g. ["RunShelf", "App", "Views"]; find or create nested groups
-  # starting from project.main_group.
-  group = project.main_group
-  segments.each do |segment|
-    child = group.children.find { |c| c.is_a?(Xcodeproj::Project::Object::PBXGroup) && c.display_name == segment }
-    child ||= group.new_group(segment, segment)
-    group = child
+  segments.reduce(project.main_group) do |group, segment|
+    group.children.find do |child|
+      child.is_a?(Xcodeproj::Project::Object::PBXGroup) && child.display_name == segment
+    end || group.new_group(segment, segment)
   end
-  group
 end
 
-project = Xcodeproj::Project.open(PROJECT_PATH)
+def membership_for(file_ref, targets)
+  targets.each_with_object([]) do |(key, target), membership|
+    membership << key if target.source_build_phase.files_references.include?(file_ref)
+  end
+end
 
-app_target = project.targets.find { |t| t.name == APP_TARGET_NAME }
-scheduler_target = project.targets.find { |t| t.name == SCHEDULER_TARGET_NAME }
-cli_target = project.targets.find { |t| t.name == CLI_TARGET_NAME }
-test_target = project.targets.find { |t| t.name == TEST_TARGET_NAME }
-raise "App target not found" unless app_target
-raise "Scheduler target not found" unless scheduler_target
-raise "CLI target not found" unless cli_target
-raise "Test target not found" unless test_target
+on_disk = RunShelfProjectSources.disk_swift_paths
+referenced = referenced_swift_paths(project)
+missing = on_disk - referenced.keys
+stale = referenced.keys.select do |path|
+  (path.start_with?("RunShelf/") || path.start_with?("RunShelfTests/")) && !on_disk.include?(path)
+end
+membership_mismatches = (on_disk & referenced.keys).each_with_object([]) do |path, mismatches|
+  expected = RunShelfProjectSources.targets_for(path).sort
+  actual = membership_for(referenced.fetch(path), targets).sort
+  mismatches << [path, actual, expected] unless actual == expected
+end
 
-referenced = collect_referenced_paths(project)
-on_disk = collect_disk_swift_paths
+if check_only
+  if missing.empty? && stale.empty? && membership_mismatches.empty?
+    puts "Xcode project Swift references and target membership are in sync."
+    exit 0
+  end
 
-added = []
-on_disk.each do |relative_path|
-  next if referenced.key?(relative_path)
+  missing.each { |path| warn "missing reference: #{path}" }
+  stale.each { |path| warn "stale reference: #{path}" }
+  membership_mismatches.each do |path, actual, expected|
+    warn "membership mismatch: #{path} actual=#{actual.join(',')} expected=#{expected.join(',')}"
+  end
+  exit 1
+end
 
-  segments = Pathname.new(relative_path).each_filename.to_a
+stale.each do |path|
+  referenced.fetch(path).remove_from_project
+end
+
+missing.each do |path|
+  segments = Pathname.new(path).each_filename.to_a
   file_name = segments.pop
-  parent_group = ensure_group(project, segments)
-
-  file_ref = parent_group.new_file(file_name)
-
-  if app_source?(relative_path)
-    app_target.source_build_phase.add_file_reference(file_ref)
-  end
-  if scheduler_source?(relative_path)
-    scheduler_target.source_build_phase.add_file_reference(file_ref)
-  end
-  if cli_source?(relative_path)
-    cli_target.source_build_phase.add_file_reference(file_ref)
-  end
-  if test_source?(relative_path)
-    test_target.source_build_phase.add_file_reference(file_ref)
-  end
-
-  added << relative_path
+  referenced[path] = ensure_group(project, segments).new_file(file_name)
 end
 
-if added.empty?
-  puts "No new Swift files to add."
+(on_disk & referenced.keys).each do |path|
+  file_ref = referenced.fetch(path)
+  expected = RunShelfProjectSources.targets_for(path)
+  targets.each do |key, target|
+    build_file = target.source_build_phase.files.find { |file| file.file_ref == file_ref }
+    if expected.include?(key)
+      target.source_build_phase.add_file_reference(file_ref) unless build_file
+    else
+      build_file&.remove_from_project
+    end
+  end
+end
+
+if missing.empty? && stale.empty? && membership_mismatches.empty?
+  puts "Xcode project is already in sync."
 else
   project.save
-  puts "Added #{added.size} file(s):"
-  added.each { |p| puts "  + #{p}" }
+  puts "Reconciled Xcode project: added=#{missing.size} removed=#{stale.size} membership=#{membership_mismatches.size}"
 end

@@ -88,14 +88,14 @@ private struct CLIContext {
 
         switch subcommand {
         case "list":
-            let tasks = try repository.loadTasks(includeRuns: true).map { TaskPayload(task: $0) }
+            let tasks = try repository.loadTasksWithLatestRun().map { TaskPayload(task: $0) }
             emitOrPrint(tasks) {
                 tasks.map { "\($0.id)\t\($0.slug ?? "-")\t\($0.name)" }.joined(separator: "\n")
             }
             return 0
         case "show":
             let selector = try takeValue("任务 id 或 slug")
-            let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: true)
+            let read = try repository.loadTaskWithLatestRun(selector: .idOrSlug(selector))
             emitOrPrint(TaskDetailPayload(task: read.task, revision: read.revision)) {
                 formatTask(read.task, revision: read.revision)
             }
@@ -201,12 +201,36 @@ private struct CLIContext {
             _ = arguments.popFirst()
             let runID = try takeValue("run id")
             let stream = arguments.removeAll("--stderr") ? "stderr" : "stdout"
+            let full = arguments.removeAll("--full")
+            let requestedBytes = try takeOptionalFlagValue("--bytes").map { value -> Int in
+                guard let bytes = Int(value), (1...67_108_864).contains(bytes) else {
+                    throw CLIExitError.validation("--bytes 必须是 1 到 67108864 之间的整数。")
+                }
+                return bytes
+            }
+            guard !(full && requestedBytes != nil) else {
+                throw CLIExitError.usage("--full 与 --bytes 不能同时使用。")
+            }
             let status = try findRun(runID: runID)
-            let text = try readLog(status: status, stream: stream)
+            let log = try readLog(
+                status: status,
+                stream: stream,
+                byteLimit: full ? nil : (requestedBytes ?? 1_048_576)
+            )
             if jsonOutput {
-                emit(LogPayload(runId: runID, stream: stream, text: text))
+                emit(LogPayload(
+                    runId: runID,
+                    stream: stream,
+                    text: log.text,
+                    truncated: log.truncated,
+                    totalBytes: log.totalBytes,
+                    returnedBytes: log.returnedBytes
+                ))
             } else {
-                print(text, terminator: "")
+                if log.truncated {
+                    print("[仅显示最后 \(log.returnedBytes) 字节，共 \(log.totalBytes) 字节]")
+                }
+                print(log.text, terminator: "")
             }
             return 0
         case "cancel", "stop":
@@ -222,7 +246,7 @@ private struct CLIContext {
             _ = arguments.removeAll("--wait")
             let allowDangerous = arguments.removeAll("--allow-dangerous")
             let selector = try takeValue("任务 id 或 slug")
-            let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: true)
+            let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: false)
             let risks = DangerousCommandScanner.scan(read.task.script)
             try rejectDangerousCommandRisks(risks, allowDangerous: allowDangerous)
             if detach {
@@ -277,9 +301,20 @@ private struct CLIContext {
         }
 
         try FileManager.default.createDirectory(at: prefixURL, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
+        var destinationInfo = stat()
+        let destinationExists = lstat(destinationURL.path, &destinationInfo) == 0
+        if !destinationExists && errno != ENOENT {
+            throw CLIExitError.unexpected("无法检查安装目标：\(String(cString: strerror(errno)))")
+        }
+        if destinationExists {
             if force {
-                try FileManager.default.removeItem(at: destinationURL)
+                let fileType = destinationInfo.st_mode & mode_t(S_IFMT)
+                guard fileType == mode_t(S_IFREG) || fileType == mode_t(S_IFLNK) else {
+                    throw CLIExitError.conflict("拒绝覆盖目录或特殊文件：\(destinationURL.path)")
+                }
+                guard unlink(destinationURL.path) == 0 else {
+                    throw CLIExitError.unexpected("无法替换安装目标：\(String(cString: strerror(errno)))")
+                }
             } else {
                 throw CLIExitError.conflict("目标已存在：\(destinationURL.path)。确认要覆盖时使用 --force。")
             }
@@ -321,10 +356,10 @@ private struct CLIContext {
         }
         switch name {
         case "task-spec":
-            print(taskSpecSchemaText)
+            print(GeneratedSchemas.taskSpec)
             return 0
         case "cli-result":
-            print(cliResultSchemaText)
+            print(GeneratedSchemas.cliResult)
             return 0
         default:
             throw CLIExitError.usage("未知 schema：\(name)")
@@ -334,7 +369,7 @@ private struct CLIContext {
     private mutating func runHost() throws -> Int32 {
         let taskID = try takeFlagValue("--task-id")
         let runID = try takeFlagValue("--run-id")
-        let read = try repository.loadTask(selector: .id(taskID), includeRuns: true)
+        let read = try repository.loadTask(selector: .id(taskID), includeRuns: false)
         let record = try TaskRunner.run(
             task: read.task,
             trigger: .manual,
@@ -446,17 +481,20 @@ private struct CLIContext {
     }
 
     private func findRun(runID: String) throws -> RunStatusPayload {
-        let tasks = try repository.loadTasks(includeRuns: true)
+        guard TaskFileStore.isSafeRunID(runID) else {
+            throw CLIExitError.validation("run id 不合法：\(runID)")
+        }
+        let tasks = try repository.loadTasks(includeRuns: false)
         for task in tasks {
-            if let run = task.runs.first(where: { $0.runId == runID }) {
-                let claim = TaskRunClaimManager.activeClaim(for: task)
+            if let run = try repository.loadRun(task: task, runID: runID) {
+                let claim = TaskRunClaimManager.activeClaim(for: task, runID: runID)
                 return RunStatusPayload(
                     task: TaskPayload(task: task),
                     run: run,
-                    claim: claim?.runId == runID ? claim : nil
+                    claim: claim
                 )
             }
-            if let claim = TaskRunClaimManager.activeClaim(for: task), claim.runId == runID {
+            if let claim = TaskRunClaimManager.activeClaim(for: task, runID: runID) {
                 return RunStatusPayload(task: TaskPayload(task: task), run: nil, claim: claim)
             }
         }
@@ -466,7 +504,7 @@ private struct CLIContext {
     private func cancelRun(runID: String) throws -> CancelRunPayload {
         let tasks = try repository.loadTasks(includeRuns: false)
         for task in tasks {
-            guard let claim = TaskRunClaimManager.activeClaim(for: task), claim.runId == runID else {
+            guard let claim = TaskRunClaimManager.activeClaim(for: task, runID: runID) else {
                 continue
             }
             let runURL = task.directoryURL
@@ -477,6 +515,9 @@ private struct CLIContext {
                 atomically: true,
                 encoding: .utf8
             )
+            guard TaskRunClaimManager.canSafelySignal(claim) else {
+                throw CLIExitError.conflict("无法验证运行进程身份；已写入取消请求，但为避免终止无关进程，未发送信号。")
+            }
             if let processGroupID = claim.processGroupID, processGroupID > 0 {
                 guard kill(-processGroupID, SIGTERM) == 0 || errno == ESRCH else {
                     throw CLIExitError.unexpected("无法终止进程组 \(processGroupID)：\(String(cString: strerror(errno)))")
@@ -491,7 +532,11 @@ private struct CLIContext {
         throw CLIExitError.notFound("找不到运行中的任务：\(runID)")
     }
 
-    private func readLog(status: RunStatusPayload, stream: String) throws -> String {
+    private func readLog(
+        status: RunStatusPayload,
+        stream: String,
+        byteLimit: Int?
+    ) throws -> LogReadResult {
         guard let run = status.run else {
             throw CLIExitError.conflict("运行记录尚未写入日志文件。")
         }
@@ -500,7 +545,31 @@ private struct CLIContext {
             .appendingPathComponent("runs", isDirectory: true)
             .appendingPathComponent(run.runId, isDirectory: true)
         let path = stream == "stderr" ? run.stderrPath : run.stdoutPath
-        return (try? String(contentsOf: runURL.appendingPathComponent(path), encoding: .utf8)) ?? ""
+        let url = runURL.appendingPathComponent(path)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw CLIExitError.notFound("日志文件不存在：\(stream)")
+        }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let totalBytes = Int(try handle.seekToEnd())
+        let offset = byteLimit.map { max(totalBytes - $0, 0) } ?? 0
+        try handle.seek(toOffset: UInt64(offset))
+        let data = try handle.readToEnd() ?? Data()
+        return LogReadResult(
+            text: Self.decodeUTF8Tail(data),
+            truncated: offset > 0,
+            totalBytes: totalBytes,
+            returnedBytes: data.count
+        )
+    }
+
+    private static func decodeUTF8Tail(_ data: Data) -> String {
+        for prefixBytesToDrop in 0...min(3, data.count) {
+            if let text = String(data: data.dropFirst(prefixBytesToDrop), encoding: .utf8) {
+                return text
+            }
+        }
+        return String(decoding: data, as: UTF8.self)
     }
 
     private mutating func readTaskSpec(path: String) throws -> TaskSpec {
@@ -515,7 +584,27 @@ private struct CLIContext {
             decoder.dateDecodingStrategy = .iso8601
             return try decoder.decode(TaskSpec.self, from: data)
         } catch {
-            throw CLIExitError.validation("TaskSpec JSON 无法解析：\(error.localizedDescription)")
+            throw CLIExitError.validation("TaskSpec JSON 无法解析：\(decodingErrorDescription(error))")
+        }
+    }
+
+    private func decodingErrorDescription(_ error: Error) -> String {
+        func path(_ codingPath: [CodingKey]) -> String {
+            let value = codingPath.map(\.stringValue).joined(separator: ".")
+            return value.isEmpty ? "$" : value
+        }
+
+        switch error {
+        case DecodingError.dataCorrupted(let context):
+            return "\(path(context.codingPath))：\(context.debugDescription)"
+        case DecodingError.keyNotFound(let key, let context):
+            return "\(path(context.codingPath + [key]))：缺少必填字段"
+        case DecodingError.typeMismatch(_, let context):
+            return "\(path(context.codingPath))：\(context.debugDescription)"
+        case DecodingError.valueNotFound(_, let context):
+            return "\(path(context.codingPath))：\(context.debugDescription)"
+        default:
+            return error.localizedDescription
         }
     }
 
@@ -681,6 +770,10 @@ private enum CLIExitError: Error {
             return .validation(error.localizedDescription)
         case .taskDirectoryMissing(_):
             return .notFound(error.localizedDescription)
+        case .taskIdentityMismatch(_, _):
+            return .validation(error.localizedDescription)
+        case .taskRunning(_, _):
+            return .running(error.localizedDescription)
         }
     }
 
@@ -804,6 +897,16 @@ private struct LogPayload: Encodable {
     var runId: String
     var stream: String
     var text: String
+    var truncated: Bool
+    var totalBytes: Int
+    var returnedBytes: Int
+}
+
+private struct LogReadResult {
+    var text: String
+    var truncated: Bool
+    var totalBytes: Int
+    var returnedBytes: Int
 }
 
 private struct DoctorPayload: Encodable {
@@ -888,60 +991,4 @@ Run Shelf 的 agent 操作约定：
 8. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
 9. 退出码契约：0=成功，1=未知错误，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
 10. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
-"""
-
-private let taskSpecSchemaText = """
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://runshelf.local/schemas/task-spec.schema.json",
-  "title": "Run Shelf TaskSpec",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": { "type": "string", "description": "任务 UUID。创建时可省略；更新时可作为选择器。" },
-    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$" },
-    "name": { "type": "string" },
-    "description": { "type": "string" },
-    "enabled": { "type": "boolean" },
-    "schedule": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": { "const": "cron" },
-        "expression": { "type": "string" },
-        "timezone": { "type": "string" }
-      },
-      "required": ["type", "expression", "timezone"]
-    },
-    "timeoutSeconds": { "type": "integer", "minimum": 0 },
-    "script": { "type": "string" },
-    "notes": { "type": "string" }
-  }
-}
-"""
-
-private let cliResultSchemaText = """
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://runshelf.local/schemas/cli-result.schema.json",
-  "title": "Run Shelf CLI Result",
-  "type": "object",
-  "additionalProperties": true,
-  "required": ["ok"],
-  "properties": {
-    "ok": { "type": "boolean" },
-    "result": {},
-    "error": {
-      "type": ["object", "null"],
-      "properties": {
-        "code": {
-          "type": "string",
-          "enum": ["usage", "not_found", "validation", "conflict", "dangerous_command", "already_running", "run_failed", "unexpected"]
-        },
-        "message": { "type": "string" }
-      },
-      "required": ["code", "message"]
-    }
-  }
-}
 """

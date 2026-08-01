@@ -23,6 +23,7 @@ struct SettingsView: View {
                             Image(systemName: "folder")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("在 Finder 中显示任务目录")
                         .help("在 Finder 中显示")
                     }
                 }

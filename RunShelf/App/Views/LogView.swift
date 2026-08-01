@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LogView: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject var selection: TaskSelectionState
     @StateObject private var loader = LogContentLoader()
     var task: RunShelfTask
 
@@ -20,17 +21,29 @@ struct LogView: View {
                 }
             }
         }
-        .onAppear { reloadIfNeeded() }
-        .onChange(of: effectiveRun?.runId) { _, _ in reloadIfNeeded() }
-        .onChange(of: task.id) { _, _ in reloadIfNeeded() }
+        .task(id: reloadKey) {
+            reloadIfNeeded(force: true)
+            while !Task.isCancelled, store.runningTaskIDs.contains(task.id) {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { break }
+                reloadIfNeeded(force: true)
+            }
+            if !Task.isCancelled {
+                reloadIfNeeded(force: true)
+            }
+        }
     }
 
-    private func reloadIfNeeded() {
+    private func reloadIfNeeded(force: Bool = false) {
         if let run = effectiveRun {
-            loader.load(task: task, run: run)
+            loader.load(task: task, run: run, force: force)
         } else {
             loader.clear()
         }
+    }
+
+    private var reloadKey: String {
+        "\(task.id):\(effectiveRun?.runId ?? "none")"
     }
 
     private var logPane: some View {
@@ -160,7 +173,7 @@ struct LogView: View {
     }
 
     private var effectiveRun: RunRecord? {
-        if let id = store.selectedRunID,
+        if let id = selection.selectedRunID,
            let run = task.runs.first(where: { $0.runId == id }) {
             return run
         }
@@ -170,7 +183,7 @@ struct LogView: View {
     private var selectionBinding: Binding<String?> {
         Binding(
             get: { effectiveRun?.runId },
-            set: { store.selectedRunID = $0 }
+            set: { selection.selectedRunID = $0 }
         )
     }
 }

@@ -4,23 +4,19 @@ Run Shelf 是一个小型原生 macOS 项目。改动应当坚持本机保存、
 
 ## 开发环境
 
-先安装生成 Xcode 工程需要的依赖：
+先安装 Xcode 工程工具依赖，并增量同步源码引用：
 
 ```bash
-gem install xcodeproj
-ruby scripts/generate_xcodeproj.rb
+bundle install
+bundle exec ruby scripts/sync_xcodeproj_files.rb
 ```
 
-提交改动前至少跑一遍测试：
+完整重建 `RunShelf.xcodeproj` 仅用于工程损坏等恢复场景；日常新增、删除或移动 Swift 文件不要运行全量生成器。
+
+提交改动前运行统一检查入口：
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild test \
-  -project RunShelf.xcodeproj \
-  -scheme RunShelf \
-  -configuration Debug \
-  -derivedDataPath .build/TestDerivedData \
-  CODE_SIGNING_ALLOWED=NO
+scripts/check.sh
 ```
 
 ## 约定

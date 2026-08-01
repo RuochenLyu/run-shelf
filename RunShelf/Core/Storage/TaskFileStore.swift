@@ -58,29 +58,47 @@ struct TaskFileStore {
     }
 
     func loadTask(at directoryURL: URL, includeRuns: Bool = true) throws -> RunShelfTask {
-        let manifestData = try Data(contentsOf: directoryURL.appendingPathComponent("task.json"))
-        let manifest = try decoder.decode(TaskManifest.self, from: manifestData)
-        guard manifest.schemaVersion == 1 else {
-            throw CocoaError(.fileReadUnknown, userInfo: [
-                NSLocalizedDescriptionKey: "不支持的 schemaVersion：\(manifest.schemaVersion)"
-            ])
-        }
+        let directoryName = directoryURL.lastPathComponent
+        return try TaskDefinitionFileLock.withLock(
+            tasksDirectoryURL: directoryURL.deletingLastPathComponent(),
+            taskID: directoryName,
+            mode: .shared,
+            fileManager: fileManager
+        ) {
+            guard UUID(uuidString: directoryName) != nil else {
+                throw TaskRepositoryError.invalidTaskID(directoryName)
+            }
 
-        let scriptURL = directoryURL.appendingPathComponent("run.sh")
-        guard fileManager.fileExists(atPath: scriptURL.path) else {
-            throw NSError(domain: "RunShelf", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "任务缺少 run.sh：\(directoryURL.lastPathComponent)"
-            ])
-        }
+            let manifestData = try Data(contentsOf: directoryURL.appendingPathComponent("task.json"))
+            let manifest = try decoder.decode(TaskManifest.self, from: manifestData)
+            guard manifest.id == directoryName else {
+                throw TaskRepositoryError.taskIdentityMismatch(
+                    directoryName: directoryName,
+                    manifestID: manifest.id
+                )
+            }
+            guard manifest.schemaVersion == 1 else {
+                throw CocoaError(.fileReadUnknown, userInfo: [
+                    NSLocalizedDescriptionKey: "不支持的 schemaVersion：\(manifest.schemaVersion)"
+                ])
+            }
 
-        return RunShelfTask(
-            manifest: manifest,
-            directoryURL: directoryURL,
-            script: Self.normalizedTemplateScript(readText(at: scriptURL)),
-            notes: readText(at: directoryURL.appendingPathComponent("notes.md")),
-            runs: includeRuns ? loadRuns(for: directoryURL) : [],
-            isDirty: false
-        )
+            let scriptURL = directoryURL.appendingPathComponent("run.sh")
+            guard fileManager.fileExists(atPath: scriptURL.path) else {
+                throw NSError(domain: "RunShelf", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "任务缺少 run.sh：\(directoryName)"
+                ])
+            }
+
+            return RunShelfTask(
+                manifest: manifest,
+                directoryURL: directoryURL,
+                script: Self.normalizedTemplateScript(try readRequiredText(at: scriptURL)),
+                notes: try readOptionalText(at: directoryURL.appendingPathComponent("notes.md")),
+                runs: includeRuns ? loadRuns(for: directoryURL) : [],
+                isDirty: false
+            )
+        }
     }
 
     /// 把旧版本（typo / 中文注释）的模板脚本统一成标准 placeholder。
@@ -91,7 +109,8 @@ struct TaskFileStore {
             .replacingOccurrences(of: "# 在这里写脚本", with: "# Write your script here")
     }
 
-    func loadRuns(for taskDirectoryURL: URL) -> [RunRecord] {
+    func loadRuns(for taskDirectoryURL: URL, limit: Int? = nil) -> [RunRecord] {
+        if let limit, limit <= 0 { return [] }
         let runsURL = taskDirectoryURL.appendingPathComponent("runs", isDirectory: true)
         guard let runDirectories = try? fileManager.contentsOfDirectory(
             at: runsURL,
@@ -102,14 +121,56 @@ struct TaskFileStore {
         }
         let claimTask = taskForRunClaim(at: taskDirectoryURL)
 
-        return runDirectories.compactMap { runDirectory -> RunRecord? in
-            guard isDirectory(runDirectory) else { return nil }
-            let metaURL = runDirectory.appendingPathComponent("meta.json")
-            guard let data = try? Data(contentsOf: metaURL) else { return nil }
-            guard let record = try? decoder.decode(RunRecord.self, from: data) else { return nil }
-            return reconcileRunningRecord(record, metaURL: metaURL, claimTask: claimTask)
+        let sortedDirectories = runDirectories.sorted {
+            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending
         }
-        .sorted { $0.startedAt > $1.startedAt }
+        var records: [RunRecord] = []
+        for runDirectory in sortedDirectories {
+            guard isDirectory(runDirectory) else { continue }
+            let metaURL = runDirectory.appendingPathComponent("meta.json")
+            guard let data = try? Data(contentsOf: metaURL),
+                  let record = try? decoder.decode(RunRecord.self, from: data)
+            else {
+                continue
+            }
+            records.append(reconcileRunningRecord(record, metaURL: metaURL, claimTask: claimTask))
+            if let limit, records.count >= max(limit, 0) {
+                break
+            }
+        }
+        return records.sorted { $0.startedAt > $1.startedAt }
+    }
+
+    func loadLatestRun(for taskDirectoryURL: URL) -> RunRecord? {
+        loadRuns(for: taskDirectoryURL, limit: 1).first
+    }
+
+    func loadRun(for taskDirectoryURL: URL, runID: String) throws -> RunRecord? {
+        guard Self.isSafeRunID(runID) else {
+            throw TaskRepositoryError.conflict("run id 不合法：\(runID)")
+        }
+        let runURL = taskDirectoryURL
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+        let metaURL = runURL.appendingPathComponent("meta.json")
+        guard fileManager.fileExists(atPath: metaURL.path) else { return nil }
+        let data = try Data(contentsOf: metaURL)
+        let record = try decoder.decode(RunRecord.self, from: data)
+        guard record.runId == runID else {
+            throw TaskRepositoryError.conflict("运行目录与 meta 身份不一致：\(runID)")
+        }
+        return reconcileRunningRecord(
+            record,
+            metaURL: metaURL,
+            claimTask: taskForRunClaim(at: taskDirectoryURL)
+        )
+    }
+
+    static func isSafeRunID(_ runID: String) -> Bool {
+        guard !runID.isEmpty, runID != ".", runID != "..", runID.count <= 160 else { return false }
+        return runID.unicodeScalars.allSatisfy {
+            CharacterSet.alphanumerics.contains($0) || "._-+".unicodeScalars.contains($0)
+        }
     }
 
     private func reconcileRunningRecord(
@@ -118,8 +179,12 @@ struct TaskFileStore {
         claimTask: RunShelfTask?
     ) -> RunRecord {
         guard record.status == .running, let claimTask else { return record }
-        let activeClaim = TaskRunClaimManager.activeClaim(for: claimTask, fileManager: fileManager)
-        guard activeClaim?.runId != record.runId else { return record }
+        let activeClaim = TaskRunClaimManager.activeClaim(
+            for: claimTask,
+            runID: record.runId,
+            fileManager: fileManager
+        )
+        guard activeClaim == nil else { return record }
 
         let endedAt = Date()
         var stale = record
@@ -154,8 +219,16 @@ struct TaskFileStore {
         try encoder.encode(record).write(to: url, options: [.atomic])
     }
 
-    private func readText(at url: URL) -> String {
-        (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    private func readRequiredText(at url: URL) throws -> String {
+        try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func readOptionalText(at url: URL) throws -> String {
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return ""
+        }
     }
 
     private func isDirectory(_ url: URL) -> Bool {

@@ -119,7 +119,9 @@ struct TaskHeaderView: View {
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("停止运行")
             .help("停止运行")
+            .disabled(!store.canCancelTask(id: task.id))
         }
         .font(.callout)
         .foregroundStyle(.blue)
@@ -222,6 +224,8 @@ struct TaskHeaderView: View {
         .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .accessibilityLabel("更多操作")
+        .accessibilityIdentifier("task-more-actions")
         .help("更多")
     }
 

@@ -33,7 +33,7 @@
           "type": "string"
         },
         "timezone": {
-          "type": "string"
+          "const": "local"
         }
       },
       "required": [

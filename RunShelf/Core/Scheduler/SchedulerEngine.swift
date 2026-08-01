@@ -89,7 +89,7 @@ final class SchedulerEngine {
         }
 
         let scanStart = state.lastCheckAt ?? now.addingTimeInterval(-60)
-        guard let scheduledAt = schedule.matchingRuns(after: scanStart, through: now).last else { return }
+        guard let scheduledAt = schedule.latestMatchingRun(after: scanStart, through: now) else { return }
 
         let scheduledMinuteKey = minuteKey(for: scheduledAt)
         guard state.lastScheduledMinuteByTaskID[task.id] != scheduledMinuteKey else { return }
@@ -137,7 +137,9 @@ final class SchedulerEngine {
             }
 
             self.queue.async {
-                self.runningTaskIDs.remove(task.id)
+                if TaskRunClaimManager.activeClaims(for: task).isEmpty {
+                    self.runningTaskIDs.remove(task.id)
+                }
                 switch result {
                 case .success(let run):
                     if run.status == .failed || run.status == .timeout {
@@ -226,6 +228,14 @@ final class SchedulerEngine {
     private func appendLog(_ message: String) {
         let line = "[\(RunShelfFormatters.dateTimeWithSeconds(Date()))] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
+
+        if let attributes = try? fileManager.attributesOfItem(atPath: logURL.path),
+           let size = (attributes[.size] as? NSNumber)?.intValue,
+           size >= 5 * 1_024 * 1_024 {
+            let rotatedURL = logURL.appendingPathExtension("1")
+            try? fileManager.removeItem(at: rotatedURL)
+            try? fileManager.moveItem(at: logURL, to: rotatedURL)
+        }
 
         if fileManager.fileExists(atPath: logURL.path), let handle = try? FileHandle(forWritingTo: logURL) {
             defer { try? handle.close() }

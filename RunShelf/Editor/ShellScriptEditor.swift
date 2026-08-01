@@ -44,6 +44,7 @@ struct ShellScriptEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        context.coordinator.update(parent: self)
         if textView.string != text {
             context.coordinator.apply(text: text, to: textView)
         }
@@ -59,6 +60,10 @@ struct ShellScriptEditor: NSViewRepresentable {
         weak var textView: NSTextView?
 
         init(_ parent: ShellScriptEditor) {
+            self.parent = parent
+        }
+
+        func update(parent: ShellScriptEditor) {
             self.parent = parent
         }
 

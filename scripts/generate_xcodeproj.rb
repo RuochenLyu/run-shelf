@@ -3,6 +3,7 @@
 
 require "fileutils"
 require "xcodeproj"
+require_relative "xcodeproj_sources"
 
 project_path = "RunShelf.xcodeproj"
 FileUtils.rm_rf(project_path)
@@ -27,34 +28,6 @@ main_group.clear
 source_group = main_group.new_group("RunShelf", "RunShelf")
 test_group = main_group.new_group("RunShelfTests", "RunShelfTests")
 
-def app_source?(path)
-  File.extname(path) == ".swift" &&
-    path.start_with?("RunShelf/") &&
-    !path.start_with?("RunShelf/SchedulerProcess/") &&
-    !path.start_with?("RunShelf/CLI/")
-end
-
-def scheduler_source?(path)
-  return false unless File.extname(path) == ".swift"
-  return true if path.start_with?("RunShelf/SchedulerProcess/")
-  return false unless path.start_with?("RunShelf/Core/")
-  return false if path.start_with?("RunShelf/Core/Stores/")
-  true
-end
-
-def cli_source?(path)
-  return false unless File.extname(path) == ".swift"
-  return true if path.start_with?("RunShelf/CLI/")
-  return false unless path.start_with?("RunShelf/Core/")
-  return false if path.start_with?("RunShelf/Core/Stores/")
-  true
-end
-
-def test_source?(path)
-  File.extname(path) == ".swift" &&
-    (path.start_with?("RunShelf/Core/") || path.start_with?("RunShelfTests/"))
-end
-
 launch_agent_file_refs = []
 
 def add_files(group, filesystem_path, app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
@@ -76,10 +49,11 @@ def add_files(group, filesystem_path, app_target, scheduler_target, cli_target, 
     file_ref = group.new_file(entry)
     case File.extname(path)
     when ".swift"
-      app_target.source_build_phase.add_file_reference(file_ref) if app_source?(path)
-      scheduler_target.source_build_phase.add_file_reference(file_ref) if scheduler_source?(path)
-      cli_target.source_build_phase.add_file_reference(file_ref) if cli_source?(path)
-      test_target.source_build_phase.add_file_reference(file_ref) if test_source?(path)
+      targets = RunShelfProjectSources.targets_for(path)
+      app_target.source_build_phase.add_file_reference(file_ref) if targets.include?(:app)
+      scheduler_target.source_build_phase.add_file_reference(file_ref) if targets.include?(:scheduler)
+      cli_target.source_build_phase.add_file_reference(file_ref) if targets.include?(:cli)
+      test_target.source_build_phase.add_file_reference(file_ref) if targets.include?(:test)
     when ".xcstrings"
       app_target.resources_build_phase.add_file_reference(file_ref)
     when ".plist"
@@ -92,6 +66,7 @@ add_files(source_group, "RunShelf", app_target, scheduler_target, cli_target, te
 add_files(test_group, "RunShelfTests", app_target, scheduler_target, cli_target, test_target, launch_agent_file_refs)
 app_target.add_dependency(scheduler_target)
 app_target.add_dependency(cli_target)
+test_target.add_dependency(cli_target)
 
 scheduler_phase = app_target.new_copy_files_build_phase("Embed LaunchServices")
 scheduler_phase.symbol_dst_subfolder_spec = :wrapper
@@ -129,6 +104,8 @@ app_target.build_configurations.each do |config|
   config.build_settings["ENABLE_HARDENED_RUNTIME"] = "YES"
   config.build_settings["ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS"] = "NO"
   config.build_settings["SKIP_INSTALL"] = "NO"
+  config.build_settings["MARKETING_VERSION"] = "0.0.0"
+  config.build_settings["CURRENT_PROJECT_VERSION"] = "0"
 end
 
 scheduler_target.build_configurations.each do |config|

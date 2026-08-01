@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+  echo "Version must look like 1.2.3, got: ${VERSION:-<empty>}" >&2
+  exit 64
+fi
+VERSION_MAJOR="${BASH_REMATCH[1]}"
+VERSION_MINOR="${BASH_REMATCH[2]}"
+VERSION_PATCH="${BASH_REMATCH[3]}"
+if (( 10#$VERSION_MINOR > 999 || 10#$VERSION_PATCH > 999 )); then
+  echo "Minor and patch versions must be <= 999." >&2
+  exit 64
+fi
+BUNDLE_BUILD_NUMBER="$((10#$VERSION_MAJOR * 1000000 + 10#$VERSION_MINOR * 1000 + 10#$VERSION_PATCH))"
 
 if [[ -f "$ROOT_DIR/.release.env" ]]; then
   set -a
@@ -85,23 +98,27 @@ rm -rf "$DERIVED_DATA" "$DIST_DIR"/*
 
 cd "$ROOT_DIR"
 
-xcodebuild -quiet test \
-  -project RunShelf.xcodeproj \
-  -scheme RunShelf \
-  -configuration Debug \
-  -derivedDataPath "$ROOT_DIR/.build/TestDerivedData" \
-  CODE_SIGNING_ALLOWED=NO
+"$ROOT_DIR/scripts/check.sh"
 
 xcodebuild -quiet build \
   -project RunShelf.xcodeproj \
   -scheme RunShelf \
   -configuration Release \
   -derivedDataPath "$DERIVED_DATA" \
+  MARKETING_VERSION="$VERSION" \
+  CURRENT_PROJECT_VERSION="$BUNDLE_BUILD_NUMBER" \
   CODE_SIGNING_ALLOWED=NO
 
 if [[ ! -d "$APP_PATH" ]]; then
   echo "Release app not found at $APP_PATH" >&2
   exit 1
+fi
+
+BUILT_MARKETING_VERSION="$(plutil -extract CFBundleShortVersionString raw "$APP_PATH/Contents/Info.plist")"
+BUILT_BUILD_NUMBER="$(plutil -extract CFBundleVersion raw "$APP_PATH/Contents/Info.plist")"
+if [[ "$BUILT_MARKETING_VERSION" != "$VERSION" || "$BUILT_BUILD_NUMBER" != "$BUNDLE_BUILD_NUMBER" ]]; then
+  echo "Bundle version mismatch: expected $VERSION ($BUNDLE_BUILD_NUMBER), got $BUILT_MARKETING_VERSION ($BUILT_BUILD_NUMBER)" >&2
+  exit 65
 fi
 
 sign_artifact "$HELPER_PATH" --options runtime

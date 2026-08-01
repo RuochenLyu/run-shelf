@@ -29,7 +29,7 @@ final class RunShelfCoreTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         try writeTaskDirectory(
             root: root,
-            id: "valid-task",
+            id: "00000000-0000-4000-8000-000000000001",
             name: "Valid",
             enabled: true,
             scheduleExpression: "*/15 * * * *",
@@ -41,10 +41,10 @@ final class RunShelfCoreTests: XCTestCase {
         try "{ broken".write(to: brokenURL.appendingPathComponent("task.json"), atomically: true, encoding: .utf8)
         try "#!/bin/zsh\n".write(to: brokenURL.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
 
-        let futureURL = root.appendingPathComponent("future-task", isDirectory: true)
+        let futureURL = root.appendingPathComponent("00000000-0000-4000-8000-000000000002", isDirectory: true)
         try writeTaskDirectory(
             root: root,
-            id: "future-task",
+            id: "00000000-0000-4000-8000-000000000002",
             name: "Future",
             enabled: false,
             scheduleExpression: "0 9 * * *",
@@ -58,7 +58,7 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(result.tasks.map(\.manifest.name), ["Valid"])
         XCTAssertEqual(result.issues.count, 2)
         XCTAssertTrue(result.issues.contains { $0.directoryName == "broken-task" })
-        XCTAssertTrue(result.issues.contains { $0.directoryName == "future-task" })
+        XCTAssertTrue(result.issues.contains { $0.directoryName == "00000000-0000-4000-8000-000000000002" })
     }
 
     func testTaskRunnerTimeoutTerminatesChildProcessGroup() throws {
@@ -171,7 +171,7 @@ final class RunShelfCoreTests: XCTestCase {
         wait(for: [finished], timeout: 3)
         let record = try XCTUnwrap(lock.withLock { firstResult }?.get())
         XCTAssertEqual(record.status, .cancelled)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: TaskRunClaimManager.claimDirectoryURL(for: task).path))
+        XCTAssertTrue(TaskRunClaimManager.activeClaims(for: task).isEmpty)
     }
 
     func testTaskRepositoryUpdatePreservesInternalRunnerPolicy() throws {
@@ -243,19 +243,19 @@ final class RunShelfCoreTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         try writeTaskDirectory(
             root: root,
-            id: "orphan-task",
+            id: "00000000-0000-4000-8000-000000000003",
             name: "Orphan",
             enabled: true,
             scheduleExpression: "0 9 * * *",
             script: "#!/bin/zsh\necho orphan\n"
         )
-        let taskDirectoryURL = root.appendingPathComponent("orphan-task", isDirectory: true)
+        let taskDirectoryURL = root.appendingPathComponent("00000000-0000-4000-8000-000000000003", isDirectory: true)
         let runURL = taskDirectoryURL.appendingPathComponent("runs/orphan-run", isDirectory: true)
         try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
         let startedAt = Date().addingTimeInterval(-60)
         let runningRecord = RunRecord(
             runId: "orphan-run",
-            taskId: "orphan-task",
+            taskId: "00000000-0000-4000-8000-000000000003",
             trigger: .manual,
             status: .running,
             exitCode: nil,
@@ -294,7 +294,7 @@ final class RunShelfCoreTests: XCTestCase {
 
         try writeTaskDirectory(
             root: tasksURL,
-            id: "stale-task",
+            id: "00000000-0000-4000-8000-000000000004",
             name: "Stale",
             enabled: true,
             scheduleExpression: "0 9 1 1 *",
@@ -319,7 +319,7 @@ final class RunShelfCoreTests: XCTestCase {
         )
 
         engine.tick(now: now)
-        let metaURL = try waitForFirstRunMeta(root: tasksURL.appendingPathComponent("stale-task/runs"))
+        let metaURL = try waitForFirstRunMeta(root: tasksURL.appendingPathComponent("00000000-0000-4000-8000-000000000004/runs"))
         let record = try decodeRunRecord(at: metaURL)
 
         XCTAssertEqual(record.status, .stale)
@@ -336,11 +336,12 @@ final class RunShelfCoreTests: XCTestCase {
     }
 
     private func makeTask(root: URL, id: String, script: String, timeoutSeconds: Int) throws -> RunShelfTask {
-        let directoryURL = root.appendingPathComponent(id, isDirectory: true)
+        let taskID = UUID().uuidString
+        let directoryURL = root.appendingPathComponent(taskID, isDirectory: true)
         try FileManager.default.createDirectory(at: directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
         let manifest = TaskManifest(
             schemaVersion: 1,
-            id: id,
+            id: taskID,
             name: id,
             description: "",
             enabled: true,
@@ -355,7 +356,7 @@ final class RunShelfCoreTests: XCTestCase {
             notifications: .defaultPolicy,
             retention: .defaultPolicy
         )
-        return RunShelfTask(
+        let task = RunShelfTask(
             manifest: manifest,
             directoryURL: directoryURL,
             script: script,
@@ -363,6 +364,12 @@ final class RunShelfCoreTests: XCTestCase {
             runs: [],
             isDirty: false
         )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: directoryURL.appendingPathComponent("task.json"))
+        try script.write(to: directoryURL.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
+        try "".write(to: directoryURL.appendingPathComponent("notes.md"), atomically: true, encoding: .utf8)
+        return task
     }
 
     private func writeTaskDirectory(
@@ -423,10 +430,9 @@ final class RunShelfCoreTests: XCTestCase {
     }
 
     private func waitForClaim(task: RunShelfTask) throws {
-        let claimURL = TaskRunClaimManager.claimDirectoryURL(for: task).appendingPathComponent("claim.json")
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
-            if FileManager.default.fileExists(atPath: claimURL.path) {
+            if !TaskRunClaimManager.activeClaims(for: task).isEmpty {
                 return
             }
             Thread.sleep(forTimeInterval: 0.05)

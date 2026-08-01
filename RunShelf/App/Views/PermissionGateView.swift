@@ -159,7 +159,6 @@ private struct GateWindowAccessor: NSViewRepresentable {
         weak var window: NSWindow?
         private weak var previousDelegate: NSWindowDelegate?
         private var previousStyleMask: NSWindow.StyleMask?
-        private var isTerminating = false
 
         func attach(to window: NSWindow) {
             guard self.window !== window else { return }
@@ -202,12 +201,7 @@ private struct GateWindowAccessor: NSViewRepresentable {
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {
-            guard !isTerminating else { return false }
-            isTerminating = true
-            DispatchQueue.main.async {
-                NSApp.terminate(nil)
-            }
-            return false
+            true
         }
     }
 }

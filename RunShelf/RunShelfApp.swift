@@ -5,35 +5,20 @@ import AppKit
 struct RunShelfApp: App {
     @StateObject private var schedulerController: SchedulerServiceController
     @StateObject private var taskStore: TaskStore
-    @State private var isGateActive: Bool
 
     init() {
         let controller = SchedulerServiceController()
         _schedulerController = StateObject(wrappedValue: controller)
         _taskStore = StateObject(wrappedValue: TaskStore())
-        // 一次性快照：仅在 app 启动时决定是否拦截。
-        // 之后无论 serviceStatus 怎么变（Settings 里 unregister、系统设置关掉登录项），
-        // 本会话不再回到 Gate；下次启动重新判断。
-        _isGateActive = State(initialValue: !controller.isAuthorized && !Self.shouldBypassGateForUITesting)
     }
 
     var body: some Scene {
         Window("Run Shelf", id: "main") {
-            Group {
-                if isGateActive {
-                    PermissionGateView {
-                        // Gate 通过的瞬间补一次诊断刷新，让 TaskInspector 拿到通知权限真实状态
-                        schedulerController.refreshDiagnostics()
-                        isGateActive = false
-                    }
-                } else {
-                    ContentView()
-                        .frame(
-                            minWidth: RunShelfWindowMetrics.mainMinWidth,
-                            minHeight: RunShelfWindowMetrics.mainMinHeight
-                        )
-                }
-            }
+            ContentView(store: taskStore)
+                .frame(
+                    minWidth: RunShelfWindowMetrics.mainMinWidth,
+                    minHeight: RunShelfWindowMetrics.mainMinHeight
+                )
             .environmentObject(schedulerController)
             .environmentObject(taskStore)
         }
@@ -44,7 +29,6 @@ struct RunShelfApp: App {
                     NotificationCenter.default.post(name: .saveSelectedTaskFromMenu, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.command])
-                .disabled(isGateActive)
             }
 
             CommandGroup(after: .saveItem) {
@@ -52,7 +36,6 @@ struct RunShelfApp: App {
                     NotificationCenter.default.post(name: .runSelectedTaskFromMenu, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: [.command])
-                .disabled(isGateActive)
 
                 Divider()
 
@@ -68,8 +51,7 @@ struct RunShelfApp: App {
         MenuBarExtra {
             MenuBarContent(
                 taskStore: taskStore,
-                schedulerController: schedulerController,
-                isGateActive: isGateActive
+                schedulerController: schedulerController
             )
         } label: {
             MenuBarLabel(
@@ -82,16 +64,6 @@ struct RunShelfApp: App {
             SettingsView()
                 .environmentObject(schedulerController)
         }
-    }
-}
-
-private extension RunShelfApp {
-    static var shouldBypassGateForUITesting: Bool {
-        #if DEBUG
-        ProcessInfo.processInfo.environment["RUN_SHELF_BYPASS_GATE"] == "1"
-        #else
-        false
-        #endif
     }
 }
 
@@ -120,23 +92,19 @@ private struct MenuBarLabel: View {
 private struct MenuBarContent: View {
     @ObservedObject var taskStore: TaskStore
     @ObservedObject var schedulerController: SchedulerServiceController
-    var isGateActive: Bool
 
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        if isGateActive {
-            Button("打开 Run Shelf 启用后台运行") { activateMainWindow() }
-            Divider()
-            Button("退出 Run Shelf") { NSApp.terminate(nil) }
-        } else {
-            runMenu
-            Divider()
-            Button("打开 Run Shelf") { activateMainWindow() }
-                .keyboardShortcut("o", modifiers: [.command])
-            Divider()
-            Button("退出 Run Shelf") { NSApp.terminate(nil) }
+        runMenu
+        Divider()
+        if !schedulerController.isAuthorized {
+            Button("后台调度未启用…") { activateMainWindow() }
         }
+        Button("打开 Run Shelf") { activateMainWindow() }
+            .keyboardShortcut("o", modifiers: [.command])
+        Divider()
+        Button("退出 Run Shelf") { NSApp.terminate(nil) }
     }
 
     @ViewBuilder

@@ -6,9 +6,10 @@ struct RunShelfSchedulerMain {
         let engine = SchedulerEngine()
 
         engine.tick()
-        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
             engine.tick()
         }
+        timer.tolerance = 5
 
         RunLoop.main.run()
     }

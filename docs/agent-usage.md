@@ -67,6 +67,8 @@ runshelf run status <run-id> --json
 runshelf run cancel <run-id> --json
 runshelf run log <run-id> --stdout
 runshelf run log <run-id> --stderr
+runshelf run log <run-id> --bytes 262144 --json
+runshelf run log <run-id> --full
 runshelf doctor --json
 runshelf install-cli --json
 runshelf help agent
@@ -91,6 +93,7 @@ runshelf apply spec.json --expected-revision "$revisionToken" --json
 ## TaskSpec
 
 `TaskSpec` 是给 agent 的稳定写入面，不是 `task.json` 的完整镜像。创建任务时没有覆盖到的内部策略使用默认值；更新任务时没有覆盖到的内部策略会保留原值。
+根对象和 `schedule` 中的未知字段都是硬错误；当前 `timezone` 只接受 `local`，不会静默接受未实现的时区。日志默认读取最后 1 MiB，JSON 消费方必须检查 `truncated`、`totalBytes` 和 `returnedBytes`。
 
 最小示例：
 

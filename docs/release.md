@@ -37,8 +37,8 @@ xcodebuild test \
 ## 手动冒烟检查
 
 ```text
-1. 首次打开能进入后台调度授权页。
-2. 启用后台运行后能进入主窗口。
+1. 首次打开能直接进入主窗口；未启用后台调度时仍可编辑、保存和手动运行。
+2. 在设置中启用后台运行后，状态能正确更新。
 3. 从模板新建任务后，会写入 task.json、run.sh 和 notes.md。
 4. 运行成功脚本后，会写入 stdout.log 和 success meta.json。
 5. 运行失败脚本后，会写入 stderr.log 和 failed meta.json。
@@ -101,6 +101,8 @@ EOF
 ```bash
 scripts/release.sh 1.1.2
 ```
+
+发布前工作区必须干净，当前分支必须与 `origin/main` 完全一致，release notes 必须已经提交。发布脚本只推送经过验证的 tag，不再隐式推送分支。Bundle 的 `CFBundleShortVersionString` 使用语义版本，`CFBundleVersion` 按 `major * 1000000 + minor * 1000 + patch` 生成。
 
 脚本默认读取 `docs/releases/v1.1.2.md`。它会拒绝脏工作区、重复 tag、重复 release。成功后会上传四个资产：
 

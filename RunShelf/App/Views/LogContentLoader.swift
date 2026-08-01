@@ -32,10 +32,10 @@ final class LogContentLoader: ObservableObject {
     private var currentKey: LoadKey?
     private var loadTask: Task<Void, Never>?
 
-    func load(task: RunShelfTask, run: RunRecord) {
+    func load(task: RunShelfTask, run: RunRecord, force: Bool = false) {
         let key = LoadKey(taskID: task.id, runID: run.runId)
         // 已经在加载同一组合：跳过（避免 view body 重算反复触发）
-        if currentKey == key, loadTask != nil { return }
+        if !force, currentKey == key, loadTask != nil { return }
 
         loadTask?.cancel()
         currentKey = key
@@ -60,6 +60,7 @@ final class LogContentLoader: ObservableObject {
             self.stdout = out
             self.stderr = err
             self.isLoading = false
+            self.loadTask = nil
         }
     }
 

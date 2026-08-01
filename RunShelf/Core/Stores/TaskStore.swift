@@ -2,40 +2,31 @@ import AppKit
 import Combine
 import Foundation
 
-enum RunLogKind: String, CaseIterable, Identifiable {
-    case stdout
-    case stderr
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .stdout: return "stdout"
-        case .stderr: return "stderr"
-        }
-    }
-}
-
 @MainActor
 final class TaskStore: ObservableObject {
     @Published private(set) var tasks: [RunShelfTask] = []
-    @Published var selectedTaskID: String? {
-        didSet {
-            if oldValue != selectedTaskID {
-                if let oldValue {
-                    setScheduleDraftValidity(taskID: oldValue, isValid: true)
-                }
-                selectedRunID = nil
-            }
-        }
-    }
-    @Published var selectedRunID: String?
+    let selection = TaskSelectionState()
     @Published private(set) var runningTaskIDs: Set<String> = []
     @Published private(set) var runningStartedAt: [String: Date] = [:]
     @Published private var invalidScheduleDraftTaskIDs: Set<String> = []
     @Published var lastErrorMessage: String?
 
     let tasksDirectoryURL: URL
+
+    var selectedTaskID: String? {
+        get { selection.selectedTaskID }
+        set {
+            if let oldValue = selection.selectedTaskID, oldValue != newValue {
+                setScheduleDraftValidity(taskID: oldValue, isValid: true)
+            }
+            selection.selectedTaskID = newValue
+        }
+    }
+
+    var selectedRunID: String? {
+        get { selection.selectedRunID }
+        set { selection.selectedRunID = newValue }
+    }
 
     private let fileManager: FileManager
     private let encoder: JSONEncoder
@@ -52,8 +43,10 @@ final class TaskStore: ObservableObject {
     // - isRefreshingFromDisk: 重入保护，避免两个 detached scan 同时跑。
     private var taskGenerations: [String: Int] = [:]
     private var signatureCache: [String: TaskFileSignature] = [:]
-    private var isRefreshingFromDisk = false
-    private var runningCancellations: [String: TaskRunCancellation] = [:]
+    private var runsCache: [String: TaskRunsCache] = [:]
+    private let diskMonitor = TaskDiskMonitor()
+    private var projectedActivities: [String: TaskLiveActivity] = [:]
+    private let runCoordinator = TaskRunCoordinator()
 
     init(
         tasksDirectoryURL: URL = TaskStore.defaultTasksDirectoryURL(),
@@ -75,6 +68,7 @@ final class TaskStore: ObservableObject {
         self.repository = TaskRepository(tasksDirectoryURL: tasksDirectoryURL, fileManager: fileManager)
 
         loadTasks()
+        startDiskMonitor()
     }
 
     nonisolated static func defaultTasksDirectoryURL() -> URL {
@@ -136,6 +130,9 @@ final class TaskStore: ObservableObject {
             signatureCache = Dictionary(uniqueKeysWithValues: loadedTasks.map { task in
                 (task.id, TaskFileSignature.capture(for: task.directoryURL))
             })
+            runsCache = includeRuns
+                ? Dictionary(uniqueKeysWithValues: loadedTasks.map { ($0.id, TaskRunsCache.capture(for: $0)) })
+                : [:]
             if selectedTaskID == nil || task(withID: selectedTaskID ?? "") == nil {
                 selectedTaskID = sortedTasks.first?.id
             }
@@ -147,32 +144,25 @@ final class TaskStore: ObservableObject {
     /// 入口签名不变。内部把磁盘 IO 搬到后台线程，避免阻塞 UI。
     /// 重入保护：上一轮 scan 还没完成时直接跳过本次触发（避免 polling 雪崩）。
     func refreshRunsFromDisk() {
-        guard !isRefreshingFromDisk else { return }
-        isRefreshingFromDisk = true
+        diskMonitor.requestRefresh()
+    }
 
-        let input = DiskScanInput(
+    private func makeDiskScanInput() -> DiskScanInput {
+        DiskScanInput(
             tasksDirectoryURL: tasksDirectoryURL,
             knownTasks: tasks.map { task in
                 DiskScanInput.KnownTask(
                     id: task.id,
                     directoryURL: task.directoryURL,
                     isDirty: task.isDirty,
-                    generation: taskGenerations[task.id] ?? 0
+                    generation: taskGenerations[task.id] ?? 0,
+                    runningRunIDs: task.runs.filter { $0.status == .running }.map(\.runId),
+                    task: task
                 )
             },
-            signatureCache: signatureCache
+            signatureCache: signatureCache,
+            runsCache: runsCache
         )
-
-        Task { [weak self] in
-            let result = await Task.detached(priority: .utility) {
-                DiskScanner.scan(input)
-            }.value
-            guard !Task.isCancelled else {
-                self?.isRefreshingFromDisk = false
-                return
-            }
-            self?.applyDiskScan(result)
-        }
     }
 
     /// MainActor 上把后台 scan 结果合并进 store。
@@ -181,8 +171,6 @@ final class TaskStore: ObservableObject {
     /// - dirty 任务永远只更新 runs 字段
     /// - 删除只清 clean 任务，dirty 草稿保留让 saveTask 失败让用户感知
     private func applyDiskScan(_ result: DiskScanResult) {
-        defer { isRefreshingFromDisk = false }
-
         for entry in result.entries {
             switch entry {
             case let .fullReload(diskTask, scanGeneration):
@@ -225,7 +213,13 @@ final class TaskStore: ObservableObject {
         for (id, sig) in result.newSignatures where aliveIDs.contains(id) {
             signatureCache[id] = sig
         }
+        for (id, cache) in result.newRunsCache where aliveIDs.contains(id) {
+            runsCache[id] = cache
+        }
         signatureCache = signatureCache.filter { aliveIDs.contains($0.key) }
+        runsCache = runsCache.filter { aliveIDs.contains($0.key) }
+        projectedActivities = result.activities.filter { aliveIDs.contains($0.key) }
+        recomputeRunningProjection()
 
         if let sel = selectedTaskID, !tasks.contains(where: { $0.id == sel }) {
             selectedTaskID = sortedTasks.first?.id
@@ -270,6 +264,7 @@ final class TaskStore: ObservableObject {
             tasks.append(task)
             taskGenerations[task.id] = 0
             signatureCache[task.id] = TaskFileSignature.capture(for: task.directoryURL)
+            runsCache[task.id] = TaskRunsCache.capture(for: task)
             selectedTaskID = task.id
             return task.id
         } catch {
@@ -321,6 +316,7 @@ final class TaskStore: ObservableObject {
             // 让正在跑的 detached scan apply 时能识别"内存版本已经领先于它看到的"
             bumpGeneration(id)
             signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
+            runsCache[id] = TaskRunsCache.capture(for: tasks[index])
             return true
         } catch {
             lastErrorMessage = "无法保存任务：\(error.localizedDescription)"
@@ -334,6 +330,7 @@ final class TaskStore: ObservableObject {
             tasks[index] = try loadTask(at: tasks[index].directoryURL)
             bumpGeneration(id)
             signatureCache[id] = TaskFileSignature.capture(for: tasks[index].directoryURL)
+            runsCache[id] = TaskRunsCache.capture(for: tasks[index])
             setScheduleDraftValidity(taskID: id, isValid: true)
         } catch {
             lastErrorMessage = "无法放弃更改：\(error.localizedDescription)"
@@ -341,18 +338,17 @@ final class TaskStore: ObservableObject {
     }
 
     func deleteTask(id: String) {
-        guard !runningTaskIDs.contains(id), let index = tasks.firstIndex(where: { $0.id == id }) else {
-            lastErrorMessage = "运行中的任务不能删除。"
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else {
+            lastErrorMessage = "找不到要删除的任务。"
             return
         }
 
-        let task = tasks[index]
         do {
-            var resultingURL: NSURL?
-            try fileManager.trashItem(at: task.directoryURL, resultingItemURL: &resultingURL)
+            _ = try repository.deleteTask(selector: .id(id))
             tasks.remove(at: index)
             taskGenerations.removeValue(forKey: id)
             signatureCache.removeValue(forKey: id)
+            runsCache.removeValue(forKey: id)
             setScheduleDraftValidity(taskID: id, isValid: true)
             NotificationCenter.default.post(
                 name: .runShelfTaskDeleted,
@@ -360,25 +356,10 @@ final class TaskStore: ObservableObject {
                 userInfo: [RunShelfNotificationUserInfoKey.taskID: id]
             )
             selectedTaskID = sortedTasks.first?.id
+        } catch TaskRepositoryError.taskRunning {
+            lastErrorMessage = "运行中的任务不能删除。"
         } catch {
-            do {
-                let trashURL = tasksDirectoryURL.appendingPathComponent("trash", isDirectory: true)
-                try fileManager.createDirectory(at: trashURL, withIntermediateDirectories: true)
-                let destination = trashURL.appendingPathComponent(task.id + "-" + UUID().uuidString, isDirectory: true)
-                try fileManager.moveItem(at: task.directoryURL, to: destination)
-                tasks.remove(at: index)
-                taskGenerations.removeValue(forKey: id)
-                signatureCache.removeValue(forKey: id)
-                setScheduleDraftValidity(taskID: id, isValid: true)
-                NotificationCenter.default.post(
-                    name: .runShelfTaskDeleted,
-                    object: nil,
-                    userInfo: [RunShelfNotificationUserInfoKey.taskID: id]
-                )
-                selectedTaskID = sortedTasks.first?.id
-            } catch {
-                lastErrorMessage = "无法删除任务：\(error.localizedDescription)"
-            }
+            lastErrorMessage = "无法删除任务：\(error.localizedDescription)"
         }
     }
 
@@ -403,37 +384,28 @@ final class TaskStore: ObservableObject {
         }
 
         let task = tasks[index]
-        let cancellation = TaskRunCancellation()
-        runningCancellations[id] = cancellation
-        runningTaskIDs.insert(id)
-        runningStartedAt[id] = Date()
-
-        Task.detached(priority: .userInitiated) {
-            let result = Result {
-                try TaskRunner.run(task: task, trigger: .manual, host: "app", cancellation: cancellation)
-            }
-
-            await MainActor.run {
-                self.runningTaskIDs.remove(id)
-                self.runningStartedAt.removeValue(forKey: id)
-                self.runningCancellations.removeValue(forKey: id)
+        let runID = TaskRunner.makeRunID(from: Date())
+        runCoordinator.start(
+            task: task,
+            runID: runID,
+            onStateChange: { [weak self] in self?.recomputeRunningProjection() },
+            completion: { [weak self] result in
+                guard let self else { return }
                 switch result {
                 case .success(let run):
                     if run.status == .failed || run.status == .timeout {
                         RunShelfNotifier.notifyFailure(task: task, run: run)
                     }
-                    self.refreshRuns(for: id)
                 case .failure(let error):
                     self.lastErrorMessage = "任务运行失败：\(error.localizedDescription)"
-                    self.refreshRuns(for: id)
                 }
+                self.refreshRunsFromDisk()
             }
-        }
+        )
     }
 
     func cancelTask(id: String) {
-        guard runningTaskIDs.contains(id), let cancellation = runningCancellations[id] else { return }
-        cancellation.cancel()
+        runCoordinator.cancel(taskID: id)
     }
 
     func setScheduleDraftValidity(taskID: String, isValid: Bool) {
@@ -458,9 +430,13 @@ final class TaskStore: ObservableObject {
     }
 
     func canRunTask(_ task: RunShelfTask) -> Bool {
-        !runningTaskIDs.contains(task.id) &&
-            TaskRunClaimManager.activeClaim(for: task) == nil &&
+        let allowsConcurrentRun = task.manifest.runner.concurrency == "allow"
+        return (allowsConcurrentRun || !runningTaskIDs.contains(task.id)) &&
             canPersistTask(task)
+    }
+
+    func canCancelTask(id: String) -> Bool {
+        runCoordinator.canCancel(taskID: id)
     }
 
     private func canPersistTask(_ task: RunShelfTask) -> Bool {
@@ -488,22 +464,6 @@ final class TaskStore: ObservableObject {
     func openTaskDirectory(id: String) {
         guard let task = task(withID: id) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([task.directoryURL])
-    }
-
-    func logText(for task: RunShelfTask, run: RunRecord?, kind: RunLogKind) -> String {
-        guard let run else { return "暂无日志" }
-        let runURL = task.directoryURL
-            .appendingPathComponent("runs", isDirectory: true)
-            .appendingPathComponent(run.runId, isDirectory: true)
-        let stdoutURL = runURL.appendingPathComponent(run.stdoutPath)
-        let stderrURL = runURL.appendingPathComponent(run.stderrPath)
-
-        switch kind {
-        case .stdout:
-            return readText(at: stdoutURL)
-        case .stderr:
-            return readText(at: stderrURL)
-        }
     }
 
     private func ensureTasksDirectory() throws {
@@ -546,28 +506,14 @@ final class TaskStore: ObservableObject {
         enabled: Bool,
         schedule: TaskSchedule? = nil
     ) throws -> RunShelfTask {
-        let id = UUID().uuidString
-        let directoryURL = tasksDirectoryURL.appendingPathComponent(id, isDirectory: true)
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: directoryURL.appendingPathComponent("runs", isDirectory: true), withIntermediateDirectories: true)
-
-        let manifest = TaskManifest.create(
-            id: id,
+        try repository.createTask(from: TaskSpec(
             name: name,
             description: template.description,
             enabled: enabled,
-            schedule: schedule ?? template.defaultSchedule
-        )
-        let task = RunShelfTask(
-            manifest: manifest,
-            directoryURL: directoryURL,
+            schedule: schedule ?? template.defaultSchedule,
             script: template.script,
-            notes: template.notes,
-            runs: [],
-            isDirty: false
-        )
-        try writeTask(task)
-        return task
+            notes: template.notes
+        )).task
     }
 
     private func loadTask(at directoryURL: URL, includeRuns: Bool = true) throws -> RunShelfTask {
@@ -584,9 +530,20 @@ final class TaskStore: ObservableObject {
         try repository.writeTask(task, expectedRevision: expectedRevision)
     }
 
-    private func refreshRuns(for id: String) {
-        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-        tasks[index].runs = diskLoader.loadRuns(for: tasks[index].directoryURL)
+    private func startDiskMonitor() {
+        diskMonitor.start(
+            inputProvider: { [weak self] in self?.makeDiskScanInput() },
+            resultHandler: { [weak self] result in self?.applyDiskScan(result) }
+        )
+    }
+
+    private func recomputeRunningProjection() {
+        runningTaskIDs = Set(projectedActivities.keys).union(runCoordinator.runningTaskIDs)
+        var starts = projectedActivities.compactMapValues(\.earliestStartedAt)
+        for (id, local) in runCoordinator.runningStartedAt {
+            starts[id] = min(starts[id] ?? local, local)
+        }
+        runningStartedAt = starts
     }
 
     private func statusRank(_ task: RunShelfTask) -> Int {
@@ -594,10 +551,6 @@ final class TaskStore: ObservableObject {
         if task.latestRun?.status == .failed || task.latestRun?.status == .timeout { return 1 }
         if task.manifest.enabled { return 2 }
         return 3
-    }
-
-    private func readText(at url: URL) -> String {
-        (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
     private func isDirectory(_ url: URL) -> Bool {

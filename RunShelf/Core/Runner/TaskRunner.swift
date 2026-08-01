@@ -374,7 +374,7 @@ private extension TaskRunner {
                 terminateProcessGroup(pid: pid, signal: SIGKILL)
             }
 
-            Thread.sleep(forTimeInterval: 0.05)
+            Thread.sleep(forTimeInterval: 0.2)
         }
 
         let exitCode = exitCode(fromWaitStatus: status)

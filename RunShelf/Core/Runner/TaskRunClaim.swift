@@ -1,12 +1,19 @@
 import Darwin
 import Foundation
 
+struct TaskProcessIdentity: Codable, Equatable, Sendable {
+    var startTimeSeconds: UInt64
+    var startTimeMicroseconds: UInt64
+}
+
 struct TaskRunClaim: Codable, Equatable, Sendable {
     var schemaVersion: Int
     var runId: String
     var taskId: String
     var processID: Int32
     var processGroupID: Int32?
+    var processIdentity: TaskProcessIdentity? = nil
+    var processGroupLeaderIdentity: TaskProcessIdentity? = nil
     var host: String
     var startedAt: Date
 }
@@ -41,6 +48,7 @@ struct TaskRunClaimLease {
     let runID: String
     let claimDirectoryURL: URL
     let fileManager: FileManager
+    let isLegacy: Bool
 
     var claimURL: URL {
         claimDirectoryURL.appendingPathComponent("claim.json")
@@ -50,9 +58,11 @@ struct TaskRunClaimLease {
         var claim = try readClaim()
         if let processID {
             claim.processID = processID
+            claim.processIdentity = TaskRunClaimManager.processIdentity(for: processID)
         }
         if let processGroupID {
             claim.processGroupID = processGroupID
+            claim.processGroupLeaderIdentity = TaskRunClaimManager.processIdentity(for: processGroupID)
         }
         if let host {
             claim.host = host
@@ -62,7 +72,11 @@ struct TaskRunClaimLease {
 
     func release() {
         guard let claim = try? readClaim(), claim.runId == runID else { return }
-        try? fileManager.removeItem(at: claimDirectoryURL)
+        if isLegacy {
+            try? fileManager.removeItem(at: claimURL)
+        } else {
+            try? fileManager.removeItem(at: claimDirectoryURL)
+        }
     }
 
     private func readClaim() throws -> TaskRunClaim {
@@ -88,47 +102,86 @@ enum TaskRunClaimManager {
         now: Date = Date(),
         fileManager: FileManager = .default
     ) throws -> TaskRunClaimLease {
-        let claimDirectoryURL = claimDirectoryURL(for: task)
-        let claimURL = claimDirectoryURL.appendingPathComponent("claim.json")
+        try TaskDefinitionFileLock.withLock(
+            tasksDirectoryURL: task.directoryURL.deletingLastPathComponent(),
+            taskID: task.id,
+            mode: .shared,
+            fileManager: fileManager
+        ) {
+            try revalidateTaskRoot(task, fileManager: fileManager)
+            let rootURL = claimDirectoryURL(for: task)
+            if !fileManager.fileExists(atPath: rootURL.path) {
+                do {
+                    try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: false)
+                } catch {
+                    let isDirectory = (try? rootURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                    guard isDirectory else { throw error }
+                }
+            }
 
-        for _ in 0..<2 {
-            do {
-                try fileManager.createDirectory(at: claimDirectoryURL, withIntermediateDirectories: false)
+            return try withClaimLock(rootURL: rootURL) {
+                try reclaimStaleClaims(task: task, rootURL: rootURL, now: now, fileManager: fileManager)
+
+                let active = activeClaims(for: task, now: now, fileManager: fileManager)
+                if task.manifest.runner.concurrency != "allow", let existing = active.first {
+                    throw TaskRunClaimError.alreadyRunning(existing)
+                }
+
+                let runDirectoryURL = rootURL.appendingPathComponent(runID, isDirectory: true)
+                do {
+                    try fileManager.createDirectory(at: runDirectoryURL, withIntermediateDirectories: false)
+                } catch {
+                    if let existing = readClaim(at: runDirectoryURL.appendingPathComponent("claim.json")) {
+                        throw TaskRunClaimError.alreadyRunning(existing)
+                    }
+                    throw TaskRunClaimError.corruptActiveClaim(runDirectoryURL.path)
+                }
+
                 let claim = TaskRunClaim(
                     schemaVersion: 1,
                     runId: runID,
                     taskId: task.id,
                     processID: getpid(),
                     processGroupID: nil,
+                    processIdentity: processIdentity(for: getpid()),
                     host: host,
                     startedAt: now
                 )
-                try write(claim: claim, to: claimURL)
+                let claimURL = runDirectoryURL.appendingPathComponent("claim.json")
+                do {
+                    try write(claim: claim, to: claimURL)
+                } catch {
+                    try? fileManager.removeItem(at: runDirectoryURL)
+                    throw error
+                }
                 return TaskRunClaimLease(
                     taskID: task.id,
                     runID: runID,
-                    claimDirectoryURL: claimDirectoryURL,
-                    fileManager: fileManager
+                    claimDirectoryURL: runDirectoryURL,
+                    fileManager: fileManager,
+                    isLegacy: false
                 )
-            } catch {
-                if fileManager.fileExists(atPath: claimDirectoryURL.path) {
-                    try reclaimIfStale(
-                        task: task,
-                        claimDirectoryURL: claimDirectoryURL,
-                        claimURL: claimURL,
-                        now: now,
-                        fileManager: fileManager
-                    )
-                } else {
-                    throw error
-                }
             }
         }
+    }
 
-        if let claim = readClaim(at: claimURL) {
-            throw TaskRunClaimError.alreadyRunning(claim)
+    private static func revalidateTaskRoot(_ task: RunShelfTask, fileManager: FileManager) throws {
+        guard task.directoryURL.lastPathComponent == task.id,
+              fileManager.fileExists(atPath: task.directoryURL.path)
+        else {
+            throw TaskRepositoryError.taskDirectoryMissing(task.id)
         }
-        throw TaskRunClaimError.corruptActiveClaim(claimDirectoryURL.path)
+        let manifestURL = task.directoryURL.appendingPathComponent("task.json")
+        let data = try Data(contentsOf: manifestURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(TaskManifest.self, from: data)
+        guard manifest.id == task.id else {
+            throw TaskRepositoryError.taskIdentityMismatch(
+                directoryName: task.id,
+                manifestID: manifest.id
+            )
+        }
     }
 
     static func existing(
@@ -136,9 +189,24 @@ enum TaskRunClaimManager {
         runID: String,
         fileManager: FileManager = .default
     ) throws -> TaskRunClaimLease {
-        let claimDirectoryURL = claimDirectoryURL(for: task)
-        let claimURL = claimDirectoryURL.appendingPathComponent("claim.json")
-        guard let claim = readClaim(at: claimURL) else {
+        let rootURL = claimDirectoryURL(for: task)
+        let runDirectoryURL = rootURL.appendingPathComponent(runID, isDirectory: true)
+        let runClaimURL = runDirectoryURL.appendingPathComponent("claim.json")
+        if let claim = readClaim(at: runClaimURL) {
+            guard claim.runId == runID else {
+                throw TaskRunClaimError.claimMismatch(expected: runID, actual: claim.runId)
+            }
+            return TaskRunClaimLease(
+                taskID: task.id,
+                runID: runID,
+                claimDirectoryURL: runDirectoryURL,
+                fileManager: fileManager,
+                isLegacy: false
+            )
+        }
+
+        let legacyClaimURL = rootURL.appendingPathComponent("claim.json")
+        guard let claim = readClaim(at: legacyClaimURL) else {
             throw TaskRunClaimError.claimNotFound(runID)
         }
         guard claim.runId == runID else {
@@ -147,9 +215,19 @@ enum TaskRunClaimManager {
         return TaskRunClaimLease(
             taskID: task.id,
             runID: runID,
-            claimDirectoryURL: claimDirectoryURL,
-            fileManager: fileManager
+            claimDirectoryURL: rootURL,
+            fileManager: fileManager,
+            isLegacy: true
         )
+    }
+
+    static func activeClaim(
+        for task: RunShelfTask,
+        runID: String,
+        now: Date = Date(),
+        fileManager: FileManager = .default
+    ) -> TaskRunClaim? {
+        activeClaims(for: task, now: now, fileManager: fileManager).first { $0.runId == runID }
     }
 
     static func activeClaim(
@@ -157,10 +235,41 @@ enum TaskRunClaimManager {
         now: Date = Date(),
         fileManager: FileManager = .default
     ) -> TaskRunClaim? {
-        let claimDirectoryURL = claimDirectoryURL(for: task)
-        let claimURL = claimDirectoryURL.appendingPathComponent("claim.json")
-        guard let claim = readClaim(at: claimURL) else { return nil }
-        return isStale(claim: claim, task: task, now: now) ? nil : claim
+        activeClaims(for: task, now: now, fileManager: fileManager).first
+    }
+
+    static func activeClaims(
+        for task: RunShelfTask,
+        now: Date = Date(),
+        fileManager: FileManager = .default
+    ) -> [TaskRunClaim] {
+        let rootURL = claimDirectoryURL(for: task)
+        var claims: [TaskRunClaim] = []
+
+        let legacyClaimURL = rootURL.appendingPathComponent("claim.json")
+        if let claim = readClaim(at: legacyClaimURL), !isStale(claim: claim, task: task, now: now) {
+            claims.append(claim)
+        }
+
+        let directories = (try? fileManager.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for directory in directories {
+            guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  let claim = readClaim(at: directory.appendingPathComponent("claim.json")),
+                  !isStale(claim: claim, task: task, now: now)
+            else {
+                continue
+            }
+            claims.append(claim)
+        }
+
+        return claims.sorted { lhs, rhs in
+            if lhs.startedAt != rhs.startedAt { return lhs.startedAt < rhs.startedAt }
+            return lhs.runId < rhs.runId
+        }
     }
 
     static func write(claim: TaskRunClaim, to url: URL) throws {
@@ -177,41 +286,89 @@ enum TaskRunClaimManager {
         return try? decoder.decode(TaskRunClaim.self, from: data)
     }
 
-    private static func reclaimIfStale(
+    private static func reclaimStaleClaims(
         task: RunShelfTask,
-        claimDirectoryURL: URL,
-        claimURL: URL,
+        rootURL: URL,
         now: Date,
         fileManager: FileManager
     ) throws {
-        if let claim = readClaim(at: claimURL) {
-            if isStale(claim: claim, task: task, now: now) {
-                try? fileManager.removeItem(at: claimDirectoryURL)
-                return
+        let legacyClaimURL = rootURL.appendingPathComponent("claim.json")
+        if let claim = readClaim(at: legacyClaimURL) {
+            if isStale(claim: claim, task: task, now: now), readClaim(at: legacyClaimURL) == claim {
+                try? fileManager.removeItem(at: legacyClaimURL)
             }
-            throw TaskRunClaimError.alreadyRunning(claim)
+        } else if fileManager.fileExists(atPath: legacyClaimURL.path) {
+            throw TaskRunClaimError.corruptActiveClaim(legacyClaimURL.path)
         }
 
-        let values = try? claimDirectoryURL.resourceValues(forKeys: [.contentModificationDateKey])
-        let modifiedAt = values?.contentModificationDate ?? now
-        if now.timeIntervalSince(modifiedAt) > 60 {
-            try? fileManager.removeItem(at: claimDirectoryURL)
-            return
+        let directories = (try? fileManager.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for directory in directories {
+            let values = try? directory.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey])
+            guard values?.isDirectory == true else { continue }
+            let claimURL = directory.appendingPathComponent("claim.json")
+            if let claim = readClaim(at: claimURL) {
+                guard isStale(claim: claim, task: task, now: now), readClaim(at: claimURL) == claim else { continue }
+                try? fileManager.removeItem(at: directory)
+            } else {
+                let modifiedAt = values?.contentModificationDate ?? now
+                if now.timeIntervalSince(modifiedAt) > 60 {
+                    try? fileManager.removeItem(at: directory)
+                } else {
+                    throw TaskRunClaimError.corruptActiveClaim(directory.path)
+                }
+            }
         }
-        throw TaskRunClaimError.corruptActiveClaim(claimDirectoryURL.path)
+    }
+
+    static func canSafelySignal(_ claim: TaskRunClaim) -> Bool {
+        if let processGroupID = claim.processGroupID {
+            guard isProcessGroupAlive(processGroupID),
+                  let expected = claim.processGroupLeaderIdentity,
+                  let current = processIdentity(for: processGroupID)
+            else {
+                return false
+            }
+            return current == expected
+        }
+        guard isProcessAlive(claim.processID),
+              let expected = claim.processIdentity,
+              let current = processIdentity(for: claim.processID)
+        else {
+            return false
+        }
+        return current == expected
+    }
+
+    static func processIdentity(for pid: Int32) -> TaskProcessIdentity? {
+        guard pid > 0 else { return nil }
+        var info = proc_bsdinfo()
+        let expectedSize = MemoryLayout<proc_bsdinfo>.size
+        let result = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(expectedSize))
+        guard result == Int32(expectedSize) else { return nil }
+        return TaskProcessIdentity(
+            startTimeSeconds: info.pbi_start_tvsec,
+            startTimeMicroseconds: info.pbi_start_tvusec
+        )
     }
 
     private static func isStale(claim: TaskRunClaim, task: RunShelfTask, now: Date) -> Bool {
-        let age = now.timeIntervalSince(claim.startedAt)
-        if age > staleInterval(for: task) {
-            return true
-        }
-
         if let processGroupID = claim.processGroupID {
-            return !isProcessGroupAlive(processGroupID)
+            guard isProcessGroupAlive(processGroupID) else { return true }
+            if let expected = claim.processGroupLeaderIdentity {
+                return processIdentity(for: processGroupID) != expected
+            }
+        } else {
+            guard isProcessAlive(claim.processID) else { return true }
+            if let expected = claim.processIdentity {
+                return processIdentity(for: claim.processID) != expected
+            }
         }
 
-        return !isProcessAlive(claim.processID)
+        return now.timeIntervalSince(claim.startedAt) > staleInterval(for: task)
     }
 
     private static func staleInterval(for task: RunShelfTask) -> TimeInterval {
@@ -220,6 +377,20 @@ enum TaskRunClaimManager {
             return TimeInterval(timeout + 600)
         }
         return 24 * 60 * 60
+    }
+
+    private static func withClaimLock<T>(rootURL: URL, operation: () throws -> T) throws -> T {
+        let lockURL = rootURL.appendingPathComponent(".claim-lock")
+        let descriptor = open(lockURL.path, O_CREAT | O_RDWR, mode_t(0o600))
+        guard descriptor >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { close(descriptor) }
+        guard flock(descriptor, LOCK_EX) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { flock(descriptor, LOCK_UN) }
+        return try operation()
     }
 
     private static func isProcessAlive(_ pid: Int32) -> Bool {

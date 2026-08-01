@@ -4,11 +4,17 @@ struct ContentView: View {
     private let inspectorWidth: CGFloat = 300
     private let collapsedSidebarTitleInset: CGFloat = 128
 
-    @EnvironmentObject private var store: TaskStore
+    @ObservedObject private var store: TaskStore
+    @ObservedObject private var selection: TaskSelectionState
     @StateObject private var schedulePrefs = SchedulePreferencesStore()
     @State private var isShowingNewTask = false
     @State private var isShowingDeleteConfirmation = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    init(store: TaskStore) {
+        self.store = store
+        self.selection = store.selection
+    }
 
     var body: some View {
         navigationContent
@@ -22,7 +28,7 @@ struct ContentView: View {
             }
             .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
                 Button("删除", role: .destructive) {
-                    if let id = store.selectedTaskID {
+                    if let id = selection.selectedTaskID {
                         store.deleteTask(id: id)
                     }
                 }
@@ -37,20 +43,13 @@ struct ContentView: View {
             } message: {
                 Text(store.lastErrorMessage ?? "")
             }
-            .task {
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 15_000_000_000)
-                    guard !Task.isCancelled else { break }
-                    store.refreshRunsFromDisk()
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .saveSelectedTaskFromMenu)) { _ in
-                if let id = store.selectedTaskID {
+                if let id = selection.selectedTaskID {
                     store.saveTask(id: id)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .runSelectedTaskFromMenu)) { _ in
-                if let id = store.selectedTaskID {
+                if let id = selection.selectedTaskID {
                     store.runTask(id: id)
                 }
             }
@@ -58,7 +57,7 @@ struct ContentView: View {
 
     private var navigationContent: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            TaskSidebarView(store: store)
+            TaskSidebarView(store: store, selection: selection)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 320)
         } detail: {
             HStack(spacing: 0) {
@@ -85,25 +84,31 @@ struct ContentView: View {
                 toolbarIcon("plus")
             }
             .help("新建任务")
+            .accessibilityLabel("新建任务")
+            .accessibilityIdentifier("new-task")
 
             Button {
-                if let id = store.selectedTaskID {
+                if let id = selection.selectedTaskID {
                     store.runTask(id: id)
                 }
             } label: {
                 toolbarIcon("play.fill")
             }
             .help("立即运行（⌘R）")
+            .accessibilityLabel("立即运行")
+            .accessibilityIdentifier("run-task")
             .disabled(!canRunSelectedTask)
 
             Button {
-                if let id = store.selectedTaskID {
+                if let id = selection.selectedTaskID {
                     store.saveTask(id: id)
                 }
             } label: {
                 toolbarIcon("square.and.arrow.down")
             }
             .help("保存改动（⌘S）")
+            .accessibilityLabel("保存改动")
+            .accessibilityIdentifier("save-task")
             .disabled(!canSaveSelectedTask)
 
             Button(role: .destructive) {
@@ -112,7 +117,9 @@ struct ContentView: View {
                 toolbarIcon("trash")
             }
             .help("删除任务")
-            .disabled(store.selectedTaskID == nil)
+            .accessibilityLabel("删除任务")
+            .accessibilityIdentifier("delete-task")
+            .disabled(selection.selectedTaskID == nil)
         }
         .buttonStyle(.borderless)
         .labelStyle(.iconOnly)
@@ -139,6 +146,7 @@ struct ContentView: View {
         if let task = store.selectedTask {
             TaskDetailView(
                 store: store,
+                selection: selection,
                 taskID: task.id,
                 titleLeadingInset: isSidebarCollapsed ? collapsedSidebarTitleInset : 0
             )

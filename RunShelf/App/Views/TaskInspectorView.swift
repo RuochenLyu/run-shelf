@@ -19,12 +19,17 @@ struct TaskInspectorView: View {
                         store.setScheduleDraftValidity(taskID: task.id, isValid: isValid)
                     }
                 )
-                .id(task.id)
                 .onDisappear {
                     store.setScheduleDraftValidity(taskID: task.id, isValid: true)
                 }
 
                 CronPreviewView(expression: task.manifest.schedule.expression, nextRunCount: 3)
+
+                if task.manifest.enabled && !schedulerController.isAuthorized {
+                    Label("后台调度未启用；手动运行仍然可用", systemImage: "pause.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
 
             Section("运行配置") {

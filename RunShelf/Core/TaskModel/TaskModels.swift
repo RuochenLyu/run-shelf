@@ -41,6 +41,26 @@ struct TaskSchedule: Codable, Equatable, Sendable {
     var expression: String
     var timezone: String
 
+    init(type: String, expression: String, timezone: String) {
+        self.type = type
+        self.expression = expression
+        self.timezone = timezone
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case type
+        case expression
+        case timezone
+    }
+
+    init(from decoder: Decoder) throws {
+        try rejectUnknownKeys(in: decoder, allowed: Set(CodingKeys.allCases.map(\.rawValue)))
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        expression = try container.decode(String.self, forKey: .expression)
+        timezone = try container.decode(String.self, forKey: .timezone)
+    }
+
     static let defaultDaily = TaskSchedule(
         type: "cron",
         expression: "0 9 * * *",
@@ -54,6 +74,10 @@ extension TaskSchedule {
             return CronParseError.invalidToken("类型", type)
         }
 
+        guard timezone == "local" else {
+            return CronParseError.invalidToken("时区", timezone)
+        }
+
         if case .failure(let error) = CronSchedule.validate(expression) {
             return error
         }
@@ -62,6 +86,29 @@ extension TaskSchedule {
 
     var isValid: Bool {
         validationError == nil
+    }
+}
+
+private struct ArbitraryCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = String(intValue)
+    }
+}
+
+func rejectUnknownKeys(in decoder: Decoder, allowed: Set<String>) throws {
+    let container = try decoder.container(keyedBy: ArbitraryCodingKey.self)
+    if let unknown = container.allKeys.map(\.stringValue).filter({ !allowed.contains($0) }).sorted().first {
+        throw DecodingError.dataCorrupted(.init(
+            codingPath: decoder.codingPath + [ArbitraryCodingKey(stringValue: unknown)!],
+            debugDescription: "未知字段：\(unknown)"
+        ))
     }
 }
 

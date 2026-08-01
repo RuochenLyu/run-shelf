@@ -36,17 +36,21 @@ struct NewTaskSheet: View {
                         spacing: 10
                     ) {
                         ForEach(TaskTemplate.builtIns) { template in
-                            TemplateCard(
-                                template: template,
-                                isSelected: template.id == selectedTemplateID
-                            )
-                            .onTapGesture {
+                            Button {
                                 selectedTemplateID = template.id
                                 scheduleExpression = template.defaultSchedule.expression
                                 // 切模板后，让 editor 按新表达式自动推断 mode；
                                 // 不再保留用户在上个模板下选择的 tab
                                 pickedMode = nil
+                            } label: {
+                                TemplateCard(
+                                    template: template,
+                                    isSelected: template.id == selectedTemplateID
+                                )
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(template.name)
+                            .accessibilityValue(template.id == selectedTemplateID ? "已选择" : "未选择")
                         }
                     }
                     .padding(.vertical, 4)

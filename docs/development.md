@@ -8,7 +8,7 @@
 macOS 15 或更高版本
 Xcode 26 或更高版本
 Ruby
-xcodeproj gem
+Bundler
 ```
 
 如果命令行构建意外使用了 Command Line Tools，可以显式指定 Xcode：
@@ -20,13 +20,25 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ## 安装工程生成依赖
 
 ```zsh
-gem install xcodeproj
+bundle install
 ```
 
-新增、删除或移动源码文件后，重新生成 Xcode 工程：
+新增、删除或移动 Swift 源码后，默认做增量同步，避免工程 UUID 抖动：
 
 ```zsh
-ruby scripts/generate_xcodeproj.rb
+bundle exec ruby scripts/sync_xcodeproj_files.rb
+```
+
+提交前可用只读模式检查文件引用与四个 target 的 membership：
+
+```zsh
+bundle exec ruby scripts/sync_xcodeproj_files.rb --check
+```
+
+只有工程损坏或需要从零重建时才运行完整生成器：
+
+```zsh
+bundle exec ruby scripts/generate_xcodeproj.rb
 ```
 
 ## 构建
@@ -124,7 +136,7 @@ RunShelf/Core/Storage/        文件读写、路径、任务仓库
 RunShelf/Core/Runner/         任务运行、进程组、claim、retention
 RunShelf/Core/Scheduler/      后台调度引擎
 RunShelf/CLI/                 runshelf 命令行入口
-RunShelf/Scheduler/           后台辅助进程入口
+RunShelf/SchedulerProcess/    后台辅助进程入口
 RunShelfTests/                Core 测试
 schemas/                      给 agent/工具消费的 JSON Schema
 docs/                         需求、使用、开发、发布文档
@@ -135,7 +147,7 @@ docs/                         需求、使用、开发、发布文档
 - 任务目录名必须等于 `TaskManifest.id`，不要改成 slug。
 - `slug` 只是给人和 agent 使用的别名，可以为空，但不能作为目录名。
 - `TaskSpec` 是 agent 的稳定写入面，不要让它无脑追随 `TaskManifest` 的所有内部字段。
-- App、scheduler、CLI 都必须通过 `.run-claim` 判断同一个任务是否正在运行。
+- App、scheduler、CLI 都必须通过 `.run-claim/<run-id>/claim.json` 判断运行状态；`skip` 保持任务级互斥，`allow` 可同时存在多个 run claim。
 - CLI 写入已有任务时应使用 `revisionToken` 做 CAS，避免覆盖 App 或另一个 CLI 的改动。
 - 不要让 agent 或用户直接拼写 `task.json`；写入入口是 `runshelf apply`。
 
