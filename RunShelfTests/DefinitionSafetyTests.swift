@@ -86,6 +86,24 @@ final class DefinitionSafetyTests: XCTestCase {
         ))
     }
 
+    func testLegacyPersistedTimezoneLoadsAndSavesAsLocal() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let task = try writeTask(root: root, timezone: "UTC")
+        let store = TaskFileStore(tasksDirectoryURL: root)
+
+        let loaded = try store.loadTask(at: task.directoryURL, includeRuns: false)
+
+        XCTAssertEqual(loaded.manifest.schedule.timezone, "local")
+        XCTAssertTrue(loaded.manifest.schedule.isValid)
+        XCTAssertNoThrow(try TaskRepository(tasksDirectoryURL: root).writeTask(
+            loaded,
+            expectedRevision: TaskDefinitionRevision.capture(for: task.directoryURL)
+        ))
+        let saved = try store.loadTask(at: task.directoryURL, includeRuns: false)
+        XCTAssertEqual(saved.manifest.schedule.timezone, "local")
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("RunShelfDefinitionSafetyTests-\(UUID().uuidString)", isDirectory: true)
@@ -93,14 +111,15 @@ final class DefinitionSafetyTests: XCTestCase {
         return url
     }
 
-    private func writeTask(root: URL) throws -> RunShelfTask {
+    private func writeTask(root: URL, timezone: String = "local") throws -> RunShelfTask {
         let id = UUID().uuidString
         let directoryURL = root.appendingPathComponent(id, isDirectory: true)
         try FileManager.default.createDirectory(
             at: directoryURL.appendingPathComponent("runs", isDirectory: true),
             withIntermediateDirectories: true
         )
-        let manifest = TaskManifest.create(id: id, name: "Safety", description: "", enabled: true)
+        var manifest = TaskManifest.create(id: id, name: "Safety", description: "", enabled: true)
+        manifest.schedule.timezone = timezone
         let task = RunShelfTask(
             manifest: manifest,
             directoryURL: directoryURL,

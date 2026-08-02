@@ -70,7 +70,7 @@ struct TaskFileStore {
             }
 
             let manifestData = try Data(contentsOf: directoryURL.appendingPathComponent("task.json"))
-            let manifest = try decoder.decode(TaskManifest.self, from: manifestData)
+            let manifest = try decodePersistedManifest(from: manifestData)
             guard manifest.id == directoryName else {
                 throw TaskRepositoryError.taskIdentityMismatch(
                     directoryName: directoryName,
@@ -198,7 +198,7 @@ struct TaskFileStore {
 
     private func taskForRunClaim(at directoryURL: URL) -> RunShelfTask? {
         guard let manifestData = try? Data(contentsOf: directoryURL.appendingPathComponent("task.json")),
-              let manifest = try? decoder.decode(TaskManifest.self, from: manifestData)
+              let manifest = try? decodePersistedManifest(from: manifestData)
         else {
             return nil
         }
@@ -210,6 +210,18 @@ struct TaskFileStore {
             runs: [],
             isDirty: false
         )
+    }
+
+    private func decodePersistedManifest(from data: Data) throws -> TaskManifest {
+        var manifest = try decoder.decode(TaskManifest.self, from: data)
+        // schemaVersion 1 historically accepted arbitrary timezone strings while
+        // the scheduler always evaluated cron expressions in the Mac's local
+        // timezone. Canonicalize those persisted values on read so an existing
+        // task remains editable and the next save records the real semantics.
+        if manifest.schemaVersion == 1, manifest.schedule.timezone != "local" {
+            manifest.schedule.timezone = "local"
+        }
+        return manifest
     }
 
     private func writeRunRecord(_ record: RunRecord, to url: URL) throws {
