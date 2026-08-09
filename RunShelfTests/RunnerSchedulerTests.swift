@@ -150,6 +150,52 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertEqual(records(in: fixture.taskURL).first?.scheduledAt, now)
     }
 
+    func testSchedulerCompletionDoesNotLeakWhenAnotherClaimAppears() throws {
+        let lock = NSLock()
+        var invocationCount = 0
+        var overlappingLease: TaskRunClaimLease?
+        var scheduledTask: RunShelfTask?
+        let fixture = try schedulerFixture(id: "completion-claim", concurrency: "skip") { task, scheduledAt, _ in
+            let invocation = lock.withLock {
+                invocationCount += 1
+                scheduledTask = task
+                return invocationCount
+            }
+            if invocation == 1 {
+                let lease = try TaskRunClaimManager.acquire(
+                    task: task,
+                    runID: "manual-overlap",
+                    host: "manual"
+                )
+                lock.withLock { overlappingLease = lease }
+            }
+            return try TaskRunner.writeSystemRecord(
+                task: task,
+                trigger: .scheduled,
+                status: .success,
+                message: "ok",
+                scheduledAt: scheduledAt
+            )
+        }
+        let firstMinute = try date(2026, 1, 2, 10, 0)
+        try fixture.writeState(lastCheckAt: firstMinute.addingTimeInterval(-60))
+
+        fixture.engine.tick(now: firstMinute)
+        try waitUntil {
+            lock.withLock { invocationCount == 1 && overlappingLease != nil }
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        lock.withLock {
+            overlappingLease?.release()
+            overlappingLease = nil
+        }
+        XCTAssertNotNil(lock.withLock { scheduledTask })
+
+        fixture.engine.tick(now: firstMinute.addingTimeInterval(60))
+        try waitUntil { lock.withLock { invocationCount == 2 } }
+        XCTAssertFalse(records(in: fixture.taskURL).contains { $0.status == .skipped })
+    }
+
     func testSchedulerHonorsSkipAndAllowClaims() throws {
         let now = try date(2026, 1, 2, 10, 0)
         let skip = try schedulerFixture(id: "skip", concurrency: "skip")
@@ -249,7 +295,19 @@ final class RunnerSchedulerTests: XCTestCase {
         return task
     }
 
-    private func schedulerFixture(id: String, concurrency: String) throws -> Fixture {
+    private func schedulerFixture(
+        id: String,
+        concurrency: String,
+        scheduledRun: @escaping SchedulerEngine.ScheduledRun = { task, scheduledAt, runID in
+            try TaskRunner.run(
+                task: task,
+                trigger: .scheduled,
+                scheduledAt: scheduledAt,
+                runId: runID,
+                host: "scheduler"
+            )
+        }
+    ) throws -> Fixture {
         let taskID = UUID().uuidString
         var task = try makeTask(id: taskID, concurrency: concurrency)
         task.manifest.name = id
@@ -273,7 +331,8 @@ final class RunnerSchedulerTests: XCTestCase {
                 appSupportDirectoryURL: appSupport,
                 stateURL: stateURL,
                 heartbeatURL: appSupport.appendingPathComponent("heartbeat.json"),
-                logURL: appSupport.appendingPathComponent("scheduler.log")
+                logURL: appSupport.appendingPathComponent("scheduler.log"),
+                scheduledRun: scheduledRun
             ),
             task: storedTask,
             taskURL: taskURL,

@@ -21,6 +21,12 @@ struct SchedulerHeartbeat: Codable {
 }
 
 final class SchedulerEngine {
+    typealias ScheduledRun = (
+        _ task: RunShelfTask,
+        _ scheduledAt: Date,
+        _ runID: String
+    ) throws -> RunRecord
+
     private let queue = DispatchQueue(label: "com.aix4u.runshelf.scheduler")
     private let fileManager: FileManager
     private let taskFileStore: TaskFileStore
@@ -28,7 +34,8 @@ final class SchedulerEngine {
     private let stateURL: URL
     private let heartbeatURL: URL
     private let logURL: URL
-    private var runningTaskIDs: Set<String> = []
+    private let scheduledRun: ScheduledRun
+    private var runningRunIDsByTaskID: [String: Set<String>] = [:]
     private var lastError: String?
 
     init(
@@ -37,7 +44,16 @@ final class SchedulerEngine {
         stateURL: URL = RunShelfPaths.schedulerStateURL(),
         heartbeatURL: URL = RunShelfPaths.schedulerHeartbeatURL(),
         logURL: URL = RunShelfPaths.schedulerLogURL(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        scheduledRun: @escaping ScheduledRun = { task, scheduledAt, runID in
+            try TaskRunner.run(
+                task: task,
+                trigger: .scheduled,
+                scheduledAt: scheduledAt,
+                runId: runID,
+                host: "scheduler"
+            )
+        }
     ) {
         self.taskFileStore = taskFileStore
         self.appSupportDirectoryURL = appSupportDirectoryURL
@@ -45,6 +61,7 @@ final class SchedulerEngine {
         self.heartbeatURL = heartbeatURL
         self.logURL = logURL
         self.fileManager = fileManager
+        self.scheduledRun = scheduledRun
     }
 
     func tick(now: Date = Date()) {
@@ -108,7 +125,7 @@ final class SchedulerEngine {
 
         let allowsConcurrentRun = task.manifest.runner.concurrency == "allow"
         if !allowsConcurrentRun,
-           (runningTaskIDs.contains(task.id) || TaskRunClaimManager.activeClaim(for: task) != nil) {
+           (runningRunIDsByTaskID[task.id]?.isEmpty == false || TaskRunClaimManager.activeClaim(for: task) != nil) {
             writeSystemRecord(
                 task: task,
                 status: .skipped,
@@ -124,21 +141,18 @@ final class SchedulerEngine {
     }
 
     private func runScheduled(task: RunShelfTask, scheduledAt: Date) {
-        runningTaskIDs.insert(task.id)
+        let runID = TaskRunner.makeRunID(from: Date())
+        runningRunIDsByTaskID[task.id, default: []].insert(runID)
 
         DispatchQueue.global(qos: .utility).async {
             let result = Result {
-                try TaskRunner.run(
-                    task: task,
-                    trigger: .scheduled,
-                    scheduledAt: scheduledAt,
-                    host: "scheduler"
-                )
+                try self.scheduledRun(task, scheduledAt, runID)
             }
 
             self.queue.async {
-                if TaskRunClaimManager.activeClaims(for: task).isEmpty {
-                    self.runningTaskIDs.remove(task.id)
+                self.runningRunIDsByTaskID[task.id]?.remove(runID)
+                if self.runningRunIDsByTaskID[task.id]?.isEmpty == true {
+                    self.runningRunIDsByTaskID.removeValue(forKey: task.id)
                 }
                 switch result {
                 case .success(let run):
@@ -203,7 +217,7 @@ final class SchedulerEngine {
             schemaVersion: 1,
             pid: getpid(),
             checkedAt: now,
-            runningTaskIDs: runningTaskIDs.sorted(),
+            runningTaskIDs: runningRunIDsByTaskID.keys.sorted(),
             lastError: lastError
         )
 
