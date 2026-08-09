@@ -26,6 +26,7 @@ final class SchedulerEngine {
         _ scheduledAt: Date,
         _ runID: String
     ) throws -> RunRecord
+    typealias FailureNotifier = (_ task: RunShelfTask, _ run: RunRecord) -> Void
 
     private let queue = DispatchQueue(label: "com.aix4u.runshelf.scheduler")
     private let fileManager: FileManager
@@ -35,6 +36,7 @@ final class SchedulerEngine {
     private let heartbeatURL: URL
     private let logURL: URL
     private let scheduledRun: ScheduledRun
+    private let failureNotifier: FailureNotifier
     private var runningRunIDsByTaskID: [String: Set<String>] = [:]
     private var lastError: String?
 
@@ -53,7 +55,8 @@ final class SchedulerEngine {
                 runId: runID,
                 host: "scheduler"
             )
-        }
+        },
+        failureNotifier: @escaping FailureNotifier = RunShelfNotifier.notifyFailure
     ) {
         self.taskFileStore = taskFileStore
         self.appSupportDirectoryURL = appSupportDirectoryURL
@@ -62,6 +65,7 @@ final class SchedulerEngine {
         self.logURL = logURL
         self.fileManager = fileManager
         self.scheduledRun = scheduledRun
+        self.failureNotifier = failureNotifier
     }
 
     func tick(now: Date = Date()) {
@@ -140,7 +144,7 @@ final class SchedulerEngine {
         runScheduled(task: task, scheduledAt: scheduledAt)
     }
 
-    private func runScheduled(task: RunShelfTask, scheduledAt: Date) {
+    func runScheduled(task: RunShelfTask, scheduledAt: Date) {
         let runID = TaskRunner.makeRunID(from: Date())
         runningRunIDsByTaskID[task.id, default: []].insert(runID)
 
@@ -157,9 +161,19 @@ final class SchedulerEngine {
                 switch result {
                 case .success(let run):
                     if run.status == .failed || run.status == .timeout {
-                        RunShelfNotifier.notifyFailure(task: task, run: run)
+                        self.failureNotifier(task, run)
                     }
                 case .failure(let error):
+                    if Self.isActiveRunError(error) {
+                        self.writeSystemRecord(
+                            task: task,
+                            status: .skipped,
+                            message: "任务已有活动运行，本次计划运行已跳过。",
+                            scheduledAt: scheduledAt
+                        )
+                        self.writeHeartbeat(now: Date())
+                        return
+                    }
                     self.appendLog("scheduled run failed before meta write for \(task.manifest.name): \(error.localizedDescription)")
                     let fallback = try? TaskRunner.writeSystemRecord(
                         task: task,
@@ -169,12 +183,22 @@ final class SchedulerEngine {
                         scheduledAt: scheduledAt
                     )
                     if let fallback {
-                        RunShelfNotifier.notifyFailure(task: task, run: fallback)
+                        self.failureNotifier(task, fallback)
                     }
                 }
                 self.writeHeartbeat(now: Date())
             }
         }
+    }
+
+    private static func isActiveRunError(_ error: Error) -> Bool {
+        if case TaskRunnerError.runAlreadyActive = error {
+            return true
+        }
+        if case TaskRunClaimError.alreadyRunning = error {
+            return true
+        }
+        return false
     }
 
     private func writeSystemRecord(task: RunShelfTask, status: TaskRunStatus, message: String, scheduledAt: Date) {

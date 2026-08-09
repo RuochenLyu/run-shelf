@@ -214,6 +214,28 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertNotNil(TaskRunClaimManager.activeClaim(for: allow.task, runID: "allow-existing"))
     }
 
+    func testScheduledClaimRaceWritesSkippedWithoutFailureNotification() throws {
+        let lock = NSLock()
+        var notificationCount = 0
+        let fixture = try schedulerFixture(
+            id: "claim-race",
+            concurrency: "skip",
+            failureNotifier: { _, _ in lock.withLock { notificationCount += 1 } }
+        )
+        let lease = try TaskRunClaimManager.acquire(
+            task: fixture.task,
+            runID: "manual-winner",
+            host: "manual"
+        )
+        defer { lease.release() }
+
+        fixture.engine.runScheduled(task: fixture.task, scheduledAt: Date())
+
+        try waitUntil { self.records(in: fixture.taskURL).contains { $0.status == .skipped } }
+        XCTAssertFalse(records(in: fixture.taskURL).contains { $0.status == .failed })
+        XCTAssertEqual(lock.withLock { notificationCount }, 0)
+    }
+
     func testRetentionRemovesOnlyOldUnclaimedOrphans() throws {
         let task = try makeTask(id: "retention-orphans", concurrency: "allow")
         let runsURL = task.directoryURL.appendingPathComponent("runs", isDirectory: true)
@@ -306,6 +328,9 @@ final class RunnerSchedulerTests: XCTestCase {
                 runId: runID,
                 host: "scheduler"
             )
+        },
+        failureNotifier: @escaping SchedulerEngine.FailureNotifier = { task, run in
+            RunShelfNotifier.notifyFailure(task: task, run: run)
         }
     ) throws -> Fixture {
         let taskID = UUID().uuidString
@@ -332,7 +357,8 @@ final class RunnerSchedulerTests: XCTestCase {
                 stateURL: stateURL,
                 heartbeatURL: appSupport.appendingPathComponent("heartbeat.json"),
                 logURL: appSupport.appendingPathComponent("scheduler.log"),
-                scheduledRun: scheduledRun
+                scheduledRun: scheduledRun,
+                failureNotifier: failureNotifier
             ),
             task: storedTask,
             taskURL: taskURL,
