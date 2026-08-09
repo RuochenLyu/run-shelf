@@ -159,6 +159,25 @@ final class RunShelfCLIE2ETests: XCTestCase {
         ))
     }
 
+    func testDetachedBusyTaskUsesAlreadyRunningContract() throws {
+        let create = try invokeApply([
+            "slug": "busy-contract",
+            "name": "Busy Contract",
+            "timeoutSeconds": 0,
+            "script": "#!/bin/zsh\nsleep 30\n"
+        ])
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+        let first = try invoke(["run", taskID, "--detach", "--json"])
+        XCTAssertEqual(first.exitCode, 0)
+        let runID = try string(result(first.json)["runId"])
+
+        let second = try invoke(["run", taskID, "--detach", "--json"])
+        try assertError(second, exitCode: 7, code: "already_running")
+
+        let cancel = try invoke(["run", "cancel", runID, "--json"])
+        XCTAssertEqual(cancel.exitCode, 0)
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",

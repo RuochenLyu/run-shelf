@@ -16,7 +16,12 @@ enum RunShelfCLI {
             context.emitError(mapped)
             exitCode = Int32(mapped.exitCode)
         } catch let error as TaskRunClaimError {
-            let mapped = CLIExitError.conflict(error.localizedDescription)
+            let mapped: CLIExitError
+            if case .alreadyRunning = error {
+                mapped = .running(error.localizedDescription)
+            } else {
+                mapped = .conflict(error.localizedDescription)
+            }
             context.emitError(mapped)
             exitCode = Int32(mapped.exitCode)
         } catch let error as TaskRunnerError {
