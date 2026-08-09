@@ -198,6 +198,30 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertNotNil(record["stderrPath"] as? String)
     }
 
+    func testUpdatingWithoutExpectedRevisionIsRejectedWithoutWriting() throws {
+        let create = try invokeApply([
+            "slug": "revision-required",
+            "name": "Original Name",
+            "script": "#!/bin/zsh\necho original\n"
+        ])
+        XCTAssertEqual(create.exitCode, 0)
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+
+        let updateWithoutRevision = try invokeApply([
+            "id": taskID,
+            "name": "Overwritten Name",
+            "script": "#!/bin/zsh\necho overwritten\n"
+        ])
+
+        try assertError(updateWithoutRevision, exitCode: 2, code: "usage")
+        XCTAssertTrue(try errorMessage(updateWithoutRevision).contains("task show"))
+        XCTAssertTrue(try errorMessage(updateWithoutRevision).contains("revisionToken"))
+        let show = try invoke(["task", "show", taskID, "--json"])
+        let showResult = try result(show.json)
+        XCTAssertEqual(try dictionary(showResult["task"])["name"] as? String, "Original Name")
+        XCTAssertTrue(try string(showResult["script"]).contains("original"))
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",

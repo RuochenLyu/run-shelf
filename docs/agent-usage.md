@@ -92,6 +92,8 @@ runshelf apply spec.json --expected-revision "$revisionToken" --json
 
 如果 App 或另一个 CLI 在你读取后改过任务，命令会返回 `conflict`，退出码是 `5`。这时不要重试同一个 spec，先重新 `task show`，确认当前内容后再生成新的 TaskSpec。
 
+更新已有任务（包括 `--dry-run`）时省略 `--expected-revision` 会返回 `usage`，退出码是 `2`，且不会写盘；创建新任务不需要 revision token。
+
 ## TaskSpec
 
 `TaskSpec` 是给 agent 的稳定写入面，不是 `task.json` 的完整镜像。创建任务时没有覆盖到的内部策略使用默认值；更新任务时没有覆盖到的内部策略会保留原值。

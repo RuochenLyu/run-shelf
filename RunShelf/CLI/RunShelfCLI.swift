@@ -147,6 +147,10 @@ private struct CLIContext {
             existing = nil
         }
 
+        if existing != nil, expectedRevision == nil {
+            throw CLIExitError.usage("更新已有任务必须提供 --expected-revision。请先运行 task show 获取 revisionToken。")
+        }
+
         _ = try repository.validate(spec: spec, creating: existing == nil)
         let risks = DangerousCommandScanner.scan(spec.script ?? existing?.task.script ?? "")
         try rejectDangerousCommandRisks(risks, allowDangerous: allowDangerous)
@@ -169,8 +173,11 @@ private struct CLIContext {
         }
 
         let result: TaskRepositoryWriteResult
-        if let existing, let selector {
-            result = try repository.updateTask(selector: selector, with: spec, expectedRevision: expectedRevision ?? existing.revision)
+        if existing != nil, let selector {
+            guard let expectedRevision else {
+                throw CLIExitError.usage("更新已有任务必须提供 --expected-revision。请先运行 task show 获取 revisionToken。")
+            }
+            result = try repository.updateTask(selector: selector, with: spec, expectedRevision: expectedRevision)
         } else {
             if expectedRevision != nil {
                 throw CLIExitError.conflict("--expected-revision 只能用于更新已有任务。")

@@ -5,6 +5,7 @@
 ### Breaking changes
 
 - 前台 `runshelf run --json` 在脚本失败、超时或取消时改为返回 `ok: false` 和 `error.code: "run_failed"`；退出码仍为 `8`，完整运行记录继续保留在 `result`。
+- `runshelf apply` 更新已有任务（包括 `--dry-run`）时现在强制要求 `--expected-revision`；省略会返回 `usage`/退出码 `2`，创建任务不受影响。
 
 ## 1.0.0 - 2026-05-29
 
