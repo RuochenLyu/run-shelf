@@ -255,6 +255,45 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertTrue(try errorMessage(cancelEnded).contains("run status"))
     }
 
+    func testContractSelfDescriptionIncludesVersionHelpSchemasAndExample() throws {
+        let help = try invoke([])
+        XCTAssertEqual(help.exitCode, 0)
+        let helpText = try XCTUnwrap(String(data: help.stdout, encoding: .utf8))
+        XCTAssertTrue(helpText.hasPrefix("AI agent：先运行 runshelf help agent\n机器可读输出："))
+        for command in [
+            "task delete", "run stop", "--bytes <n>|--full", "schema cli-result",
+            "schema task-spec [--example]", "version [--json]", "RUNSHELF_JSON"
+        ] {
+            XCTAssertTrue(helpText.contains(command), "help 缺少 \(command)")
+        }
+
+        let agentHelp = try invoke(["help", "agent"])
+        let agentText = try XCTUnwrap(String(data: agentHelp.stdout, encoding: .utf8))
+        for contract in ["task delete", "run log", "run stop", "schemaVersion", "run_failed", "doctor"] {
+            XCTAssertTrue(agentText.contains(contract), "agent help 缺少 \(contract)")
+        }
+
+        let version = try invoke(["version", "--json"])
+        XCTAssertEqual(version.exitCode, 0)
+        XCTAssertEqual(try version.json["schemaVersion"] as? Int, 1)
+        let versionResult = try result(version.json)
+        XCTAssertFalse(try string(versionResult["appVersion"]).isEmpty)
+        XCTAssertEqual(versionResult["envelopeSchemaVersion"] as? Int, 1)
+
+        let list = try invoke(["task", "list", "--json"])
+        XCTAssertEqual(try list.json["schemaVersion"] as? Int, 1)
+
+        let resultSchema = try invoke(["schema", "cli-result"])
+        let schema = try dictionary(JSONSerialization.jsonObject(with: resultSchema.stdout))
+        let required = try XCTUnwrap(schema["required"] as? [String])
+        XCTAssertTrue(required.contains("schemaVersion"))
+
+        let example = try invoke(["schema", "task-spec", "--example"])
+        let exampleJSON = try dictionary(JSONSerialization.jsonObject(with: example.stdout))
+        XCTAssertEqual(exampleJSON["name"] as? String, "Example task")
+        XCTAssertTrue(try string(exampleJSON["script"]).contains("echo hello"))
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",

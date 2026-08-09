@@ -80,23 +80,31 @@ export PATH="$HOME/.local/bin:$PATH"
 ```zsh
 runshelf task list --json
 runshelf task show <id|slug> --json
+runshelf task delete <id|slug> --json
 runshelf apply spec.json --dry-run --json
 runshelf apply spec.json --json
+runshelf apply spec.json --dry-run --expected-revision <revisionToken> --json  # 预演修改
 runshelf apply spec.json --expected-revision <revisionToken> --json   # 修改已有任务
 runshelf run <id|slug> --wait --json
 runshelf run <id|slug> --detach --json
 runshelf run status <run-id> --json
 runshelf run cancel <run-id> --json
+runshelf run stop <run-id> --json                         # cancel 的别名
 runshelf run log <run-id> --stdout
 runshelf run log <run-id> --stderr
 runshelf run log <run-id> --bytes 262144 --json
 runshelf run log <run-id> --full
 runshelf doctor --json
 runshelf help agent
+runshelf schema task-spec --example
+runshelf schema cli-result
+runshelf version --json
 ```
 
 `apply` 写入的是 TaskSpec JSON，不是完整 `task.json`。创建任务时没有覆盖到的内部策略使用默认值；更新任务时没有覆盖到的内部策略会保留原值。
 未知字段会直接返回校验错误；当前时区只支持字面值 `local`。日志默认只返回最后 1 MiB，JSON 调用方应检查 `truncated`，只有显式 `--full` 才读取完整文件。
+
+所有 `--json` 响应都带 `schemaVersion`；也可以设置 `RUNSHELF_JSON=1` 强制 JSON 输出。`version --json` 返回 App 与 envelope schema 版本。前台运行失败时返回 `ok: false`、`error.code: "run_failed"` 和退出码 `8`，完整运行记录仍在 `result.run`。`schema` 命令输出原始 JSON（不包 envelope）。
 
 最小 TaskSpec 示例：
 
@@ -117,6 +125,7 @@ runshelf help agent
 ```
 
 修改已有任务时，先 `task show` 读取 `revisionToken`，再带回 `apply --expected-revision`。如果 App 或另一个 CLI 在中间改过任务，CLI 会返回 `conflict`，避免静默覆盖。
+更新已有任务时（包括 `--dry-run`）省略 `--expected-revision` 会返回 `usage`/退出码 `2`，且不会写盘。slug 不能使用 CLI 保留字 `status`、`log`、`cancel`、`stop`。
 
 ## 让 Codex/Claude 操作
 

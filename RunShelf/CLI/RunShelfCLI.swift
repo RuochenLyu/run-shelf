@@ -71,6 +71,8 @@ private struct CLIContext {
             return try runHelp()
         case "schema":
             return try runSchema()
+        case "version":
+            return try runVersion()
         case "__run-host":
             return try runHost()
         default:
@@ -390,17 +392,52 @@ private struct CLIContext {
         guard let name = arguments.popFirst() else {
             throw CLIExitError.usage("schema 需要名称：task-spec 或 cli-result")
         }
+        let example = arguments.removeAll("--example")
         try rejectUnexpectedArguments()
         switch name {
         case "task-spec":
-            print(GeneratedSchemas.taskSpec)
+            print(example ? taskSpecExample : GeneratedSchemas.taskSpec)
             return 0
         case "cli-result":
+            guard !example else {
+                throw CLIExitError.usage("--example 只支持 schema task-spec。")
+            }
             print(GeneratedSchemas.cliResult)
             return 0
         default:
             throw CLIExitError.usage("未知 schema：\(name)")
         }
+    }
+
+    private mutating func runVersion() throws -> Int32 {
+        try rejectUnexpectedArguments()
+        let appVersion = resolvedAppVersion()
+        let payload = VersionPayload(appVersion: appVersion, envelopeSchemaVersion: cliEnvelopeSchemaVersion)
+        emitOrPrint(payload) {
+            "Run Shelf \(appVersion)\nCLI envelope schema \(cliEnvelopeSchemaVersion)"
+        }
+        return 0
+    }
+
+    private func resolvedAppVersion() -> String {
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+            return version
+        }
+        guard let executableURL = Bundle.main.executableURL else { return "unknown" }
+        let productsDirectoryURL = executableURL.deletingLastPathComponent()
+        let candidateAppURLs = [
+            productsDirectoryURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent(),
+            productsDirectoryURL.appendingPathComponent("Run Shelf.app", isDirectory: true)
+        ]
+        for appURL in candidateAppURLs where appURL.pathExtension == "app" {
+            if let version = Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                return version
+            }
+        }
+        return "unknown"
     }
 
     private mutating func runHost() throws -> Int32 {
@@ -748,17 +785,24 @@ private struct CLIContext {
     private func printGeneralHelp() {
         print(
             """
+            AI agent：先运行 runshelf help agent
+            机器可读输出：命令加 --json，或设置 RUNSHELF_JSON=1
+
             runshelf task list [--json]
             runshelf task show <id|slug> [--json]
+            runshelf task delete <id|slug> [--json]
             runshelf apply <task-spec.json|-> [--dry-run] [--expected-revision <token>] [--allow-dangerous] [--json]
             runshelf run <id|slug> [--wait|--detach] [--allow-dangerous] [--json]
             runshelf run status <run-id> [--json]
             runshelf run cancel <run-id> [--json]
-            runshelf run log <run-id> [--stdout|--stderr]
+            runshelf run stop <run-id> [--json]  # cancel 的别名
+            runshelf run log <run-id> [--stdout|--stderr] [--bytes <n>|--full] [--json]
             runshelf doctor [--json]
             runshelf install-cli [--prefix ~/.local/bin] [--force] [--json]
             runshelf help agent
-            runshelf schema task-spec
+            runshelf schema task-spec [--example]
+            runshelf schema cli-result
+            runshelf version [--json]
             """
         )
     }
@@ -844,6 +888,7 @@ private enum CLIExitError: Error {
 }
 
 private struct Envelope<Result: Encodable>: Encodable {
+    var schemaVersion: Int = cliEnvelopeSchemaVersion
     var ok: Bool
     var result: Result?
     var error: ErrorPayload?
@@ -978,6 +1023,11 @@ private struct InstallCLIPayload: Encodable {
     var pathConfigured: Bool
 }
 
+private struct VersionPayload: Encodable {
+    var appVersion: String
+    var envelopeSchemaVersion: Int
+}
+
 private func formatTask(_ task: RunShelfTask, revision: TaskDefinitionRevision) -> String {
     """
     \(task.manifest.name)
@@ -1032,19 +1082,31 @@ private extension Array where Element == String {
     }
 }
 
+private let cliEnvelopeSchemaVersion = 1
+
+private let taskSpecExample = """
+{
+  "name": "Example task",
+  "script": "#!/bin/zsh\\nset -euo pipefail\\n\\necho hello\\n"
+}
+"""
+
 private let agentHelpText = """
 Run Shelf 的 agent 操作约定：
 
 1. 不要直接编辑 task.json、run.sh、notes.md。用 runshelf apply 写入，CLI 会做校验、CAS 冲突检测和原子写。
-2. 先读再改：runshelf task show <id|slug> --json。优先使用 id 或 slug，不要靠 name 选择任务。
-3. 修改任务时，把 show 返回的 revisionToken 带回 apply：runshelf apply spec.json --expected-revision <token> --json。
-4. 先 dry-run 再真正写入：runshelf apply spec.json --dry-run --json，然后 runshelf apply spec.json --expected-revision <token> --json。
-5. 长任务用 runshelf run <id|slug> --detach --json，拿到 runId 后用 runshelf run status <runId> --json 轮询；需要停止时用 runshelf run cancel <runId> --json。
-6. 脚本命中高风险命令时，apply/run 默认拒绝；确认要写入或运行时显式加 --allow-dangerous。
-7. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
-8. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
-9. slug 不能使用 CLI 保留字 status、log、cancel、stop。
-10. 退出码契约：0=成功，1=未知错误或 doctor 发现任务读取问题，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
-11. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
-12. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
+2. 读取用 runshelf task list --json 和 runshelf task show <id|slug> --json；优先使用 id 或 slug，不要靠 name 选择任务。
+3. 创建先运行 runshelf apply spec.json --dry-run --json，再运行 runshelf apply spec.json --json。
+4. 更新先 show 取得 revisionToken；dry-run 和真正 apply 都带 --expected-revision <token>。缺少 token 会返回 usage/2，并且不写盘。
+5. 前台运行用 runshelf run <id|slug> --wait --json；长任务用 --detach，拿到 runId 后用 run status 轮询。
+6. 日志用 runshelf run log <runId> --stdout|--stderr --json；默认返回最后 1 MiB，可用 --bytes 或 --full。停止用 run cancel（run stop 是别名）。
+7. 运行结束后先用 run status 查看最终状态，再用 runshelf task delete <id|slug> --json 删除任务；运行中的任务不能删除。
+8. 脚本命中高风险命令时，apply/run 默认拒绝；确认要写入或运行时显式加 --allow-dangerous。
+9. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
+10. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
+11. slug 不能使用 CLI 保留字 status、log、cancel、stop。
+12. JSON envelope 必含 schemaVersion；用 runshelf version --json 查询 App 版本和 envelope schema 版本。也可设置 RUNSHELF_JSON=1 强制 JSON 输出。
+13. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
+14. 退出码：0=成功，1=未知错误或 doctor 发现任务读取问题，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
+15. schema task-spec --example 输出最小示例；schema task-spec 和 schema cli-result 输出原始 schema，不包 envelope。需要固定命令名时使用 install-cli。
 """

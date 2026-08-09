@@ -59,13 +59,16 @@ export PATH="$HOME/.local/bin:$PATH"
 ```zsh
 runshelf task list --json
 runshelf task show <id|slug> --json
+runshelf task delete <id|slug> --json
 runshelf apply spec.json --dry-run --json
 runshelf apply spec.json --json
+runshelf apply spec.json --dry-run --expected-revision <revisionToken> --json
 runshelf apply spec.json --expected-revision <revisionToken> --json
 runshelf run <id|slug> --wait --json
 runshelf run <id|slug> --detach --json
 runshelf run status <run-id> --json
 runshelf run cancel <run-id> --json
+runshelf run stop <run-id> --json
 runshelf run log <run-id> --stdout
 runshelf run log <run-id> --stderr
 runshelf run log <run-id> --bytes 262144 --json
@@ -74,7 +77,9 @@ runshelf doctor --json
 runshelf install-cli --json
 runshelf help agent
 runshelf schema task-spec
+runshelf schema task-spec --example
 runshelf schema cli-result
+runshelf version --json
 ```
 
 `--wait` 会让 CLI 持有运行直到任务结束；`--detach` 会启动一个后台 host 进程，CLI 立刻返回 `runId`，后续用 `run status` 轮询。
@@ -82,6 +87,24 @@ runshelf schema cli-result
 前台 `run` 以非成功状态结束时，退出码是 `8`，JSON envelope 同时返回 `ok: false` 和 `error.code: "run_failed"`；`result.run` 仍保留完整运行记录，包括状态、脚本退出码和日志路径，便于 agent 诊断。
 
 如果 `run status` 显示后台运行仍在继续，但 agent 判断必须停止，用 `runshelf run cancel <run-id> --json`。CLI 会读取 `.run-claim` 里的进程组并发送 `SIGTERM`。
+
+`run stop` 是 `run cancel` 的别名。任务运行结束后可以用 `task delete` 删除；任务仍在运行时删除会返回 `already_running`/退出码 `7`。`run cancel` 对已经结束的 run 返回 `not_found`，应改用 `run status` 查看最终状态。
+
+## JSON envelope 与自描述
+
+支持 JSON 的命令在传入 `--json`（或设置 `RUNSHELF_JSON=1`）时输出单个 envelope。所有 envelope 都包含：
+
+```json
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "result": {}
+}
+```
+
+每个 envelope 都至少包含 `schemaVersion` 和 `ok`。成功时包含 `result`；失败通常包含带 `code`、`message` 的 `error`，并省略 `result`。唯一保留失败结果的情况是前台 `run`：它返回 `ok: false` 和 `run_failed`，同时在 `result.run` 留下完整运行记录。`doctor` 发现任务读取问题时仍返回可检查的成功 envelope（`ok: true`、`result.loadIssues` 非空），但进程退出码是 `1`。
+
+`runshelf version --json` 返回 App 版本和 envelope schema 版本。`runshelf schema task-spec`、`runshelf schema cli-result` 输出原始 JSON Schema，不包 envelope；`runshelf schema task-spec --example` 输出原始最小 TaskSpec JSON。`help` 输出文本。
 
 ## 写入冲突
 
@@ -119,6 +142,12 @@ runshelf apply spec.json --expected-revision "$revisionToken" --json
 ```
 
 完整 schema 在 `schemas/task-spec.schema.json`。
+
+可以直接让 CLI 生成最小可用示例：
+
+```zsh
+runshelf schema task-spec --example
+```
 
 ## 高风险命令
 

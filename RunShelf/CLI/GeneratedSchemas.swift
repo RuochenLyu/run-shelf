@@ -77,9 +77,14 @@ enum GeneratedSchemas {
   "type": "object",
   "additionalProperties": true,
   "required": [
+    "schemaVersion",
     "ok"
   ],
   "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "Version of the CLI JSON envelope contract."
+    },
     "ok": {
       "type": "boolean",
       "description": "Whether the operation succeeded. A foreground run that finishes unsuccessfully returns false with error.code run_failed and retains the run record in result."
