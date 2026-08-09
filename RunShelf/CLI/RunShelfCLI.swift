@@ -276,13 +276,21 @@ private struct CLIContext {
             }
 
             let record = try TaskRunner.run(task: read.task, trigger: .manual, host: "cli")
-            emitOrPrint(RunPayload(taskId: read.task.id, run: record)) {
-                "\(record.runId)\t\(record.status.rawValue)"
-            }
+            let payload = RunPayload(taskId: read.task.id, run: record)
             if record.status == .success {
+                emitOrPrint(payload) {
+                    "\(record.runId)\t\(record.status.rawValue)"
+                }
                 return 0
             }
-            return Int32(CLIExitError.runFailed("任务运行失败：\(record.status.rawValue)").exitCode)
+            let error = CLIExitError.runFailed("任务运行失败：\(record.status.rawValue)")
+            if jsonOutput {
+                emit(Envelope(ok: false, result: payload, error: ErrorPayload(code: error.code, message: error.message)))
+            } else {
+                print("\(record.runId)\t\(record.status.rawValue)")
+                FileHandle.standardError.write(Data(("runshelf: \(error.message)\n").utf8))
+            }
+            return Int32(error.exitCode)
         }
     }
 
@@ -1019,5 +1027,6 @@ Run Shelf 的 agent 操作约定：
 7. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
 8. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
 9. 退出码契约：0=成功，1=未知错误，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
-10. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
+10. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
+11. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
 """

@@ -178,6 +178,26 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertEqual(cancel.exitCode, 0)
     }
 
+    func testForegroundRunFailureReturnsErrorEnvelopeWithRunResult() throws {
+        let create = try invokeApply([
+            "slug": "failed-run",
+            "name": "Failed Run",
+            "script": "#!/bin/zsh\necho failure-output\nexit 42\n"
+        ])
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+
+        let run = try invoke(["run", taskID, "--json"])
+
+        try assertError(run, exitCode: 8, code: "run_failed")
+        let runResult = try dictionary(run.json["result"])
+        XCTAssertEqual(runResult["taskId"] as? String, taskID)
+        let record = try dictionary(runResult["run"])
+        XCTAssertEqual(record["status"] as? String, "failed")
+        XCTAssertEqual(record["exitCode"] as? Int, 42)
+        XCTAssertNotNil(record["stdoutPath"] as? String)
+        XCTAssertNotNil(record["stderrPath"] as? String)
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",

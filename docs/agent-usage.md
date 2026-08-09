@@ -78,6 +78,8 @@ runshelf schema cli-result
 
 `--wait` 会让 CLI 持有运行直到任务结束；`--detach` 会启动一个后台 host 进程，CLI 立刻返回 `runId`，后续用 `run status` 轮询。
 
+前台 `run` 以非成功状态结束时，退出码是 `8`，JSON envelope 同时返回 `ok: false` 和 `error.code: "run_failed"`；`result.run` 仍保留完整运行记录，包括状态、脚本退出码和日志路径，便于 agent 诊断。
+
 如果 `run status` 显示后台运行仍在继续，但 agent 判断必须停止，用 `runshelf run cancel <run-id> --json`。CLI 会读取 `.run-claim` 里的进程组并发送 `SIGTERM`。
 
 ## 写入冲突

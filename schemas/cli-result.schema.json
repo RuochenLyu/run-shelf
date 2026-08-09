@@ -9,9 +9,12 @@
   ],
   "properties": {
     "ok": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Whether the operation succeeded. A foreground run that finishes unsuccessfully returns false with error.code run_failed and retains the run record in result."
     },
-    "result": {},
+    "result": {
+      "description": "The operation result. It remains populated for run_failed so callers can inspect status, exitCode, and log paths."
+    },
     "error": {
       "type": [
         "object",
