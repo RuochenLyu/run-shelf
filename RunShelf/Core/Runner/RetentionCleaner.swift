@@ -6,7 +6,8 @@ enum RetentionCleaner {
         policy: RetentionPolicy,
         preserving runIdToPreserve: String? = nil,
         now: Date = Date(),
-        orphanGracePeriod: TimeInterval = 5 * 60
+        orphanGracePeriod: TimeInterval = 5 * 60,
+        diagnosticLogger: (String) -> Void = { NSLog("%@", $0) }
     ) {
         let fileManager = FileManager.default
         let runsURL = taskDirectoryURL.appendingPathComponent("runs", isDirectory: true)
@@ -51,6 +52,11 @@ enum RetentionCleaner {
         for runDirectory in runDirectories where !validRunDirectories.contains(runDirectory.standardizedFileURL) {
             let runID = runDirectory.lastPathComponent
             guard !preservedRunIDs.contains(runID) else { continue }
+            let metaURL = runDirectory.appendingPathComponent("meta.json")
+            if fileManager.fileExists(atPath: metaURL.path) {
+                diagnosticLogger("保留无法解码的运行记录：\(metaURL.path)")
+                continue
+            }
             guard let values = try? runDirectory.resourceValues(forKeys: [
                 .isDirectoryKey,
                 .contentModificationDateKey

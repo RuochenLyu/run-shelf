@@ -273,6 +273,47 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: claimedURL.path))
     }
 
+    func testRetentionPreservesCorruptMetaAndRemovesMetaLessOrphan() throws {
+        let task = try makeTask(id: "retention-corrupt-meta", concurrency: "skip")
+        let runsURL = task.directoryURL.appendingPathComponent("runs", isDirectory: true)
+        let corruptURL = runsURL.appendingPathComponent("corrupt-meta", isDirectory: true)
+        let orphanURL = runsURL.appendingPathComponent("no-meta", isDirectory: true)
+        try FileManager.default.createDirectory(at: corruptURL, withIntermediateDirectories: false)
+        try FileManager.default.createDirectory(at: orphanURL, withIntermediateDirectories: false)
+        try "{not-json".write(
+            to: corruptURL.appendingPathComponent("meta.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "important output\n".write(
+            to: corruptURL.appendingPathComponent("stdout.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let now = Date()
+        for url in [corruptURL, orphanURL] {
+            try FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(-600)],
+                ofItemAtPath: url.path
+            )
+        }
+        var diagnostics: [String] = []
+
+        RetentionCleaner.clean(
+            taskDirectoryURL: task.directoryURL,
+            policy: task.manifest.retention,
+            now: now,
+            orphanGracePeriod: 300,
+            diagnosticLogger: { diagnostics.append($0) }
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: corruptURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: corruptURL.appendingPathComponent("stdout.log").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphanURL.path))
+        XCTAssertEqual(diagnostics.count, 1)
+        XCTAssertTrue(diagnostics[0].contains("corrupt-meta/meta.json"))
+    }
+
     private func makeTask(
         id: String,
         concurrency: String,
