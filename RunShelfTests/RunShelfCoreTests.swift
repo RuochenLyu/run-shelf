@@ -130,8 +130,10 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(loader.stdout.text, "other\n")
 
         loader.load(task: task, run: run)
-        XCTAssertEqual(loader.stdout.text, "first\nsecond\n", "Revisiting a cached run should be immediate")
+        XCTAssertEqual(loader.stdout, .empty, "Running logs must be reread instead of served from cache")
         XCTAssertFalse(loader.isLoading)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "first\nsecond\n")
 
         try "first\nsecond\nfinal\n".write(to: stdoutURL, atomically: true, encoding: .utf8)
         var completedRun = run
@@ -191,6 +193,67 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(loader.stderr, .empty)
         await loader.waitForCurrentLoad()
         XCTAssertEqual(loader.stdout.text, "second run\n")
+    }
+
+    @MainActor
+    func testRunningLogContentIsNotCached() async throws {
+        let root = try makeTemporaryDirectory()
+        let taskID = UUID().uuidString
+        let taskURL = root.appendingPathComponent(taskID, isDirectory: true)
+        let runURL = taskURL.appendingPathComponent("runs/live", isDirectory: true)
+        let finishedURL = taskURL.appendingPathComponent("runs/finished", isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: finishedURL, withIntermediateDirectories: true)
+        let liveStdoutURL = runURL.appendingPathComponent("stdout.log")
+        try "first\n".write(to: liveStdoutURL, atomically: true, encoding: .utf8)
+        try "".write(to: runURL.appendingPathComponent("stderr.log"), atomically: true, encoding: .utf8)
+        try "finished\n".write(
+            to: finishedURL.appendingPathComponent("stdout.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "".write(to: finishedURL.appendingPathComponent("stderr.log"), atomically: true, encoding: .utf8)
+        let live = RunRecord(
+            runId: "live",
+            taskId: taskID,
+            trigger: .manual,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: nil,
+            startedAt: Date(),
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: "",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        var finished = live
+        finished.runId = "finished"
+        finished.status = .success
+        finished.exitCode = 0
+        finished.endedAt = Date()
+        let task = RunShelfTask(
+            manifest: .create(id: taskID, name: "Cache contract", description: "", enabled: true),
+            directoryURL: taskURL,
+            script: "#!/bin/zsh\n",
+            notes: "",
+            runs: [live, finished],
+            isDirty: false
+        )
+        let loader = LogContentLoader()
+        loader.load(task: task, run: live)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "first\n")
+
+        try "second\n".write(to: liveStdoutURL, atomically: true, encoding: .utf8)
+        loader.load(task: task, run: finished)
+        await loader.waitForCurrentLoad()
+        loader.load(task: task, run: live)
+
+        XCTAssertEqual(loader.stdout, .empty)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "second\n")
     }
 
     @MainActor

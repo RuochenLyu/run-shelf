@@ -4,6 +4,7 @@ import Foundation
 /// 异步读 stdout/stderr 日志文件。
 /// - 切 run 时 cancel 上一次未完成的读，结果不会污染新选中的 run。
 /// - 大文件只读尾部，避免 SwiftUI Text 在主线程做巨型字符串布局。
+/// - 只缓存终态 run；running 日志可变，每次刷新都重新读取文件。
 @MainActor
 final class LogContentLoader: ObservableObject {
     /// 单条日志文件最多读取的字节数（截尾）。超过部分丢弃，但记录原始大小让 UI 提示。
@@ -42,7 +43,6 @@ final class LogContentLoader: ObservableObject {
     func load(task: RunShelfTask, run: RunRecord, force: Bool = false) {
         let key = LoadKey(taskID: task.id, runID: run.runId, status: run.status.rawValue)
         // 已经在加载同一组合：跳过（避免 view body 重算反复触发）
-        if !force, currentKey == key, loadTask != nil { return }
         if !force, currentKey == key { return }
 
         loadTask?.cancel()
@@ -91,7 +91,9 @@ final class LogContentLoader: ObservableObject {
             guard self.currentKey == key else { return }
 
             let content = CachedContent(stdout: out, stderr: err)
-            self.storeInCache(content, for: key)
+            if run.status != .running {
+                self.storeInCache(content, for: key)
+            }
             self.publish(content)
             self.loadingIndicatorTask?.cancel()
             self.loadingIndicatorTask = nil
