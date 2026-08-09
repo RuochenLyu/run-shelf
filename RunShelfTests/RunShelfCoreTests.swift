@@ -410,6 +410,51 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(try decodeRunRecord(at: metaURL).status, .stale)
     }
 
+    func testReconcileDoesNotOverwriteTerminalMetaFromStaleRunningInput() throws {
+        let root = try makeTemporaryDirectory()
+        let taskID = "00000000-0000-4000-8000-000000000013"
+        try writeTaskDirectory(
+            root: root,
+            id: taskID,
+            name: "Terminal",
+            enabled: true,
+            scheduleExpression: "0 9 * * *",
+            script: "#!/bin/zsh\necho done\n"
+        )
+        let taskDirectoryURL = root.appendingPathComponent(taskID, isDirectory: true)
+        let task = try TaskFileStore(tasksDirectoryURL: root).loadTask(at: taskDirectoryURL, includeRuns: false)
+        let runURL = taskDirectoryURL.appendingPathComponent("runs/terminal-run", isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+        let running = RunRecord(
+            runId: "terminal-run",
+            taskId: taskID,
+            trigger: .manual,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: nil,
+            startedAt: Date().addingTimeInterval(-1),
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: "",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        var terminal = running
+        terminal.status = .success
+        terminal.exitCode = 0
+        terminal.endedAt = Date()
+        terminal.durationMs = 1_000
+        let metaURL = runURL.appendingPathComponent("meta.json")
+        try writeRunRecord(terminal, to: metaURL)
+        let store = TaskFileStore(tasksDirectoryURL: root)
+
+        let reconciled = store.reconcileRunningRecord(running, metaURL: metaURL, claimTask: task)
+
+        XCTAssertEqual(reconciled.status, .success)
+        XCTAssertEqual(try decodeRunRecord(at: metaURL).status, .success)
+    }
+
     func testSchedulerWritesStaleRecordForExpiredMissedRun() throws {
         let appSupportURL = try makeTemporaryDirectory()
         let tasksURL = appSupportURL.appendingPathComponent("tasks", isDirectory: true)

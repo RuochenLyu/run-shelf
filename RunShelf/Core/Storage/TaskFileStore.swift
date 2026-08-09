@@ -173,27 +173,37 @@ struct TaskFileStore {
         }
     }
 
-    private func reconcileRunningRecord(
+    func reconcileRunningRecord(
         _ record: RunRecord,
         metaURL: URL,
         claimTask: RunShelfTask?
     ) -> RunRecord {
         guard record.status == .running, let claimTask else { return record }
-        let activeClaim = TaskRunClaimManager.activeClaim(
-            for: claimTask,
-            runID: record.runId,
-            fileManager: fileManager
-        )
-        guard activeClaim == nil else { return record }
+        let claimRootURL = TaskRunClaimManager.claimDirectoryURL(for: claimTask)
+        do {
+            try fileManager.createDirectory(at: claimRootURL, withIntermediateDirectories: true)
+            return try TaskRunClaimManager.withClaimLock(rootURL: claimRootURL) {
+                let latest = try decoder.decode(RunRecord.self, from: Data(contentsOf: metaURL))
+                guard latest.status == .running else { return latest }
+                let activeClaim = TaskRunClaimManager.activeClaim(
+                    for: claimTask,
+                    runID: latest.runId,
+                    fileManager: fileManager
+                )
+                guard activeClaim == nil else { return latest }
 
-        let endedAt = Date()
-        var stale = record
-        stale.status = .stale
-        stale.endedAt = endedAt
-        stale.durationMs = Int(endedAt.timeIntervalSince(record.startedAt) * 1000)
-        stale.message = stale.message ?? "运行宿主已不存在，本次运行已标记为 stale。"
-        try? writeRunRecord(stale, to: metaURL)
-        return stale
+                let endedAt = Date()
+                var stale = latest
+                stale.status = .stale
+                stale.endedAt = endedAt
+                stale.durationMs = Int(endedAt.timeIntervalSince(latest.startedAt) * 1000)
+                stale.message = stale.message ?? "运行宿主已不存在，本次运行已标记为 stale。"
+                try writeRunRecord(stale, to: metaURL)
+                return stale
+            }
+        } catch {
+            return record
+        }
     }
 
     private func taskForRunClaim(at directoryURL: URL) -> RunShelfTask? {

@@ -379,7 +379,7 @@ enum TaskRunClaimManager {
         return 24 * 60 * 60
     }
 
-    private static func withClaimLock<T>(rootURL: URL, operation: () throws -> T) throws -> T {
+    static func withClaimLock<T>(rootURL: URL, operation: () throws -> T) throws -> T {
         let lockURL = rootURL.appendingPathComponent(".claim-lock")
         let descriptor = open(lockURL.path, O_CREAT | O_RDWR, mode_t(0o600))
         guard descriptor >= 0 else {
