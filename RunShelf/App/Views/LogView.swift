@@ -4,6 +4,7 @@ struct LogView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var selection: TaskSelectionState
     @StateObject private var loader = LogContentLoader()
+    @StateObject private var scrollStore = LogScrollStore()
     var task: RunShelfTask
 
     var body: some View {
@@ -117,7 +118,8 @@ struct LogView: View {
                         stdoutNotice: truncationNotice(for: loader.stdout),
                         stderrNotice: truncationNotice(for: loader.stderr)
                     ),
-                    scrollKey: "\(task.id):\(run.runId)"
+                    scrollKey: "\(task.id):\(run.runId)",
+                    scrollStore: scrollStore
                 )
 
                 if loader.isLoading {

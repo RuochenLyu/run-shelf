@@ -13,6 +13,7 @@ struct LogTextView: NSViewRepresentable {
 
     var content: Content
     var scrollKey: String
+    var scrollStore: LogScrollStore
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -58,7 +59,7 @@ struct LogTextView: NSViewRepresentable {
         let coordinator = context.coordinator
         let currentOrigin = scrollView.contentView.bounds.origin
         if let currentKey = coordinator.currentKey {
-            coordinator.scrollOrigins[currentKey] = currentOrigin
+            scrollStore.record(origin: currentOrigin, for: currentKey)
         }
 
         let switchedRun = coordinator.currentKey != scrollKey
@@ -77,14 +78,13 @@ struct LogTextView: NSViewRepresentable {
             return
         }
 
-        let targetOrigin = coordinator.scrollOrigins[scrollKey] ?? .zero
-        DispatchQueue.main.async { [weak scrollView, weak textView, weak coordinator] in
-            guard let scrollView, let textView, let coordinator else { return }
+        let targetOrigin = scrollStore.beginRestore(for: scrollKey)
+        DispatchQueue.main.async { [weak scrollView, weak textView, weak coordinator, weak scrollStore] in
+            guard let scrollView, let textView, let coordinator, let scrollStore else { return }
             guard coordinator.currentKey == scrollKey else { return }
-            if let textContainer = textView.textContainer {
-                textView.layoutManager?.ensureLayout(for: textContainer)
-            }
-            let documentHeight = textView.bounds.height
+            // Do not force layout of the full log. AppKit can keep non-contiguous
+            // layout lazy while we clamp against the document view's current frame.
+            let documentHeight = textView.frame.height
             let viewportHeight = scrollView.contentView.bounds.height
             let maximumY = max(documentHeight - viewportHeight, 0)
             let constrainedOrigin = NSPoint(
@@ -93,6 +93,7 @@ struct LogTextView: NSViewRepresentable {
             )
             scrollView.contentView.scroll(to: constrainedOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
+            scrollStore.completeRestore(for: scrollKey)
         }
     }
 
@@ -136,6 +137,5 @@ struct LogTextView: NSViewRepresentable {
     final class Coordinator {
         var currentKey: String?
         var content: Content?
-        var scrollOrigins: [String: NSPoint] = [:]
     }
 }

@@ -1,5 +1,6 @@
-import Darwin
+import AppKit
 import Combine
+import Darwin
 import Foundation
 import XCTest
 
@@ -268,6 +269,25 @@ final class RunShelfCoreTests: XCTestCase {
 
         tasks.forEach { coordinator.cancel(taskID: $0.id) }
         await fulfillment(of: [completions], timeout: 10)
+    }
+
+    func testLogScrollStateDefersPendingOriginAndBoundsLRU() {
+        var state = LogScrollState()
+        for index in 0..<60 {
+            state.record(origin: NSPoint(x: 0, y: CGFloat(index)), for: "run-\(index)")
+        }
+
+        XCTAssertEqual(state.origins.count, 50)
+        XCTAssertNil(state.origins["run-0"])
+        XCTAssertEqual(state.origins["run-59"]?.y, 59)
+
+        XCTAssertEqual(state.beginRestore(for: "run-59").y, 59)
+        state.record(origin: NSPoint(x: 0, y: 1), for: "run-59")
+        XCTAssertEqual(state.origins["run-59"]?.y, 59)
+
+        state.completeRestore(for: "run-59")
+        state.record(origin: NSPoint(x: 0, y: 42), for: "run-59")
+        XCTAssertEqual(state.origins["run-59"]?.y, 42)
     }
 
     func testCronUsesOrSemanticsWhenDayOfMonthAndWeekdayAreBothRestricted() throws {
