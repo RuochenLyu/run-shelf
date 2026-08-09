@@ -18,6 +18,38 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertEqual(schedule.matchingRuns(after: start, through: end).count, 64)
     }
 
+    func testSpringForwardCronRunsOnceAtShiftedLocalTime() throws {
+        let schedule = try CronSchedule.parse("30 2 * * *")
+        var losAngeles = Calendar(identifier: .gregorian)
+        losAngeles.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let start = try XCTUnwrap(losAngeles.date(from: DateComponents(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 0,
+            minute: 0
+        )))
+        let end = try XCTUnwrap(losAngeles.date(from: DateComponents(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 23,
+            minute: 59
+        )))
+        let expected = try XCTUnwrap(losAngeles.date(from: DateComponents(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 3,
+            minute: 30
+        )))
+
+        let matching = schedule.matchingRuns(after: start, through: end, calendar: losAngeles)
+
+        XCTAssertEqual(matching, [expected])
+        XCTAssertEqual(try schedule.nextRuns(after: start, count: 1, calendar: losAngeles), [expected])
+    }
+
     func testLiveClaimDoesNotExpireOnlyBecauseItIsOld() throws {
         let task = try makeTask(id: "long", concurrency: "skip")
         let lease = try TaskRunClaimManager.acquire(

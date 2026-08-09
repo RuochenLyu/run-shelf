@@ -78,8 +78,7 @@ struct CronSchedule: Equatable {
     }
 
     func nextRuns(after date: Date = Date(), count: Int = 5, calendar inputCalendar: Calendar = .current) throws -> [Date] {
-        var calendar = inputCalendar
-        calendar.timeZone = .current
+        let calendar = inputCalendar
 
         let start = calendar.dateInterval(of: .minute, for: date)?.end ?? date.addingTimeInterval(60)
         let limit = calendar.date(byAdding: .year, value: 5, to: start) ?? start.addingTimeInterval(60 * 60 * 24 * 366 * 5)
@@ -94,8 +93,7 @@ struct CronSchedule: Equatable {
     func matchingRuns(after start: Date, through end: Date, limit: Int = 64, calendar inputCalendar: Calendar = .current) -> [Date] {
         guard start < end else { return [] }
 
-        var calendar = inputCalendar
-        calendar.timeZone = .current
+        let calendar = inputCalendar
 
         let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
         let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
@@ -105,8 +103,7 @@ struct CronSchedule: Equatable {
     func latestMatchingRun(after start: Date, through end: Date, calendar inputCalendar: Calendar = .current) -> Date? {
         guard start < end else { return nil }
 
-        var calendar = inputCalendar
-        calendar.timeZone = .current
+        let calendar = inputCalendar
 
         let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
         let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
@@ -147,8 +144,7 @@ struct CronSchedule: Equatable {
     ) -> MatchingRunSummary {
         guard start < end else { return MatchingRunSummary(prefix: [], latest: nil, count: 0) }
 
-        var calendar = inputCalendar
-        calendar.timeZone = .current
+        let calendar = inputCalendar
         let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
         let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
         let sortedHours = hours.values.sorted()
@@ -228,12 +224,17 @@ struct CronSchedule: Equatable {
             return nil
         }
 
-        let actual = calendar.dateComponents([.hour, .minute, .second], from: date)
-        guard actual.hour == hour, actual.minute == minute, actual.second == 0 else {
-            return nil
-        }
         guard calendar.isDate(date, inSameDayAs: day) else {
             return nil
+        }
+        let actual = calendar.dateComponents([.hour, .minute, .second], from: date)
+        if actual.hour != hour || actual.minute != minute || actual.second != 0 {
+            let startOfDay = calendar.startOfDay(for: day)
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: startOfDay),
+                  calendar.timeZone.secondsFromGMT(for: nextDay) > calendar.timeZone.secondsFromGMT(for: startOfDay)
+            else {
+                return nil
+            }
         }
         return date
     }
