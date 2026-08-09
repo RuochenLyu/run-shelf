@@ -276,6 +276,39 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertEqual(fullResult["returnedBytes"] as? Int, 0)
     }
 
+    func testUnknownArgumentsAreRejectedBeforeSideEffectsAndStdoutIsExplicit() throws {
+        let typoSpec = try writeSpec([
+            "slug": "typo-apply",
+            "name": "Typo Apply",
+            "script": "#!/bin/zsh\necho should-not-exist\n"
+        ])
+        let typoApply = try invoke(["apply", typoSpec.path, "--dryrun", "--json"])
+        try assertError(typoApply, exitCode: 2, code: "usage")
+        let listAfterTypo = try invoke(["task", "list", "--json"])
+        XCTAssertTrue(try XCTUnwrap(listAfterTypo.json["result"] as? [[String: Any]]).isEmpty)
+
+        let create = try invokeApply([
+            "slug": "typo-run",
+            "name": "Typo Run",
+            "script": "#!/bin/zsh\necho stdout-marker\necho stderr-marker >&2\n"
+        ])
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+        let typoRun = try invoke(["run", taskID, "--detech", "--json"])
+        try assertError(typoRun, exitCode: 2, code: "usage")
+        let runsURL = appSupportURL.appendingPathComponent("tasks/\(taskID)/runs", isDirectory: true)
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: runsURL.path).isEmpty)
+
+        let run = try invoke(["run", taskID, "--json"])
+        XCTAssertEqual(run.exitCode, 0)
+        let runID = try string(dictionary(result(run.json)["run"])["runId"])
+        let stdout = try invoke(["run", "log", runID, "--stdout", "--json"])
+        XCTAssertEqual(stdout.exitCode, 0)
+        let stdoutResult = try result(stdout.json)
+        XCTAssertEqual(stdoutResult["stream"] as? String, "stdout")
+        XCTAssertTrue(try string(stdoutResult["text"]).contains("stdout-marker"))
+        XCTAssertFalse(try string(stdoutResult["text"]).contains("stderr-marker"))
+    }
+
     func testLoaderRejectsNonUUIDAndManifestDirectoryMismatch() throws {
         let tasksURL = appSupportURL.appendingPathComponent("tasks", isDirectory: true)
         try FileManager.default.createDirectory(at: tasksURL, withIntermediateDirectories: true)

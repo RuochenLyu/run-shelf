@@ -88,6 +88,7 @@ private struct CLIContext {
 
         switch subcommand {
         case "list":
+            try rejectUnexpectedArguments()
             let tasks = try repository.loadTasksWithLatestRun().map { TaskPayload(task: $0) }
             emitOrPrint(tasks) {
                 tasks.map { "\($0.id)\t\($0.slug ?? "-")\t\($0.name)" }.joined(separator: "\n")
@@ -95,6 +96,7 @@ private struct CLIContext {
             return 0
         case "show":
             let selector = try takeValue("任务 id 或 slug")
+            try rejectUnexpectedArguments()
             let read = try repository.loadTaskWithLatestRun(selector: .idOrSlug(selector))
             emitOrPrint(TaskDetailPayload(task: read.task, revision: read.revision)) {
                 formatTask(read.task, revision: read.revision)
@@ -102,6 +104,7 @@ private struct CLIContext {
             return 0
         case "delete":
             let selector = try takeValue("任务 id 或 slug")
+            try rejectUnexpectedArguments()
             let id = try repository.deleteTask(selector: .idOrSlug(selector))
             emitOrPrint(["deleted": id]) {
                 "已移到废纸篓：\(id)"
@@ -117,6 +120,7 @@ private struct CLIContext {
         let allowDangerous = arguments.removeAll("--allow-dangerous")
         let expectedRevision = try takeOptionalFlagValue("--expected-revision").map(TaskDefinitionRevision.init(token:))
         let path = try takeValue("TaskSpec JSON 文件路径，或 -")
+        try rejectUnexpectedArguments()
         let spec = try readTaskSpec(path: path)
         let selector: TaskRepositorySelector?
         if let id = spec.id {
@@ -192,6 +196,7 @@ private struct CLIContext {
         case "status":
             _ = arguments.popFirst()
             let runID = try takeValue("run id")
+            try rejectUnexpectedArguments()
             let status = try findRun(runID: runID)
             emitOrPrint(status) {
                 formatRunStatus(status)
@@ -200,7 +205,12 @@ private struct CLIContext {
         case "log":
             _ = arguments.popFirst()
             let runID = try takeValue("run id")
-            let stream = arguments.removeAll("--stderr") ? "stderr" : "stdout"
+            let readsStdout = arguments.removeAll("--stdout")
+            let readsStderr = arguments.removeAll("--stderr")
+            guard !(readsStdout && readsStderr) else {
+                throw CLIExitError.usage("--stdout 与 --stderr 不能同时使用。")
+            }
+            let stream = readsStderr ? "stderr" : "stdout"
             let full = arguments.removeAll("--full")
             let requestedBytes = try takeOptionalFlagValue("--bytes").map { value -> Int in
                 guard let bytes = Int(value), (1...67_108_864).contains(bytes) else {
@@ -211,6 +221,7 @@ private struct CLIContext {
             guard !(full && requestedBytes != nil) else {
                 throw CLIExitError.usage("--full 与 --bytes 不能同时使用。")
             }
+            try rejectUnexpectedArguments()
             let status = try findRun(runID: runID)
             let log = try readLog(
                 status: status,
@@ -236,6 +247,7 @@ private struct CLIContext {
         case "cancel", "stop":
             _ = arguments.popFirst()
             let runID = try takeValue("run id")
+            try rejectUnexpectedArguments()
             let payload = try cancelRun(runID: runID)
             emitOrPrint(payload) {
                 "已发送终止信号：\(payload.runId)"
@@ -246,6 +258,7 @@ private struct CLIContext {
             _ = arguments.removeAll("--wait")
             let allowDangerous = arguments.removeAll("--allow-dangerous")
             let selector = try takeValue("任务 id 或 slug")
+            try rejectUnexpectedArguments()
             let read = try repository.loadTask(selector: .idOrSlug(selector), includeRuns: false)
             let risks = DangerousCommandScanner.scan(read.task.script)
             try rejectDangerousCommandRisks(risks, allowDangerous: allowDangerous)
@@ -269,6 +282,7 @@ private struct CLIContext {
     }
 
     private mutating func runDoctor() throws -> Int32 {
+        try rejectUnexpectedArguments()
         let loadResult = try repository.loadTasksWithIssues(includeRuns: false)
         let heartbeat = readJSONFile(at: RunShelfPaths.schedulerHeartbeatURL(), as: SchedulerHeartbeat.self)
         let payload = DoctorPayload(
@@ -294,6 +308,7 @@ private struct CLIContext {
     private mutating func runInstallCLI() throws -> Int32 {
         let force = arguments.removeAll("--force")
         let prefix = (try takeOptionalFlagValue("--prefix")) ?? "~/.local/bin"
+        try rejectUnexpectedArguments()
         let prefixURL = URL(fileURLWithPath: (prefix as NSString).expandingTildeInPath, isDirectory: true)
         let destinationURL = prefixURL.appendingPathComponent("runshelf")
         guard let executableURL = Bundle.main.executableURL else {
@@ -343,6 +358,7 @@ private struct CLIContext {
         }
         switch topic {
         case "agent":
+            try rejectUnexpectedArguments()
             print(agentHelpText)
             return 0
         default:
@@ -354,6 +370,7 @@ private struct CLIContext {
         guard let name = arguments.popFirst() else {
             throw CLIExitError.usage("schema 需要名称：task-spec 或 cli-result")
         }
+        try rejectUnexpectedArguments()
         switch name {
         case "task-spec":
             print(GeneratedSchemas.taskSpec)
@@ -369,6 +386,7 @@ private struct CLIContext {
     private mutating func runHost() throws -> Int32 {
         let taskID = try takeFlagValue("--task-id")
         let runID = try takeFlagValue("--run-id")
+        try rejectUnexpectedArguments()
         let read = try repository.loadTask(selector: .id(taskID), includeRuns: false)
         let record = try TaskRunner.run(
             task: read.task,
@@ -668,6 +686,12 @@ private struct CLIContext {
         arguments.remove(at: index + 1)
         arguments.remove(at: index)
         return value
+    }
+
+    private func rejectUnexpectedArguments() throws {
+        guard arguments.isEmpty else {
+            throw CLIExitError.usage("未知参数：\(arguments.joined(separator: " "))")
+        }
     }
 
     private func emitOrPrint<T: Encodable>(_ payload: T, text: () -> String) {
