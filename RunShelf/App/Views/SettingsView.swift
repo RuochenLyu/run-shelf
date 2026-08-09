@@ -6,6 +6,9 @@ struct SettingsView: View {
     @EnvironmentObject private var controller: SchedulerServiceController
     @AppStorage(RunShelfSettings.defaultRetentionDaysKey) private var defaultRetentionDays = RunShelfSettings.defaultRetentionDays
     @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
+    @State private var cliStatus: RunShelfCLIInstallationStatus?
+    @State private var cliFeedback: String?
+    @State private var isShowingAgentWritePreview = false
 
     var body: some View {
         Form {
@@ -71,6 +74,54 @@ struct SettingsView: View {
                 }
             }
 
+            Section("命令行与 AI Agent") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(cliStatus?.isInstalled == true ? "runshelf 命令已安装" : "在终端中使用 runshelf")
+                        if let status = cliStatus, status.isInstalled {
+                            Text("\(status.path) · 版本 \(appVersion)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    Spacer()
+                    Button(cliStatus?.isInstalled == true ? "已安装" : "安装 runshelf 命令") {
+                        installCommandLineTool()
+                    }
+                    .controlSize(.small)
+                    .disabled(embeddedCLIURL == nil || cliStatus?.isInstalled == true)
+                }
+
+                if let status = cliStatus, status.isInstalled, !status.pathConfigured {
+                    Text("命令已安装，但当前 PATH 不包含 \(RunShelfCLIInstaller.defaultPrefixURL().path)。请把该目录加入 shell 配置。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("把 Run Shelf 的 CLI 契约交给 AI agent，让它安全地创建、运行和查询任务。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Button("复制集成说明") {
+                        copyAgentGuide()
+                    }
+                    Button("写入 ~/.claude/CLAUDE.md") {
+                        isShowingAgentWritePreview = true
+                    }
+                }
+                .controlSize(.small)
+                .disabled(embeddedCLIURL == nil)
+
+                if let cliFeedback {
+                    Text(cliFeedback)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+
             Section {
                 LabeledContent("保留天数") {
                     RetentionNumberField(value: defaultRetentionDaysBinding, unit: "天", range: 1...365)
@@ -87,9 +138,13 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 600)
+        .frame(width: 520, height: 720)
         .onAppear {
             controller.refresh()
+            refreshCLIStatus()
+        }
+        .sheet(isPresented: $isShowingAgentWritePreview) {
+            agentWritePreview
         }
         .alert("Run Shelf", isPresented: errorBinding) {
             Button("知道了", role: .cancel) {
@@ -97,6 +152,103 @@ struct SettingsView: View {
             }
         } message: {
             Text(controller.lastErrorMessage ?? "")
+        }
+    }
+
+    // MARK: - Command line and agent section
+
+    private var embeddedCLIURL: URL? {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/Helpers/runshelf")
+        return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "未知"
+    }
+
+    private var agentGuide: String {
+        RunShelfAgentGuide.markdown(executableURL: embeddedCLIURL)
+    }
+
+    private var claudeInstructionsURL: URL {
+        RunShelfAgentSetupWriter.claudeInstructionsURL()
+    }
+
+    private var agentWritePreview: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("写入 ~/.claude/CLAUDE.md")
+                .font(.headline)
+            Text("Run Shelf 只会新增或更新下面的标记块，标记块外的内容保持不变。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            ScrollView {
+                Text(RunShelfAgentGuide.markedBlock(executableURL: embeddedCLIURL))
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 360)
+            HStack {
+                Spacer()
+                Button("取消", role: .cancel) {
+                    isShowingAgentWritePreview = false
+                }
+                Button("写入") {
+                    writeClaudeInstructions()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 640, height: 560)
+    }
+
+    private func refreshCLIStatus() {
+        guard let embeddedCLIURL else {
+            cliStatus = nil
+            cliFeedback = "应用文件不完整，找不到内置 runshelf 命令。"
+            return
+        }
+        cliStatus = RunShelfCLIInstaller.inspect(executableURL: embeddedCLIURL)
+    }
+
+    private func installCommandLineTool() {
+        guard let embeddedCLIURL else { return }
+        do {
+            let result = try RunShelfCLIInstaller.install(
+                executableURL: embeddedCLIURL,
+                prefixURL: RunShelfCLIInstaller.defaultPrefixURL(),
+                force: false
+            )
+            cliFeedback = result.pathConfigured
+                ? "已安装：\(result.path)"
+                : "已安装：\(result.path)。当前 PATH 尚未包含安装目录。"
+            refreshCLIStatus()
+        } catch {
+            cliFeedback = error.localizedDescription
+            refreshCLIStatus()
+        }
+    }
+
+    private func copyAgentGuide() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(agentGuide, forType: .string)
+        cliFeedback = "已复制集成说明。"
+    }
+
+    private func writeClaudeInstructions() {
+        do {
+            let changed = try RunShelfAgentSetupWriter.writeMarkedBlock(
+                to: claudeInstructionsURL,
+                executableURL: embeddedCLIURL
+            )
+            cliFeedback = changed
+                ? "已写入：\(claudeInstructionsURL.path)"
+                : "无需更改：\(claudeInstructionsURL.path)"
+            isShowingAgentWritePreview = false
+        } catch {
+            cliFeedback = error.localizedDescription
         }
     }
 

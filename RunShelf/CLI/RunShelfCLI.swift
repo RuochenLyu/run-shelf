@@ -334,37 +334,26 @@ private struct CLIContext {
         let prefix = (try takeOptionalFlagValue("--prefix")) ?? "~/.local/bin"
         try rejectUnexpectedArguments()
         let prefixURL = URL(fileURLWithPath: (prefix as NSString).expandingTildeInPath, isDirectory: true)
-        let destinationURL = prefixURL.appendingPathComponent("runshelf")
         guard let executableURL = Bundle.main.executableURL else {
             throw CLIExitError.unexpected("无法定位 runshelf 可执行文件。")
         }
-
-        try FileManager.default.createDirectory(at: prefixURL, withIntermediateDirectories: true)
-        var destinationInfo = stat()
-        let destinationExists = lstat(destinationURL.path, &destinationInfo) == 0
-        if !destinationExists && errno != ENOENT {
-            throw CLIExitError.unexpected("无法检查安装目标：\(String(cString: strerror(errno)))")
-        }
-        if destinationExists {
-            if force {
-                let fileType = destinationInfo.st_mode & mode_t(S_IFMT)
-                guard fileType == mode_t(S_IFREG) || fileType == mode_t(S_IFLNK) else {
-                    throw CLIExitError.conflict("拒绝覆盖目录或特殊文件：\(destinationURL.path)")
-                }
-                guard unlink(destinationURL.path) == 0 else {
-                    throw CLIExitError.unexpected("无法替换安装目标：\(String(cString: strerror(errno)))")
-                }
-            } else {
-                throw CLIExitError.conflict("目标已存在：\(destinationURL.path)。确认要覆盖时使用 --force。")
+        let result: RunShelfCLIInstallationResult
+        do {
+            result = try RunShelfCLIInstaller.install(
+                executableURL: executableURL,
+                prefixURL: prefixURL,
+                force: force
+            )
+        } catch let error as RunShelfCLIInstallerError {
+            if error.isConflict {
+                throw CLIExitError.conflict(error.localizedDescription)
             }
+            throw CLIExitError.unexpected(error.localizedDescription)
         }
-        try FileManager.default.createSymbolicLink(at: destinationURL, withDestinationURL: executableURL)
-
-        let pathEntries = (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
         let payload = InstallCLIPayload(
-            path: destinationURL.path,
-            target: executableURL.path,
-            pathConfigured: pathEntries.contains(prefixURL.path)
+            path: result.path,
+            target: result.target,
+            pathConfigured: result.pathConfigured
         )
         emitOrPrint(payload) {
             if payload.pathConfigured {
@@ -406,10 +395,7 @@ private struct CLIContext {
         let targetURL: URL
         switch writeTarget {
         case "claude":
-            let homePath = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
-            targetURL = URL(fileURLWithPath: homePath, isDirectory: true)
-                .appendingPathComponent(".claude", isDirectory: true)
-                .appendingPathComponent("CLAUDE.md")
+            targetURL = RunShelfAgentSetupWriter.claudeInstructionsURL()
         case "agents":
             targetURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
                 .appendingPathComponent("AGENTS.md")

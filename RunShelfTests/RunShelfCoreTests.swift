@@ -638,6 +638,43 @@ final class RunShelfCoreTests: XCTestCase {
         )))
     }
 
+    func testCLIInstallerSharesInstallAndStatusDetection() throws {
+        let root = try makeTemporaryDirectory()
+        let executableURL = root.appendingPathComponent("embedded/runshelf")
+        try FileManager.default.createDirectory(
+            at: executableURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("binary".utf8).write(to: executableURL)
+        let prefixURL = root.appendingPathComponent("bin", isDirectory: true)
+        let environment = ["HOME": root.path, "PATH": "/usr/bin:\(prefixURL.path)"]
+
+        let before = RunShelfCLIInstaller.inspect(
+            executableURL: executableURL,
+            prefixURL: prefixURL,
+            environment: environment
+        )
+        XCTAssertFalse(before.isInstalled)
+        XCTAssertTrue(before.pathConfigured)
+
+        let result = try RunShelfCLIInstaller.install(
+            executableURL: executableURL,
+            prefixURL: prefixURL,
+            force: false,
+            environment: environment
+        )
+        XCTAssertEqual(result.path, prefixURL.appendingPathComponent("runshelf").path)
+        XCTAssertTrue(result.pathConfigured)
+
+        let after = RunShelfCLIInstaller.inspect(
+            executableURL: executableURL,
+            prefixURL: prefixURL,
+            environment: environment
+        )
+        XCTAssertTrue(after.isInstalled)
+        XCTAssertEqual(after.target, executableURL.path)
+    }
+
     func testTaskDefinitionRevisionTokenRoundTripsAndDetectsConflict() throws {
         let root = try makeTemporaryDirectory()
         let repository = TaskRepository(tasksDirectoryURL: root)

@@ -70,6 +70,15 @@ enum RunShelfAgentGuide {
 }
 
 enum RunShelfAgentSetupWriter {
+    static func claudeInstructionsURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        let homePath = environment["HOME"] ?? NSHomeDirectory()
+        return URL(fileURLWithPath: homePath, isDirectory: true)
+            .appendingPathComponent(".claude", isDirectory: true)
+            .appendingPathComponent("CLAUDE.md")
+    }
+
     static func writeMarkedBlock(
         to targetURL: URL,
         executableURL: URL? = Bundle.main.executableURL,

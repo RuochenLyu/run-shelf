@@ -54,6 +54,8 @@
 		6645B779A08F3FE9B592A8B0 /* TaskRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D12AD932FCE359A0997A4B /* TaskRunCoordinator.swift */; };
 		6886CF7B6DDEEB61C6300810 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
 		6A3BD7297156A5E075AFF5BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		6E576C034BA4C64E3BE50618 /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
+		70DE7303B1DAE9D3A5D5E29F /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		73E28AAC36DEDF1231CB0922 /* LogScrollState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB6E37CAC5A27FF4C862545 /* LogScrollState.swift */; };
 		74D78D9D3F48C4FFB4986CAB /* RunShelfCLIE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39FBAA3646201AE7E321FEED /* RunShelfCLIE2ETests.swift */; };
 		7509FF164A2389D508ED4AE2 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
@@ -71,6 +73,7 @@
 		8A77F0FC12A0B003BDAFAD69 /* DiskScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BA651D45E0696B41871E37 /* DiskScannerTests.swift */; };
 		8AA56C284D61CAAE9A8F2A84 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
 		8C2FC184B16A7C05A99E6FBD /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
+		8D6679E04C4462AC8ED880D7 /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		8EEF06B1AE89AA5373238E4C /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
 		963F27FCD7D4DFB7BE23B96F /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C162136D8417BC1B1C2785CF /* TaskStore.swift */; };
 		98D8B9BD592C4786E8BF028B /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
@@ -88,6 +91,7 @@
 		A8452E0C36DCCF832C69E461 /* CronSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE656CA65686562CB8B3F686 /* CronSchedule.swift */; };
 		A8E6BC302156C103B83509C3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5298CDA73E6C315157B13AC4 /* Localizable.xcstrings */; };
 		A991490F3D9AC14EE4F55825 /* TaskDiskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322A549506859D18118CA3F8 /* TaskDiskMonitor.swift */; };
+		AA160A015F7C7D6B72D9CCFA /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		AE139CCB18F8CBC2FE9A489C /* GeneratedSchemas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0781AA74CE27DD68B9BAD5E0 /* GeneratedSchemas.swift */; };
 		AE55F8E6B49AA992D8E3B12D /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
 		B3165C131CB0A356AAEA12EE /* RunShelfPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46229BF791F5384E4ADF2636 /* RunShelfPaths.swift */; };
@@ -239,6 +243,7 @@
 		9F99A4459B3E0CFC684DD0B3 /* runshelf */ = {isa = PBXFileReference; includeInIndex = 0; path = runshelf; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE656CA65686562CB8B3F686 /* CronSchedule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CronSchedule.swift; sourceTree = "<group>"; };
 		C162136D8417BC1B1C2785CF /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
+		C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCLIInstaller.swift; sourceTree = "<group>"; };
 		C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
 		CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
 		D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSidebarView.swift; sourceTree = "<group>"; };
@@ -496,6 +501,7 @@
 			isa = PBXGroup;
 			children = (
 				5EF286006A4413E1700B2713 /* RunShelfAgentBridge.swift */,
+				C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */,
 			);
 			name = Agent;
 			path = Agent;
@@ -726,6 +732,7 @@
 				1779E9B52FBD8CCEAFF70EE7 /* LogContentLoader.swift in Sources */,
 				5F72CDD20F4D309C5EFD6B58 /* LogScrollState.swift in Sources */,
 				2B01EE65B4F07DFC00202A11 /* RunShelfAgentBridge.swift in Sources */,
+				AA160A015F7C7D6B72D9CCFA /* RunShelfCLIInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -775,6 +782,7 @@
 				F7366F26F68479ABEB42215F /* LogTextView.swift in Sources */,
 				73E28AAC36DEDF1231CB0922 /* LogScrollState.swift in Sources */,
 				CBC8CD1EBAE3A38AA832D2CE /* RunShelfAgentBridge.swift in Sources */,
+				8D6679E04C4462AC8ED880D7 /* RunShelfCLIInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -802,6 +810,7 @@
 				B5B9B99F04F2D5E8562C4E5D /* LogContentLoader.swift in Sources */,
 				1CEDF7FEE784CFFA310C9A94 /* LogScrollState.swift in Sources */,
 				DE5D7D72AD8C4E8277D9785B /* RunShelfAgentBridge.swift in Sources */,
+				6E576C034BA4C64E3BE50618 /* RunShelfCLIInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -840,6 +849,7 @@
 				F5CF6B178334CBBD7E570F09 /* LogContentLoader.swift in Sources */,
 				F067AFCC0A6FA04D8BEF319C /* LogScrollState.swift in Sources */,
 				4D84A180896DD589ACEF556E /* RunShelfAgentBridge.swift in Sources */,
+				70DE7303B1DAE9D3A5D5E29F /* RunShelfCLIInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
