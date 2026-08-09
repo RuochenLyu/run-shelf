@@ -38,6 +38,7 @@ DMG_STAGE_DIR="$DIST_DIR/dmg-stage"
 
 SIGN_IDENTITY="${RUN_SHELF_SIGN_IDENTITY:-}"
 NOTARY_PROFILE="${RUN_SHELF_NOTARY_PROFILE:-}"
+TIMESTAMP_URL="${RUN_SHELF_TIMESTAMP_URL:-http://timestamp.apple.com/ts01}"
 SKIP_NOTARY="${RUN_SHELF_SKIP_NOTARY:-0}"
 if [[ "$SKIP_NOTARY" == "1" ]]; then
   NOTARY_PROFILE=""
@@ -69,7 +70,7 @@ sign_artifact() {
   local attempt
 
   for attempt in 1 2 3; do
-    if codesign --force --timestamp --sign "$SIGN_IDENTITY" "$@" "$artifact_path"; then
+    if codesign --force --timestamp="$TIMESTAMP_URL" --sign "$SIGN_IDENTITY" "$@" "$artifact_path"; then
       return 0
     fi
     if [[ "$attempt" -lt 3 ]]; then
