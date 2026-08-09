@@ -9,6 +9,8 @@ Run Shelf is a local script manager for macOS. Put your everyday shell scripts i
 
 It is not a cloud automation platform and needs no account. Tasks, scripts, notes, and run history live in plain files on your Mac and are never uploaded.
 
+![Run Shelf main window with the task list, script editor, and schedule inspector](docs/assets/main-window.png)
+
 ## Features
 
 - File-native tasks: each task is a directory containing `task.json`, `run.sh`, `notes.md`, and its run history.
@@ -38,6 +40,12 @@ After the first launch you can enable background running in Settings. It is opti
 2. Run it manually and confirm stdout, stderr, and the exit code look right.
 3. When you want it scheduled, enable the task and turn on background running in Settings.
 4. When a run fails, open its history entry and inspect stdout/stderr.
+
+![Creating a Run Shelf task and running it immediately](docs/assets/demo.gif)
+
+[Full-quality video](docs/assets/demo.mp4)
+
+![Run Shelf failed run history with stderr output](docs/assets/run-history.png)
 
 Tasks are stored by default in:
 

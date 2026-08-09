@@ -9,6 +9,8 @@ Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Sh
 
 它不是云端自动化平台，也不需要账号。任务、脚本、备注和运行历史都保存在本机文件里，不会上传。
 
+![Run Shelf 主窗口：任务列表、脚本编辑器与运行计划](docs/assets/main-window.png)
+
 ## 功能
 
 - 文件化任务：每个任务都是一个目录，包含 `task.json`、`run.sh`、`notes.md` 和运行历史。
@@ -38,6 +40,12 @@ Run Shelf 最低支持 macOS 15。macOS 26 上会自然使用系统提供的新�
 2. 手动运行任务，确认 stdout、stderr 和退出码符合预期。
 3. 需要定时执行时启用任务，并在设置里开启后台运行。
 4. 运行失败时，从历史记录进入 stdout/stderr 排查。
+
+![Run Shelf 新建任务并立即运行的演示](docs/assets/demo.gif)
+
+[高清视频](docs/assets/demo.mp4)
+
+![Run Shelf 失败运行历史与 stderr 日志](docs/assets/run-history.png)
 
 任务默认保存在：
 
