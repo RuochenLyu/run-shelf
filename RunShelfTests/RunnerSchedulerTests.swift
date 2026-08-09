@@ -286,6 +286,69 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertEqual(lock.withLock { notificationCount }, 0)
     }
 
+    func testSchedulerPersistsMinuteBeforeDispatch() throws {
+        let lock = NSLock()
+        var stateURL: URL?
+        var persistedMinute: String?
+        let fixture = try schedulerFixture(id: "persist-before-dispatch", concurrency: "skip") { task, scheduledAt, _ in
+            let url = try XCTUnwrap(lock.withLock { stateURL })
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let state = try decoder.decode(SchedulerState.self, from: data)
+            lock.withLock { persistedMinute = state.lastScheduledMinuteByTaskID[task.id] }
+            return try TaskRunner.writeSystemRecord(
+                task: task,
+                trigger: .scheduled,
+                status: .success,
+                message: "ok",
+                scheduledAt: scheduledAt
+            )
+        }
+        lock.withLock { stateURL = fixture.stateURL }
+        let now = try date(2026, 1, 2, 10, 0)
+        try fixture.writeState(lastCheckAt: now.addingTimeInterval(-60))
+
+        fixture.engine.tick(now: now)
+
+        try waitUntil { lock.withLock { persistedMinute != nil } }
+        XCTAssertEqual(lock.withLock { persistedMinute }, minuteKey(now))
+    }
+
+    func testSchedulerPrunesStateForDeletedTasks() throws {
+        let fixture = try schedulerFixture(id: "state-prune", concurrency: "skip")
+        let now = try date(2026, 1, 2, 10, 0)
+        try fixture.writeState(
+            lastCheckAt: now,
+            lastScheduledMinuteByTaskID: [
+                fixture.task.id: minuteKey(now),
+                "deleted-task": "2026-01-01T00:00"
+            ]
+        )
+
+        fixture.engine.tick(now: now)
+
+        try waitUntil { FileManager.default.fileExists(atPath: fixture.heartbeatURL.path) }
+        let state = try fixture.readState()
+        XCTAssertEqual(state.lastScheduledMinuteByTaskID, [fixture.task.id: minuteKey(now)])
+    }
+
+    func testSchedulerResetsSystemTimeZoneBeforeTick() throws {
+        let lock = NSLock()
+        var resetCount = 0
+        let fixture = try schedulerFixture(
+            id: "timezone-reset",
+            concurrency: "skip",
+            resetSystemTimeZone: { lock.withLock { resetCount += 1 } }
+        )
+        let now = try date(2026, 1, 2, 10, 0)
+        try fixture.writeState(lastCheckAt: now)
+
+        fixture.engine.tick(now: now)
+
+        try waitUntil { lock.withLock { resetCount == 1 } }
+    }
+
     func testRetentionRemovesOnlyOldUnclaimedOrphans() throws {
         let task = try makeTask(id: "retention-orphans", concurrency: "allow")
         let runsURL = task.directoryURL.appendingPathComponent("runs", isDirectory: true)
@@ -422,7 +485,8 @@ final class RunnerSchedulerTests: XCTestCase {
         },
         failureNotifier: @escaping SchedulerEngine.FailureNotifier = { task, run in
             RunShelfNotifier.notifyFailure(task: task, run: run)
-        }
+        },
+        resetSystemTimeZone: @escaping () -> Void = { NSTimeZone.resetSystemTimeZone() }
     ) throws -> Fixture {
         let taskID = UUID().uuidString
         var task = try makeTask(id: taskID, concurrency: concurrency)
@@ -441,19 +505,22 @@ final class RunnerSchedulerTests: XCTestCase {
         try storedTask.script.write(to: taskURL.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
         try "".write(to: taskURL.appendingPathComponent("notes.md"), atomically: true, encoding: .utf8)
         let stateURL = appSupport.appendingPathComponent("state.json")
+        let heartbeatURL = appSupport.appendingPathComponent("heartbeat.json")
         return Fixture(
             engine: SchedulerEngine(
                 taskFileStore: TaskFileStore(tasksDirectoryURL: tasksURL),
                 appSupportDirectoryURL: appSupport,
                 stateURL: stateURL,
-                heartbeatURL: appSupport.appendingPathComponent("heartbeat.json"),
+                heartbeatURL: heartbeatURL,
                 logURL: appSupport.appendingPathComponent("scheduler.log"),
                 scheduledRun: scheduledRun,
-                failureNotifier: failureNotifier
+                failureNotifier: failureNotifier,
+                resetSystemTimeZone: resetSystemTimeZone
             ),
             task: storedTask,
             taskURL: taskURL,
-            stateURL: stateURL
+            stateURL: stateURL,
+            heartbeatURL: heartbeatURL
         )
     }
 
@@ -485,6 +552,14 @@ final class RunnerSchedulerTests: XCTestCase {
         value.timeZone = .current
         return value
     }
+
+    private func minuteKey(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return formatter.string(from: date)
+    }
 }
 
 private struct Fixture {
@@ -492,11 +567,25 @@ private struct Fixture {
     let task: RunShelfTask
     let taskURL: URL
     let stateURL: URL
+    let heartbeatURL: URL
 
-    func writeState(lastCheckAt: Date) throws {
-        let state = SchedulerState(schemaVersion: 1, lastCheckAt: lastCheckAt, lastScheduledMinuteByTaskID: [:])
+    func writeState(
+        lastCheckAt: Date,
+        lastScheduledMinuteByTaskID: [String: String] = [:]
+    ) throws {
+        let state = SchedulerState(
+            schemaVersion: 1,
+            lastCheckAt: lastCheckAt,
+            lastScheduledMinuteByTaskID: lastScheduledMinuteByTaskID
+        )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         try encoder.encode(state).write(to: stateURL)
+    }
+
+    func readState() throws -> SchedulerState {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SchedulerState.self, from: Data(contentsOf: stateURL))
     }
 }

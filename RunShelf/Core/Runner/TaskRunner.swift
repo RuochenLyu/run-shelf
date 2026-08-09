@@ -285,7 +285,7 @@ enum TaskRunner {
     }
 }
 
-private extension TaskRunner {
+extension TaskRunner {
     struct ExecutionResult {
         var exitCode: Int
         var didTimeout: Bool
@@ -314,7 +314,11 @@ private extension TaskRunner {
         do {
             try onProcessStarted?(pid)
         } catch {
-            terminateProcessGroup(pid: pid, signal: SIGTERM)
+            terminateAndReapProcessGroup(
+                pid: pid,
+                graceSeconds: terminationGraceSeconds,
+                monotonicNow: monotonicNow
+            )
             throw error
         }
         cancellation?.setCancellationHandler {
@@ -401,6 +405,33 @@ private extension TaskRunner {
             wasCancelled: wasCancelled,
             message: message
         )
+    }
+
+    static func terminateAndReapProcessGroup(
+        pid: pid_t,
+        graceSeconds: TimeInterval,
+        monotonicNow: MonotonicClock
+    ) {
+        terminateProcessGroup(pid: pid, signal: SIGTERM)
+        let deadline = monotonicNow() + max(graceSeconds, 0)
+        var status: Int32 = 0
+
+        while true {
+            let result = waitpid(pid, &status, WNOHANG)
+            if result == pid || (result == -1 && errno == ECHILD) {
+                return
+            }
+            if result == -1, errno != EINTR {
+                break
+            }
+            if monotonicNow() >= deadline {
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+
+        terminateProcessGroup(pid: pid, signal: SIGKILL)
+        while waitpid(pid, &status, 0) == -1, errno == EINTR {}
     }
 
     static func spawnProcessGroup(

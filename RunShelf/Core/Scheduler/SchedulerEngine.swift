@@ -37,6 +37,7 @@ final class SchedulerEngine {
     private let logURL: URL
     private let scheduledRun: ScheduledRun
     private let failureNotifier: FailureNotifier
+    private let resetSystemTimeZone: () -> Void
     private var runningRunIDsByTaskID: [String: Set<String>] = [:]
     private var lastError: String?
 
@@ -56,7 +57,8 @@ final class SchedulerEngine {
                 host: "scheduler"
             )
         },
-        failureNotifier: @escaping FailureNotifier = RunShelfNotifier.notifyFailure
+        failureNotifier: @escaping FailureNotifier = RunShelfNotifier.notifyFailure,
+        resetSystemTimeZone: @escaping () -> Void = { NSTimeZone.resetSystemTimeZone() }
     ) {
         self.taskFileStore = taskFileStore
         self.appSupportDirectoryURL = appSupportDirectoryURL
@@ -66,6 +68,7 @@ final class SchedulerEngine {
         self.fileManager = fileManager
         self.scheduledRun = scheduledRun
         self.failureNotifier = failureNotifier
+        self.resetSystemTimeZone = resetSystemTimeZone
     }
 
     func tick(now: Date = Date()) {
@@ -76,6 +79,7 @@ final class SchedulerEngine {
 
     private func performTick(now: Date) {
         do {
+            resetSystemTimeZone()
             try fileManager.createDirectory(at: appSupportDirectoryURL, withIntermediateDirectories: true)
 
             var state = loadState()
@@ -83,9 +87,13 @@ final class SchedulerEngine {
             for issue in loadResult.issues {
                 appendLog("task load skipped: \(issue.logMessage)")
             }
+            let existingTaskIDs = Set(loadResult.tasks.map(\.id))
+            state.lastScheduledMinuteByTaskID = state.lastScheduledMinuteByTaskID.filter {
+                existingTaskIDs.contains($0.key)
+            }
 
             for task in loadResult.tasks where task.manifest.enabled {
-                process(task: task, now: now, state: &state)
+                try process(task: task, now: now, state: &state)
             }
             state.lastCheckAt = now
             try saveState(state)
@@ -98,7 +106,7 @@ final class SchedulerEngine {
         writeHeartbeat(now: now)
     }
 
-    private func process(task: RunShelfTask, now: Date, state: inout SchedulerState) {
+    private func process(task: RunShelfTask, now: Date, state: inout SchedulerState) throws {
         guard task.manifest.schedule.type == "cron" else { return }
 
         let schedule: CronSchedule
@@ -168,6 +176,7 @@ final class SchedulerEngine {
         }
 
         state.lastScheduledMinuteByTaskID[task.id] = scheduledMinuteKey
+        try saveState(state)
         runScheduled(task: task, scheduledAt: scheduledAt)
     }
 

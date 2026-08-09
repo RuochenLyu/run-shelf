@@ -241,6 +241,52 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(record.durationMs ?? 0, 1_000)
     }
 
+    func testRunSnapshotReapsChildWhenProcessStartedCallbackThrows() throws {
+        let root = try makeTemporaryDirectory()
+        let snapshotURL = root.appendingPathComponent("throw-after-spawn.sh")
+        let stdoutURL = root.appendingPathComponent("stdout.log")
+        let stderrURL = root.appendingPathComponent("stderr.log")
+        try "#!/bin/zsh\ntrap '' TERM\nsleep 30\n".write(
+            to: snapshotURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o755))],
+            ofItemAtPath: snapshotURL.path
+        )
+        FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let stdout = try FileHandle(forWritingTo: stdoutURL)
+        let stderr = try FileHandle(forWritingTo: stderrURL)
+        defer {
+            try? stdout.close()
+            try? stderr.close()
+        }
+        var spawnedPID: pid_t?
+
+        XCTAssertThrowsError(try TaskRunner.runSnapshot(
+            snapshotURL: snapshotURL,
+            workingDirectoryURL: root,
+            stdoutHandle: stdout,
+            stderrHandle: stderr,
+            timeoutSeconds: 0,
+            cancellation: nil,
+            externalCancellationURL: nil,
+            terminationGraceSeconds: 0.1,
+            monotonicNow: {
+                TimeInterval(clock_gettime_nsec_np(CLOCK_UPTIME_RAW)) / 1_000_000_000
+            },
+            onProcessStarted: { pid in
+                spawnedPID = pid
+                throw CocoaError(.fileReadUnknown)
+            }
+        ))
+
+        let pid = try XCTUnwrap(spawnedPID)
+        XCTAssertFalse(isProcessAlive(pid), "throw path must reap the spawned child instead of leaving a zombie")
+    }
+
     func testTaskRunnerCancellationWritesCancelledRun() throws {
         let root = try makeTemporaryDirectory()
         let task = try makeTask(
