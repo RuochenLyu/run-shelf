@@ -50,7 +50,8 @@ final class TaskStore: ObservableObject {
 
     init(
         tasksDirectoryURL: URL = TaskStore.defaultTasksDirectoryURL(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        startsDiskMonitor: Bool = true
     ) {
         self.tasksDirectoryURL = tasksDirectoryURL
         self.fileManager = fileManager
@@ -68,7 +69,9 @@ final class TaskStore: ObservableObject {
         self.repository = TaskRepository(tasksDirectoryURL: tasksDirectoryURL, fileManager: fileManager)
 
         loadTasks()
-        startDiskMonitor()
+        if startsDiskMonitor {
+            startDiskMonitor()
+        }
     }
 
     nonisolated static func defaultTasksDirectoryURL() -> URL {
@@ -170,18 +173,23 @@ final class TaskStore: ObservableObject {
     /// - fullReload 必须 generation 一致 + 当前 clean 才能覆盖；否则降级 runsOnly merge
     /// - dirty 任务永远只更新 runs 字段
     /// - 删除只清 clean 任务，dirty 草稿保留让 saveTask 失败让用户感知
-    private func applyDiskScan(_ result: DiskScanResult) {
+    func applyDiskScan(_ result: DiskScanResult) {
         for entry in result.entries {
             switch entry {
             case let .fullReload(diskTask, scanGeneration):
                 if let index = tasks.firstIndex(where: { $0.id == diskTask.id }) {
                     let currentGeneration = taskGenerations[diskTask.id] ?? 0
                     if currentGeneration == scanGeneration && !tasks[index].isDirty {
-                        tasks[index] = diskTask
+                        if tasks[index] != diskTask {
+                            tasks[index] = diskTask
+                        }
                     } else {
                         // Race: scan 期间用户改了/保存了。只 merge runs，
                         // manifest/script/notes 保留内存版本（用户最新意图）
-                        tasks[index].runs = mergedRuns(existing: tasks[index].runs, incoming: diskTask.runs)
+                        let runs = mergedRuns(existing: tasks[index].runs, incoming: diskTask.runs)
+                        if tasks[index].runs != runs {
+                            tasks[index].runs = runs
+                        }
                     }
                 } else {
                     // 磁盘上新出现的任务（外部恢复 / sync / scheduler 直写不太可能但 defensive）
@@ -192,10 +200,14 @@ final class TaskStore: ObservableObject {
             case let .runsOnly(taskID, runs, scanGeneration):
                 guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { continue }
                 let currentGeneration = taskGenerations[taskID] ?? 0
+                let nextRuns: [RunRecord]
                 if currentGeneration == scanGeneration && !tasks[index].isDirty {
-                    tasks[index].runs = runs
+                    nextRuns = runs
                 } else {
-                    tasks[index].runs = mergedRuns(existing: tasks[index].runs, incoming: runs)
+                    nextRuns = mergedRuns(existing: tasks[index].runs, incoming: runs)
+                }
+                if tasks[index].runs != nextRuns {
+                    tasks[index].runs = nextRuns
                 }
             }
         }
@@ -218,7 +230,10 @@ final class TaskStore: ObservableObject {
         }
         signatureCache = signatureCache.filter { aliveIDs.contains($0.key) }
         runsCache = runsCache.filter { aliveIDs.contains($0.key) }
-        projectedActivities = result.activities.filter { aliveIDs.contains($0.key) }
+        let nextActivities = result.activities.filter { aliveIDs.contains($0.key) }
+        if projectedActivities != nextActivities {
+            projectedActivities = nextActivities
+        }
         recomputeRunningProjection()
 
         if let sel = selectedTaskID, !tasks.contains(where: { $0.id == sel }) {
@@ -226,7 +241,9 @@ final class TaskStore: ObservableObject {
         }
 
         if let firstError = result.errors.first {
-            lastErrorMessage = firstError
+            if lastErrorMessage != firstError {
+                lastErrorMessage = firstError
+            }
         }
     }
 
@@ -538,12 +555,17 @@ final class TaskStore: ObservableObject {
     }
 
     private func recomputeRunningProjection() {
-        runningTaskIDs = Set(projectedActivities.keys).union(runCoordinator.runningTaskIDs)
+        let nextRunningTaskIDs = Set(projectedActivities.keys).union(runCoordinator.runningTaskIDs)
         var starts = projectedActivities.compactMapValues(\.earliestStartedAt)
         for (id, local) in runCoordinator.runningStartedAt {
             starts[id] = min(starts[id] ?? local, local)
         }
-        runningStartedAt = starts
+        if runningTaskIDs != nextRunningTaskIDs {
+            runningTaskIDs = nextRunningTaskIDs
+        }
+        if runningStartedAt != starts {
+            runningStartedAt = starts
+        }
     }
 
     private func statusRank(_ task: RunShelfTask) -> Int {

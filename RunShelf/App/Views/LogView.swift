@@ -23,12 +23,9 @@ struct LogView: View {
         }
         .task(id: reloadKey) {
             reloadIfNeeded(force: true)
-            while !Task.isCancelled, store.runningTaskIDs.contains(task.id) {
+            while !Task.isCancelled, effectiveRun?.status == .running {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard !Task.isCancelled else { break }
-                reloadIfNeeded(force: true)
-            }
-            if !Task.isCancelled {
                 reloadIfNeeded(force: true)
             }
         }
@@ -43,7 +40,7 @@ struct LogView: View {
     }
 
     private var reloadKey: String {
-        "\(task.id):\(effectiveRun?.runId ?? "none")"
+        "\(task.id):\(effectiveRun?.runId ?? "none"):\(effectiveRun.map { String(describing: $0.status) } ?? "none")"
     }
 
     private var logPane: some View {

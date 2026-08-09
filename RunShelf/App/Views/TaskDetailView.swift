@@ -15,6 +15,22 @@ enum TaskDetailTab: String, Hashable, CaseIterable, Identifiable {
         case .log: return "日志"
         }
     }
+
+    var keyboardEquivalent: KeyEquivalent {
+        switch self {
+        case .script: return "1"
+        case .notes: return "2"
+        case .log: return "3"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .script: return "脚本（⌘1）"
+        case .notes: return "备注（⌘2）"
+        case .log: return "日志（⌘3）"
+        }
+    }
 }
 
 struct TaskDetailView: View {
@@ -47,14 +63,44 @@ struct TaskDetailView: View {
     private var tabBar: some View {
         HStack {
             Spacer()
-            Picker("", selection: $selectedTab) {
+            HStack(spacing: 0) {
                 ForEach(TaskDetailTab.allCases) { tab in
-                    Text(tab.displayName).tag(tab)
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        Text(tab.displayName)
+                            .font(.callout)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(tab.keyboardEquivalent, modifiers: [.command])
+                    .background {
+                        if selectedTab == tab {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color(nsColor: .selectedContentBackgroundColor))
+                        }
+                    }
+                    .foregroundStyle(
+                        selectedTab == tab
+                            ? Color(nsColor: .selectedControlTextColor)
+                            : .primary
+                    )
+                    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+                    .help(tab.helpText)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .padding(2)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            }
             .frame(width: 240)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("任务详情")
             Spacer()
         }
         .padding(.horizontal, 24)

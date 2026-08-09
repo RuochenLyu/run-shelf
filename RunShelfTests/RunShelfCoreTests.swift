@@ -1,4 +1,5 @@
 import Darwin
+import Combine
 import Foundation
 import XCTest
 
@@ -12,6 +13,97 @@ final class RunShelfCoreTests: XCTestCase {
         }
         temporaryDirectories.removeAll()
         try super.tearDownWithError()
+    }
+
+    @MainActor
+    func testStableDiskRefreshDoesNotPublishStoreChanges() async throws {
+        let root = try makeTemporaryDirectory()
+        let tasksURL = root.appendingPathComponent("tasks", isDirectory: true)
+        try FileManager.default.createDirectory(at: tasksURL, withIntermediateDirectories: true)
+        try "seeded\n".write(
+            to: tasksURL.appendingPathComponent(".examples-seeded"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let store = TaskStore(tasksDirectoryURL: tasksURL, startsDiskMonitor: false)
+
+        var changeCount = 0
+        let observation = store.objectWillChange.sink { changeCount += 1 }
+        defer { observation.cancel() }
+
+        store.applyDiskScan(DiskScanResult(
+            entries: [],
+            deletedTaskIDs: [],
+            newSignatures: [:],
+            newRunsCache: [:],
+            activities: [:],
+            errors: []
+        ))
+
+        XCTAssertEqual(changeCount, 0, "A no-op disk scan must not invalidate the full SwiftUI tree")
+    }
+
+    @MainActor
+    func testLiveLogRefreshKeepsExistingContentVisibleAndSkipsIdenticalPublishes() async throws {
+        let root = try makeTemporaryDirectory()
+        let taskID = "00000000-0000-4000-8000-000000000099"
+        let runID = "20260809T010203Z-live"
+        let taskURL = root.appendingPathComponent(taskID, isDirectory: true)
+        let runURL = taskURL
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+
+        let stdoutURL = runURL.appendingPathComponent("stdout.log")
+        let stderrURL = runURL.appendingPathComponent("stderr.log")
+        try "first\n".write(to: stdoutURL, atomically: true, encoding: .utf8)
+        try "".write(to: stderrURL, atomically: true, encoding: .utf8)
+
+        let run = RunRecord(
+            runId: runID,
+            taskId: taskID,
+            trigger: .manual,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: nil,
+            startedAt: Date(),
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: "hash",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        let task = RunShelfTask(
+            manifest: .create(id: taskID, name: "Log refresh", description: "", enabled: true),
+            directoryURL: taskURL,
+            script: "#!/bin/zsh\n",
+            notes: "",
+            runs: [run],
+            isDirty: false
+        )
+        let loader = LogContentLoader()
+
+        loader.load(task: task, run: run, force: true)
+        XCTAssertTrue(loader.isLoading)
+        await loader.waitForCurrentLoad()
+        XCTAssertFalse(loader.isLoading)
+        XCTAssertEqual(loader.stdout.text, "first\n")
+
+        var unchangedPublishCount = 0
+        let observation = loader.objectWillChange.sink { unchangedPublishCount += 1 }
+        loader.load(task: task, run: run, force: true)
+        XCTAssertFalse(loader.isLoading, "Refreshing the same run must keep the log view visible")
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(unchangedPublishCount, 0, "Identical log content must not invalidate the view")
+
+        try "first\nsecond\n".write(to: stdoutURL, atomically: true, encoding: .utf8)
+        loader.load(task: task, run: run, force: true)
+        XCTAssertFalse(loader.isLoading, "A live update must not replace the scroll view with a spinner")
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "first\nsecond\n")
+        observation.cancel()
     }
 
     func testCronUsesOrSemanticsWhenDayOfMonthAndWeekdayAreBothRestricted() throws {
@@ -76,7 +168,9 @@ final class RunShelfCoreTests: XCTestCase {
         echo $! > \(pidURL.path)
         wait
         """
-        let task = try makeTask(root: root, id: "timeout-task", script: script, timeoutSeconds: 1)
+        // Full suites run process tests in parallel. Leave enough startup time for the shell
+        // to persist its child PID before exercising timeout termination.
+        let task = try makeTask(root: root, id: "timeout-task", script: script, timeoutSeconds: 3)
 
         let record = try TaskRunner.run(
             task: task,
@@ -85,7 +179,7 @@ final class RunShelfCoreTests: XCTestCase {
         )
 
         XCTAssertEqual(record.status, .timeout)
-        XCTAssertEqual(record.message, "超过 1 秒未结束")
+        XCTAssertEqual(record.message, "超过 3 秒未结束")
         Thread.sleep(forTimeInterval: 0.3)
         XCTAssertFalse(FileManager.default.fileExists(atPath: markerURL.path))
 

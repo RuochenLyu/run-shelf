@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// 异步读 stdout/stderr 日志文件。
@@ -36,10 +37,16 @@ final class LogContentLoader: ObservableObject {
         let key = LoadKey(taskID: task.id, runID: run.runId)
         // 已经在加载同一组合：跳过（避免 view body 重算反复触发）
         if !force, currentKey == key, loadTask != nil { return }
+        if !force, currentKey == key { return }
 
         loadTask?.cancel()
+        let isInitialLoad = currentKey != key
         currentKey = key
-        isLoading = true
+        if isInitialLoad {
+            stdout = .empty
+            stderr = .empty
+            isLoading = true
+        }
 
         let runURL = task.directoryURL
             .appendingPathComponent("runs", isDirectory: true)
@@ -57,9 +64,15 @@ final class LogContentLoader: ObservableObject {
             // 二次校验：load 期间用户切了别的 run，丢弃这次结果
             guard self.currentKey == key else { return }
 
-            self.stdout = out
-            self.stderr = err
-            self.isLoading = false
+            if self.stdout != out {
+                self.stdout = out
+            }
+            if self.stderr != err {
+                self.stderr = err
+            }
+            if self.isLoading {
+                self.isLoading = false
+            }
             self.loadTask = nil
         }
     }
@@ -71,6 +84,12 @@ final class LogContentLoader: ObservableObject {
         stdout = .empty
         stderr = .empty
         isLoading = false
+    }
+
+    /// 测试和确定性调用可等待当前读取完成，无需猜测文件系统时序。
+    func waitForCurrentLoad() async {
+        let task = loadTask
+        await task?.value
     }
 
     /// 后台读：文件 ≤ maxBytes 整读；超过则 seek 到末尾倒退 maxBytes 字节，
