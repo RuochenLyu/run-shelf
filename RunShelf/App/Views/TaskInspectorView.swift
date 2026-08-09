@@ -8,6 +8,14 @@ struct TaskInspectorView: View {
 
     var body: some View {
         Form {
+            if task.manifest.origin == .cli {
+                Section {
+                    LabeledContent("来源") {
+                        TaskOriginBadge(origin: task.manifest.origin)
+                    }
+                }
+            }
+
             Section("计划") {
                 ScheduleEditorView(
                     expression: cronBinding,

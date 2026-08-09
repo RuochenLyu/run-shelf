@@ -105,9 +105,12 @@ private struct TaskSidebarRow: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(displayName)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    TaskOriginBadge(origin: task.manifest.origin)
+                }
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -398,6 +398,13 @@ final class RunShelfCLIE2ETests: XCTestCase {
     }
 
     func testTaskSpecRejectsUnknownFieldsAndUnsupportedTimezone() throws {
+        let originInput = try invokeApply([
+            "name": "Forged Origin",
+            "origin": "app"
+        ])
+        try assertError(originInput, exitCode: 4, code: "validation")
+        XCTAssertTrue(try errorMessage(originInput).contains("origin"))
+
         let unknownRoot = try invokeApply([
             "name": "Unknown Root",
             "enable": true
@@ -436,6 +443,40 @@ final class RunShelfCLIE2ETests: XCTestCase {
             ]
         ])
         XCTAssertEqual(valid.exitCode, 0)
+    }
+
+    func testCLIOriginIsPersistedExposedAndPreservedAcrossUpdates() throws {
+        let create = try invokeApply([
+            "slug": "cli-origin",
+            "name": "CLI Origin",
+            "script": "#!/bin/zsh\necho origin\n"
+        ])
+        let createResult = try result(create.json)
+        let createdTask = try dictionary(createResult["task"])
+        XCTAssertEqual(createdTask["origin"] as? String, "cli")
+        let taskID = try string(createdTask["id"])
+
+        let manifestURL = appSupportURL.appendingPathComponent("tasks/\(taskID)/task.json")
+        let manifest = try dictionary(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)))
+        XCTAssertEqual(manifest["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(manifest["origin"] as? String, "cli")
+
+        let list = try invoke(["task", "list", "--json"])
+        let listedTasks = try XCTUnwrap(try list.json["result"] as? [[String: Any]])
+        XCTAssertEqual(listedTasks.first?["origin"] as? String, "cli")
+
+        let show = try invoke(["task", "show", taskID, "--json"])
+        let showResult = try result(show.json)
+        XCTAssertEqual(try dictionary(showResult["task"])["origin"] as? String, "cli")
+        let revision = try string(showResult["revisionToken"])
+
+        let update = try invokeApply([
+            "id": taskID,
+            "name": "CLI Origin Updated"
+        ], extraArguments: ["--expected-revision", revision])
+        XCTAssertEqual(try dictionary(result(update.json)["task"])["origin"] as? String, "cli")
+        let updatedManifest = try dictionary(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)))
+        XCTAssertEqual(updatedManifest["origin"] as? String, "cli")
     }
 
     func testLogDefaultsToBoundedTailAndFullIsExplicit() throws {

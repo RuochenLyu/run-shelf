@@ -326,7 +326,7 @@ struct TaskRepository {
         throw TaskRepositoryError.conflict("任务文件正在被修改，请重新读取后再试。")
     }
 
-    func createTask(from spec: TaskSpec) throws -> TaskRepositoryWriteResult {
+    func createTask(from spec: TaskSpec, origin: TaskOrigin? = nil) throws -> TaskRepositoryWriteResult {
         try TaskRepositoryFileLock.withExclusiveLock(
             tasksDirectoryURL: tasksDirectoryURL,
             fileManager: fileManager
@@ -346,6 +346,7 @@ struct TaskRepository {
             var manifest = TaskManifest.create(
                 id: id,
                 slug: slug,
+                origin: origin,
                 name: name,
                 description: spec.description ?? "",
                 enabled: spec.enabled ?? true,
@@ -530,10 +531,11 @@ struct TaskRepository {
     }
 
     private func writeTaskWhileLocked(
-        _ task: RunShelfTask,
+        _ inputTask: RunShelfTask,
         expectedRevision: TaskDefinitionRevision?,
         isCreating: Bool
     ) throws -> TaskDefinitionRevision {
+        var task = inputTask
         guard fileManager.fileExists(atPath: task.directoryURL.path) else {
             throw TaskRepositoryError.taskDirectoryMissing(task.id)
         }
@@ -542,7 +544,8 @@ struct TaskRepository {
         }
         _ = try validatedSchedule(task.manifest.schedule)
         if !isCreating {
-            try revalidateTaskRootWhileLocked(task)
+            let persistedManifest = try revalidateTaskRootWhileLocked(task)
+            task.manifest.origin = persistedManifest.origin
         }
         if let expectedRevision {
             let currentRevision = TaskDefinitionRevision.capture(for: task.directoryURL)
@@ -578,7 +581,8 @@ struct TaskRepository {
         return TaskDefinitionRevision.capture(for: task.directoryURL)
     }
 
-    private func revalidateTaskRootWhileLocked(_ task: RunShelfTask) throws {
+    @discardableResult
+    private func revalidateTaskRootWhileLocked(_ task: RunShelfTask) throws -> TaskManifest {
         guard fileManager.fileExists(atPath: task.directoryURL.path) else {
             throw TaskRepositoryError.taskDirectoryMissing(task.id)
         }
@@ -595,6 +599,7 @@ struct TaskRepository {
                 manifestID: manifest.id
             )
         }
+        return manifest
     }
 
     private func ensureUniqueSlugWhileRepositoryLocked(_ slug: String, excludingID: String?) throws {

@@ -675,6 +675,37 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(after.target, executableURL.path)
     }
 
+    @MainActor
+    func testAppTaskOriginIsAssignedAndCannotBeRewritten() throws {
+        let root = try makeTemporaryDirectory()
+        let tasksURL = root.appendingPathComponent("tasks", isDirectory: true)
+        try FileManager.default.createDirectory(at: tasksURL, withIntermediateDirectories: true)
+        try Data("seeded\n".utf8).write(to: tasksURL.appendingPathComponent(".examples-seeded"))
+        let store = TaskStore(tasksDirectoryURL: tasksURL, startsDiskMonitor: false)
+
+        let taskID = try XCTUnwrap(store.createTask(from: TaskTemplate.examples[0], name: "App Origin"))
+        XCTAssertEqual(store.task(withID: taskID)?.manifest.origin, .app)
+
+        store.updateTask(id: taskID) { task in
+            task.manifest.name = "App Origin Updated"
+            task.manifest.origin = .cli
+        }
+        XCTAssertEqual(store.task(withID: taskID)?.manifest.origin, .app)
+        XCTAssertTrue(store.saveTask(id: taskID))
+
+        let reloaded = try TaskRepository(tasksDirectoryURL: tasksURL)
+            .loadTask(selector: .id(taskID), includeRuns: false)
+        XCTAssertEqual(reloaded.task.manifest.origin, .app)
+
+        var forged = reloaded.task
+        forged.manifest.origin = .cli
+        try TaskRepository(tasksDirectoryURL: tasksURL)
+            .writeTask(forged, expectedRevision: reloaded.revision)
+        let preserved = try TaskRepository(tasksDirectoryURL: tasksURL)
+            .loadTask(selector: .id(taskID), includeRuns: false)
+        XCTAssertEqual(preserved.task.manifest.origin, .app)
+    }
+
     func testTaskDefinitionRevisionTokenRoundTripsAndDetectsConflict() throws {
         let root = try makeTemporaryDirectory()
         let repository = TaskRepository(tasksDirectoryURL: root)

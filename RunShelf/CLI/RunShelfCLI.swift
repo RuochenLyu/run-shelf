@@ -186,7 +186,7 @@ private struct CLIContext {
             if expectedRevision != nil {
                 throw CLIExitError.conflict("--expected-revision 只能用于更新已有任务。")
             }
-            result = try repository.createTask(from: spec)
+            result = try repository.createTask(from: spec, origin: .cli)
         }
         let payload = ApplyPayload(
             action: action,
@@ -926,6 +926,7 @@ private struct ErrorPayload: Encodable {
 private struct TaskPayload: Encodable {
     var id: String
     var slug: String?
+    var origin: String?
     var name: String
     var description: String
     var enabled: Bool
@@ -937,6 +938,7 @@ private struct TaskPayload: Encodable {
     init(task: RunShelfTask) {
         self.id = task.id
         self.slug = task.manifest.slug
+        self.origin = task.manifest.origin?.rawValue
         self.name = task.manifest.name
         self.description = task.manifest.description
         self.enabled = task.manifest.enabled

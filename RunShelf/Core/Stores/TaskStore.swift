@@ -309,7 +309,9 @@ final class TaskStore: ObservableObject {
         }
 
         let originalTask = tasks[index]
+        let originalOrigin = tasks[index].manifest.origin
         mutate(&tasks[index])
+        tasks[index].manifest.origin = originalOrigin
         if tasks[index] != originalTask {
             tasks[index].manifest.updatedAt = Date()
             tasks[index].isDirty = true
@@ -530,7 +532,7 @@ final class TaskStore: ObservableObject {
             schedule: schedule ?? template.defaultSchedule,
             script: template.script,
             notes: template.notes
-        )).task
+        ), origin: .app).task
     }
 
     private func loadTask(at directoryURL: URL, includeRuns: Bool = true) throws -> RunShelfTask {
