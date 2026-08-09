@@ -140,6 +140,84 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertEqual(loader.stdout.text, "first\nsecond\nfinal\n", "A completed run must receive one final read")
     }
 
+    @MainActor
+    func testConcurrentManualRunsDoNotStarveLogLoading() async throws {
+        let root = try makeTemporaryDirectory()
+        let runCount = ProcessInfo.processInfo.activeProcessorCount + 1
+        let coordinator = TaskRunCoordinator()
+        let completions = expectation(description: "manual runs finish")
+        completions.expectedFulfillmentCount = runCount
+        var tasks: [RunShelfTask] = []
+
+        for index in 0..<runCount {
+            let task = try makeTask(
+                root: root,
+                id: "blocking-\(index)",
+                script: "#!/bin/zsh\nsleep 30\n",
+                timeoutSeconds: 0
+            )
+            tasks.append(task)
+            coordinator.start(
+                task: task,
+                runID: "manual-\(index)",
+                onStateChange: {},
+                completion: { _ in completions.fulfill() }
+            )
+        }
+        defer { tasks.forEach { coordinator.cancel(taskID: $0.id) } }
+
+        let claimsDeadline = Date().addingTimeInterval(3)
+        while Date() < claimsDeadline,
+              tasks.contains(where: { TaskRunClaimManager.activeClaims(for: $0).isEmpty }) {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(tasks.contains { TaskRunClaimManager.activeClaims(for: $0).isEmpty })
+
+        let logTask = try makeTask(
+            root: root,
+            id: "log-reader",
+            script: "#!/bin/zsh\n",
+            timeoutSeconds: 0
+        )
+        let runID = "finished-log"
+        let runURL = logTask.directoryURL.appendingPathComponent("runs/\(runID)", isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+        try "log remains responsive\n".write(
+            to: runURL.appendingPathComponent("stdout.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "".write(to: runURL.appendingPathComponent("stderr.log"), atomically: true, encoding: .utf8)
+        let run = RunRecord(
+            runId: runID,
+            taskId: logTask.id,
+            trigger: .manual,
+            status: .success,
+            exitCode: 0,
+            scheduledAt: nil,
+            startedAt: Date(),
+            endedAt: Date(),
+            durationMs: 1,
+            scriptSha256: "",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        let loader = LogContentLoader()
+        loader.load(task: logTask, run: run)
+
+        let loaded = expectation(description: "log read completes while runners block")
+        Task {
+            await loader.waitForCurrentLoad()
+            loaded.fulfill()
+        }
+        await fulfillment(of: [loaded], timeout: 2)
+        XCTAssertEqual(loader.stdout.text, "log remains responsive\n")
+
+        tasks.forEach { coordinator.cancel(taskID: $0.id) }
+        await fulfillment(of: [completions], timeout: 10)
+    }
+
     func testCronUsesOrSemanticsWhenDayOfMonthAndWeekdayAreBothRestricted() throws {
         let schedule = try CronSchedule.parse("0 9 1 * 1")
         let firstOfMonth = try makeDate(year: 2026, month: 1, day: 1, hour: 9, minute: 0)

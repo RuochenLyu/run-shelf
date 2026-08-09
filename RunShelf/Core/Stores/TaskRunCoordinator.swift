@@ -24,7 +24,9 @@ final class TaskRunCoordinator {
         startTimes[task.id, default: [:]][runID] = Date()
         onStateChange()
 
-        Task.detached(priority: .userInitiated) {
+        // TaskRunner is intentionally synchronous (waitpid + polling). Keep it off
+        // Swift's cooperative executor so long runs cannot starve async disk/log work.
+        DispatchQueue.global(qos: .utility).async {
             let result = Result {
                 try TaskRunner.run(
                     task: task,
@@ -34,7 +36,7 @@ final class TaskRunCoordinator {
                     cancellation: cancellation
                 )
             }
-            await MainActor.run {
+            Task { @MainActor in
                 self.cancellations[task.id]?.removeValue(forKey: runID)
                 self.startTimes[task.id]?.removeValue(forKey: runID)
                 if self.cancellations[task.id]?.isEmpty != false {
