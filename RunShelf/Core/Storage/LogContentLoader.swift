@@ -60,6 +60,9 @@ final class LogContentLoader: ObservableObject {
 
         let isInitialLoad = currentKey != key
         currentKey = key
+        if isInitialLoad {
+            publish(.init(stdout: .empty, stderr: .empty))
+        }
         setWaitingForContent(isInitialLoad)
         if isInitialLoad || (stdout.text.isEmpty && stderr.text.isEmpty) {
             setLoading(false)

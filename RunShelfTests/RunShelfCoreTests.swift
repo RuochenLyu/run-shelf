@@ -141,6 +141,58 @@ final class RunShelfCoreTests: XCTestCase {
     }
 
     @MainActor
+    func testLogLoaderClearsContentImmediatelyWhenSwitchingRuns() async throws {
+        let root = try makeTemporaryDirectory()
+        let taskID = UUID().uuidString
+        let taskURL = root.appendingPathComponent(taskID, isDirectory: true)
+        let runsURL = taskURL.appendingPathComponent("runs", isDirectory: true)
+        try FileManager.default.createDirectory(at: runsURL, withIntermediateDirectories: true)
+        var runs: [RunRecord] = []
+        for (index, text) in ["first run\n", "second run\n"].enumerated() {
+            let runID = "run-\(index)"
+            let runURL = runsURL.appendingPathComponent(runID, isDirectory: true)
+            try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+            try text.write(to: runURL.appendingPathComponent("stdout.log"), atomically: true, encoding: .utf8)
+            try "".write(to: runURL.appendingPathComponent("stderr.log"), atomically: true, encoding: .utf8)
+            runs.append(RunRecord(
+                runId: runID,
+                taskId: taskID,
+                trigger: .manual,
+                status: .success,
+                exitCode: 0,
+                scheduledAt: nil,
+                startedAt: Date().addingTimeInterval(TimeInterval(index)),
+                endedAt: Date().addingTimeInterval(TimeInterval(index)),
+                durationMs: 1,
+                scriptSha256: "",
+                stdoutPath: "stdout.log",
+                stderrPath: "stderr.log",
+                message: nil
+            ))
+        }
+        let task = RunShelfTask(
+            manifest: .create(id: taskID, name: "Switch logs", description: "", enabled: true),
+            directoryURL: taskURL,
+            script: "#!/bin/zsh\n",
+            notes: "",
+            runs: runs,
+            isDirty: false
+        )
+        let loader = LogContentLoader()
+        loader.load(task: task, run: runs[0])
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "first run\n")
+
+        loader.load(task: task, run: runs[1])
+
+        XCTAssertTrue(loader.isWaitingForContent)
+        XCTAssertEqual(loader.stdout, .empty)
+        XCTAssertEqual(loader.stderr, .empty)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "second run\n")
+    }
+
+    @MainActor
     func testConcurrentManualRunsDoNotStarveLogLoading() async throws {
         let root = try makeTemporaryDirectory()
         let runCount = ProcessInfo.processInfo.activeProcessorCount + 1
