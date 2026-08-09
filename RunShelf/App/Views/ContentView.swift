@@ -25,6 +25,7 @@ struct ContentView: View {
             }
             .sheet(isPresented: $isShowingNewTask) {
                 NewTaskSheet(store: store)
+                    .environmentObject(schedulePrefs)
             }
             .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
                 Button("删除", role: .destructive) {

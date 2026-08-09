@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+### Fixes
+
+- 修复新建任务 sheet 因缺少 SchedulePreferencesStore 环境对象而崩溃的问题。
+
 ### Breaking changes
 
 - 前台 `runshelf run --json` 在脚本失败、超时或取消时改为返回 `ok: false` 和 `error.code: "run_failed"`；退出码仍为 `8`，完整运行记录继续保留在 `result`。
