@@ -109,11 +109,38 @@ final class SchedulerEngine {
             return
         }
 
-        let scanStart = state.lastCheckAt ?? now.addingTimeInterval(-60)
-        guard let scheduledAt = schedule.latestMatchingRun(after: scanStart, through: now) else { return }
+        let previousCheck = state.lastCheckAt ?? now.addingTimeInterval(-60)
+        let scanStart = previousCheck > now ? now.addingTimeInterval(-60) : previousCheck
+        let detailedStaleLimit = 19
+        let summary = schedule.matchingRunSummary(
+            after: scanStart,
+            through: now,
+            prefixLimit: detailedStaleLimit
+        )
+        guard let scheduledAt = summary.latest else { return }
 
         let scheduledMinuteKey = minuteKey(for: scheduledAt)
         guard state.lastScheduledMinuteByTaskID[task.id] != scheduledMinuteKey else { return }
+
+        let precedingRunCount = max(summary.count - 1, 0)
+        let detailedRuns = summary.prefix.filter { $0 != scheduledAt }.prefix(detailedStaleLimit)
+        for missedAt in detailedRuns {
+            writeSystemRecord(
+                task: task,
+                status: .stale,
+                message: "计划运行时间 \(RunShelfFormatters.dateTimeWithSeconds(missedAt)) 未运行。",
+                scheduledAt: missedAt
+            )
+        }
+        let omittedRunCount = precedingRunCount - detailedRuns.count
+        if omittedRunCount > 0 {
+            writeSystemRecord(
+                task: task,
+                status: .stale,
+                message: "另有 \(omittedRunCount) 次计划运行未运行。",
+                scheduledAt: scheduledAt
+            )
+        }
 
         let maxDelay = TimeInterval(max(task.manifest.runner.missedRunPolicy.maxDelaySeconds, 0))
         if now.timeIntervalSince(scheduledAt) > maxDelay {

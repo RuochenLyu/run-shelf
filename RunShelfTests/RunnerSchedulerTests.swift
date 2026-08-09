@@ -150,6 +150,24 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertEqual(records(in: fixture.taskURL).first?.scheduledAt, now)
     }
 
+    func testSchedulerRecordsEveryMissedPointBeforeLatestCatchUp() throws {
+        let fixture = try schedulerFixture(id: "missed-window", concurrency: "skip")
+        let now = try date(2026, 1, 2, 10, 0)
+        try fixture.writeState(lastCheckAt: now.addingTimeInterval(-3 * 60))
+
+        fixture.engine.tick(now: now)
+
+        try waitUntil { self.records(in: fixture.taskURL).contains { $0.status == .success } }
+        let records = records(in: fixture.taskURL)
+        XCTAssertEqual(records.filter { $0.status == .stale }.count, 2)
+        XCTAssertEqual(records.filter { $0.status == .success }.count, 1)
+        XCTAssertEqual(Set(records.compactMap(\.scheduledAt)), Set([
+            now.addingTimeInterval(-2 * 60),
+            now.addingTimeInterval(-60),
+            now
+        ]))
+    }
+
     func testSchedulerCompletionDoesNotLeakWhenAnotherClaimAppears() throws {
         let lock = NSLock()
         var invocationCount = 0

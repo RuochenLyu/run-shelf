@@ -35,6 +35,12 @@ struct CronField: Equatable {
 }
 
 struct CronSchedule: Equatable {
+    struct MatchingRunSummary {
+        var prefix: [Date]
+        var latest: Date?
+        var count: Int
+    }
+
     var expression: String
     var minutes: CronField
     var hours: CronField
@@ -131,6 +137,51 @@ struct CronSchedule: Equatable {
         }
 
         return nil
+    }
+
+    func matchingRunSummary(
+        after start: Date,
+        through end: Date,
+        prefixLimit: Int,
+        calendar inputCalendar: Calendar = .current
+    ) -> MatchingRunSummary {
+        guard start < end else { return MatchingRunSummary(prefix: [], latest: nil, count: 0) }
+
+        var calendar = inputCalendar
+        calendar.timeZone = .current
+        let startMinute = calendar.dateInterval(of: .minute, for: start)?.end ?? start.addingTimeInterval(60)
+        let endMinute = calendar.dateInterval(of: .minute, for: end)?.start ?? end
+        let sortedHours = hours.values.sorted()
+        let sortedMinutes = minutes.values.sorted()
+        var cursorDay = calendar.startOfDay(for: startMinute)
+        var summary = MatchingRunSummary(prefix: [], latest: nil, count: 0)
+
+        while cursorDay <= endMinute {
+            if dayMatches(cursorDay, calendar: calendar) {
+                for hour in sortedHours {
+                    for minute in sortedMinutes {
+                        guard let candidate = date(on: cursorDay, hour: hour, minute: minute, calendar: calendar),
+                              candidate >= startMinute,
+                              candidate <= endMinute,
+                              summary.latest != candidate
+                        else {
+                            continue
+                        }
+                        summary.count += 1
+                        summary.latest = candidate
+                        if summary.prefix.count < max(prefixLimit, 0) {
+                            summary.prefix.append(candidate)
+                        }
+                    }
+                }
+            }
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: cursorDay) else {
+                break
+            }
+            cursorDay = nextDay
+        }
+        return summary
     }
 
     private func candidateRuns(after start: Date, through limitDate: Date, limit: Int, calendar: Calendar) -> [Date] {
