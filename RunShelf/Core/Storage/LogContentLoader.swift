@@ -10,6 +10,8 @@ final class LogContentLoader: ObservableObject {
     nonisolated static let maxBytes: Int64 = 1_048_576  // 1 MB
     /// SwiftUI Text 布局超长单行很贵；保留行尾即可覆盖日志里常见的长 JSON / blob。
     nonisolated private static let maxLineCharacters = 16_384
+    private static let cacheLimit = 8
+    private static let loadingIndicatorDelayNanoseconds: UInt64 = 150_000_000
 
     struct Content: Equatable {
         var text: String
@@ -28,24 +30,45 @@ final class LogContentLoader: ObservableObject {
     @Published private(set) var stdout: Content = .empty
     @Published private(set) var stderr: Content = .empty
     @Published private(set) var isLoading = false
+    @Published private(set) var isWaitingForContent = false
 
     /// 当前正在加载的 (taskID, runID) 组合，防止 stale 结果污染。
     private var currentKey: LoadKey?
     private var loadTask: Task<Void, Never>?
+    private var loadingIndicatorTask: Task<Void, Never>?
+    private var cache: [LoadKey: CachedContent] = [:]
+    private var cacheOrder: [LoadKey] = []
 
     func load(task: RunShelfTask, run: RunRecord, force: Bool = false) {
-        let key = LoadKey(taskID: task.id, runID: run.runId)
+        let key = LoadKey(taskID: task.id, runID: run.runId, status: run.status.rawValue)
         // 已经在加载同一组合：跳过（避免 view body 重算反复触发）
         if !force, currentKey == key, loadTask != nil { return }
         if !force, currentKey == key { return }
 
         loadTask?.cancel()
+        loadingIndicatorTask?.cancel()
+
+        if !force, let cached = cache[key] {
+            currentKey = key
+            publish(cached)
+            touchCacheKey(key)
+            loadTask = nil
+            setLoading(false)
+            setWaitingForContent(false)
+            return
+        }
+
         let isInitialLoad = currentKey != key
         currentKey = key
-        if isInitialLoad {
-            stdout = .empty
-            stderr = .empty
-            isLoading = true
+        setWaitingForContent(isInitialLoad)
+        if isInitialLoad || (stdout.text.isEmpty && stderr.text.isEmpty) {
+            setLoading(false)
+            loadingIndicatorTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: Self.loadingIndicatorDelayNanoseconds)
+                guard !Task.isCancelled, let self else { return }
+                guard self.currentKey == key, self.loadTask != nil else { return }
+                self.setLoading(true)
+            }
         }
 
         let runURL = task.directoryURL
@@ -64,32 +87,67 @@ final class LogContentLoader: ObservableObject {
             // 二次校验：load 期间用户切了别的 run，丢弃这次结果
             guard self.currentKey == key else { return }
 
-            if self.stdout != out {
-                self.stdout = out
-            }
-            if self.stderr != err {
-                self.stderr = err
-            }
-            if self.isLoading {
-                self.isLoading = false
-            }
+            let content = CachedContent(stdout: out, stderr: err)
+            self.storeInCache(content, for: key)
+            self.publish(content)
+            self.loadingIndicatorTask?.cancel()
+            self.loadingIndicatorTask = nil
+            self.setWaitingForContent(false)
+            self.setLoading(false)
             self.loadTask = nil
         }
     }
 
     func clear() {
         loadTask?.cancel()
+        loadingIndicatorTask?.cancel()
         loadTask = nil
+        loadingIndicatorTask = nil
         currentKey = nil
         stdout = .empty
         stderr = .empty
-        isLoading = false
+        setLoading(false)
+        setWaitingForContent(false)
     }
 
     /// 测试和确定性调用可等待当前读取完成，无需猜测文件系统时序。
     func waitForCurrentLoad() async {
         let task = loadTask
         await task?.value
+    }
+
+    private func publish(_ content: CachedContent) {
+        if stdout != content.stdout {
+            stdout = content.stdout
+        }
+        if stderr != content.stderr {
+            stderr = content.stderr
+        }
+    }
+
+    private func setLoading(_ value: Bool) {
+        if isLoading != value {
+            isLoading = value
+        }
+    }
+
+    private func setWaitingForContent(_ value: Bool) {
+        if isWaitingForContent != value {
+            isWaitingForContent = value
+        }
+    }
+
+    private func storeInCache(_ content: CachedContent, for key: LoadKey) {
+        cache[key] = content
+        touchCacheKey(key)
+        while cacheOrder.count > Self.cacheLimit {
+            cache.removeValue(forKey: cacheOrder.removeFirst())
+        }
+    }
+
+    private func touchCacheKey(_ key: LoadKey) {
+        cacheOrder.removeAll { $0 == key }
+        cacheOrder.append(key)
     }
 
     /// 后台读：文件 ≤ maxBytes 整读；超过则 seek 到末尾倒退 maxBytes 字节，
@@ -184,8 +242,14 @@ final class LogContentLoader: ObservableObject {
         return (output, didTruncate)
     }
 
-    private struct LoadKey: Equatable {
+    private struct CachedContent {
+        let stdout: Content
+        let stderr: Content
+    }
+
+    private struct LoadKey: Hashable {
         let taskID: String
         let runID: String
+        let status: String
     }
 }

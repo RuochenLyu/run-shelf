@@ -22,7 +22,7 @@ struct LogView: View {
             }
         }
         .task(id: reloadKey) {
-            reloadIfNeeded(force: true)
+            reloadIfNeeded(force: effectiveRun?.status == .running)
             while !Task.isCancelled, effectiveRun?.status == .running {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard !Task.isCancelled else { break }
@@ -89,11 +89,13 @@ struct LogView: View {
         let stdout = loader.stdout.text
         let stderr = loader.stderr.text
 
-        if loader.isLoading {
+        if stdout.isEmpty && stderr.isEmpty && loader.isWaitingForContent {
             VStack {
                 Spacer()
-                ProgressView()
-                    .controlSize(.small)
+                if loader.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,47 +109,30 @@ struct LogView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if !stdout.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if loader.stdout.isFileTruncated {
-                                truncationHint(byteCount: loader.stdout.byteCount, color: .secondary)
-                            }
-                            Text(stdout)
-                                .font(.system(.callout, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
+            ZStack {
+                LogTextView(
+                    content: LogTextView.Content(
+                        stdout: stdout,
+                        stderr: stderr,
+                        stdoutNotice: truncationNotice(for: loader.stdout),
+                        stderrNotice: truncationNotice(for: loader.stderr)
+                    ),
+                    scrollKey: "\(task.id):\(run.runId)"
+                )
 
-                    if !stderr.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("标准错误", systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.orange)
-
-                            if loader.stderr.isFileTruncated {
-                                truncationHint(byteCount: loader.stderr.byteCount, color: .secondary)
-                            }
-                            Text(stderr)
-                                .font(.system(.callout, design: .monospaced))
-                                .foregroundStyle(.red)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
+                if loader.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(10)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
             }
         }
     }
 
-    private func truncationHint(byteCount: Int64, color: Color) -> some View {
-        Text("仅显示最后 \(RunShelfFormatters.byteSize(LogContentLoader.maxBytes))（总 \(RunShelfFormatters.byteSize(byteCount))）")
-            .font(.caption)
-            .foregroundStyle(color)
+    private func truncationNotice(for content: LogContentLoader.Content) -> String? {
+        guard content.isFileTruncated else { return nil }
+        return "仅显示最后 \(RunShelfFormatters.byteSize(LogContentLoader.maxBytes))（总 \(RunShelfFormatters.byteSize(content.byteCount))）"
     }
 
     private var emptyState: some View {

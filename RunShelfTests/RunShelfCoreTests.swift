@@ -86,7 +86,7 @@ final class RunShelfCoreTests: XCTestCase {
         let loader = LogContentLoader()
 
         loader.load(task: task, run: run, force: true)
-        XCTAssertTrue(loader.isLoading)
+        XCTAssertFalse(loader.isLoading, "Fast local reads should not flash a loading placeholder")
         await loader.waitForCurrentLoad()
         XCTAssertFalse(loader.isLoading)
         XCTAssertEqual(loader.stdout.text, "first\n")
@@ -104,6 +104,40 @@ final class RunShelfCoreTests: XCTestCase {
         await loader.waitForCurrentLoad()
         XCTAssertEqual(loader.stdout.text, "first\nsecond\n")
         observation.cancel()
+
+        let otherRunID = "20260809T010204Z-finished"
+        let otherRunURL = taskURL
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(otherRunID, isDirectory: true)
+        try FileManager.default.createDirectory(at: otherRunURL, withIntermediateDirectories: true)
+        try "other\n".write(
+            to: otherRunURL.appendingPathComponent("stdout.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "".write(
+            to: otherRunURL.appendingPathComponent("stderr.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        var otherRun = run
+        otherRun.runId = otherRunID
+        otherRun.status = .success
+
+        loader.load(task: task, run: otherRun)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "other\n")
+
+        loader.load(task: task, run: run)
+        XCTAssertEqual(loader.stdout.text, "first\nsecond\n", "Revisiting a cached run should be immediate")
+        XCTAssertFalse(loader.isLoading)
+
+        try "first\nsecond\nfinal\n".write(to: stdoutURL, atomically: true, encoding: .utf8)
+        var completedRun = run
+        completedRun.status = .success
+        loader.load(task: task, run: completedRun)
+        await loader.waitForCurrentLoad()
+        XCTAssertEqual(loader.stdout.text, "first\nsecond\nfinal\n", "A completed run must receive one final read")
     }
 
     func testCronUsesOrSemanticsWhenDayOfMonthAndWeekdayAreBothRestricted() throws {

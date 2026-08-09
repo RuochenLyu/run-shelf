@@ -115,6 +115,7 @@
 		F5CF6B178334CBBD7E570F09 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F6F7DF7A9D39CA3FAC5056 /* LogContentLoader.swift */; };
 		F66174AAAC9032E1E918E4D0 /* PermissionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */; };
 		F6765F7C3A9969242BF33857 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		F7366F26F68479ABEB42215F /* LogTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC2F271BBCF8915724E69A5 /* LogTextView.swift */; };
 		F78C125B5CF223A7E67A067E /* ShellScriptEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */; };
 		F7C6D55257F32446754ACB6F /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6452E5D8F27F04BD9200CF39 /* StatusBadge.swift */; };
 		FA219ACBEE9397481347B43E /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
@@ -240,6 +241,7 @@
 		F3AD85FE666E21E1118A4A3F /* TaskSelectionState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSelectionState.swift; sourceTree = "<group>"; };
 		F4F9E1A3FBD8E621ED3F539A /* RunShelfCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCoreTests.swift; sourceTree = "<group>"; };
 		F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModels.swift; sourceTree = "<group>"; };
+		FFC2F271BBCF8915724E69A5 /* LogTextView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogTextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -360,6 +362,7 @@
 				94817BF0B0F6D615D79BCDCF /* TaskHeaderView.swift */,
 				73EBA73DEB9D70ED60150379 /* TaskInspectorView.swift */,
 				D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */,
+				FFC2F271BBCF8915724E69A5 /* LogTextView.swift */,
 			);
 			name = Views;
 			path = Views;
@@ -746,6 +749,7 @@
 				6645B779A08F3FE9B592A8B0 /* TaskRunCoordinator.swift in Sources */,
 				A821A408980E13D28A4748BD /* TaskSelectionState.swift in Sources */,
 				49D23319E8563ED0C2A6BB8D /* LogContentLoader.swift in Sources */,
+				F7366F26F68479ABEB42215F /* LogTextView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
