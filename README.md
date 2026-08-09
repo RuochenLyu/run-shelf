@@ -1,5 +1,10 @@
 # Run Shelf
 
+[![Check](https://github.com/RuochenLyu/run-shelf/actions/workflows/check.yml/badge.svg)](https://github.com/RuochenLyu/run-shelf/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+简体中文 | [English](README.en.md)
+
 Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Shell 脚本放进来，手动运行，按 cron 表达式定时运行，并查看每次运行的输出、退出码和失败原因。
 
 它不是云端自动化平台，也不需要账号。任务、脚本、备注和运行历史都保存在本机文件里，不会上传。

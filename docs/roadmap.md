@@ -1,5 +1,7 @@
 # Run Shelf Roadmap
 
+> 本文档是 P0/P1 阶段的开发路线存档，保留用于追溯工程决策。当前进展以 CHANGELOG 与代码为准。
+
 本文档把 `docs/requirements.md` 拆成可执行的开发顺序，并记录已经确认采用的默认工程决策。
 
 ## 1. 当前结论

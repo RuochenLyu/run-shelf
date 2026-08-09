@@ -4,6 +4,8 @@ Run Shelf 是一个小型原生 macOS 项目。改动应当坚持本机保存、
 
 ## 开发环境
 
+Ruby（Gemfile）仅用于工程文件生成：xcodeproj 源码引用同步和 CLI schema 生成。App 与 CLI 本身零 Ruby 依赖。
+
 先安装 Xcode 工程工具依赖，并增量同步源码引用：
 
 ```bash

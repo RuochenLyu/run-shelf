@@ -58,16 +58,16 @@ cp .release.env.example .release.env
 `.release.env` 不进 git，只保存本机发布参数：
 
 ```bash
-RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Ruochen Lyu (B4BJ3QY8T2)"
-RUN_SHELF_NOTARY_PROFILE="silent-switch-notary"
+RUN_SHELF_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID1234)"
+RUN_SHELF_NOTARY_PROFILE="runshelf-notary"
 ```
 
 如果换电脑，先在钥匙串里保存 notarytool 凭据。profile 名称要和 `.release.env` 一致：
 
 ```bash
-xcrun notarytool store-credentials "silent-switch-notary" \
+xcrun notarytool store-credentials "runshelf-notary" \
   --apple-id "APPLE_ID" \
-  --team-id "B4BJ3QY8T2"
+  --team-id "TEAMID1234"
 ```
 
 正式发布必须公证。只做本地签名包时才显式跳过：
