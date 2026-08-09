@@ -14,7 +14,7 @@ schemas = {
 }
 
 rendered = schemas.map do |name, path|
-  json = JSON.pretty_generate(JSON.parse(File.read(path))) + "\n"
+  json = JSON.pretty_generate(JSON.parse(File.read(path, encoding: "UTF-8"))) + "\n"
   abort "Schema contains unsupported raw-string terminator: #{path}" if json.include?('"""#')
   "    static let #{name} = #\"\"\"\n#{json}\"\"\"#"
 end.join("\n\n")
@@ -29,7 +29,7 @@ output = <<~SWIFT
 SWIFT
 
 if check_only
-  abort "Generated schema source is out of date. Run scripts/generate_cli_schemas.rb." unless File.exist?(output_path) && File.read(output_path) == output
+  abort "Generated schema source is out of date. Run scripts/generate_cli_schemas.rb." unless File.exist?(output_path) && File.read(output_path, encoding: "UTF-8") == output
   puts "Generated CLI schemas are in sync."
 else
   File.write(output_path, output)
