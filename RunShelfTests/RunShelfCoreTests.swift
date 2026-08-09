@@ -28,21 +28,50 @@ final class RunShelfCoreTests: XCTestCase {
         )
 
         let store = TaskStore(tasksDirectoryURL: tasksURL, startsDiskMonitor: false)
-
-        var changeCount = 0
-        let observation = store.objectWillChange.sink { changeCount += 1 }
-        defer { observation.cancel() }
-
-        store.applyDiskScan(DiskScanResult(
-            entries: [],
+        var task = try makeTask(
+            root: tasksURL,
+            id: "stable-scan",
+            script: "#!/bin/zsh\necho stable\n",
+            timeoutSeconds: 0
+        )
+        let run = RunRecord(
+            runId: "stable-run",
+            taskId: task.id,
+            trigger: .manual,
+            status: .success,
+            exitCode: 0,
+            scheduledAt: nil,
+            startedAt: Date(),
+            endedAt: Date(),
+            durationMs: 1,
+            scriptSha256: "hash",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        task.runs = [run]
+        let stableResult = DiskScanResult(
+            entries: [
+                .fullReload(task, generation: 0),
+                .runsOnly(taskID: task.id, runs: [run], generation: 0)
+            ],
             deletedTaskIDs: [],
             newSignatures: [:],
             newRunsCache: [:],
             activities: [:],
             errors: []
-        ))
+        )
 
-        XCTAssertEqual(changeCount, 0, "A no-op disk scan must not invalidate the full SwiftUI tree")
+        store.applyDiskScan(stableResult)
+        XCTAssertEqual(store.tasks, [task])
+
+        var changeCount = 0
+        let observation = store.objectWillChange.sink { changeCount += 1 }
+        defer { observation.cancel() }
+
+        store.applyDiskScan(stableResult)
+
+        XCTAssertEqual(changeCount, 0, "Equal fullReload and runsOnly content must not invalidate the SwiftUI tree")
     }
 
     @MainActor
