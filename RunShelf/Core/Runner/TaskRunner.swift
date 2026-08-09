@@ -50,6 +50,8 @@ final class TaskRunCancellation: @unchecked Sendable {
 }
 
 enum TaskRunner {
+    typealias MonotonicClock = () -> TimeInterval
+
     static func run(
         task: RunShelfTask,
         trigger: RunTrigger,
@@ -58,7 +60,10 @@ enum TaskRunner {
         host: String = "runner",
         claimMode: TaskRunClaimMode = .acquire,
         cancellation: TaskRunCancellation? = nil,
-        terminationGraceSeconds: TimeInterval = 5
+        terminationGraceSeconds: TimeInterval = 5,
+        monotonicNow: @escaping MonotonicClock = {
+            TimeInterval(clock_gettime_nsec_np(CLOCK_UPTIME_RAW)) / 1_000_000_000
+        }
     ) throws -> RunRecord {
         let fileManager = FileManager.default
         let startedAt = Date()
@@ -148,6 +153,7 @@ enum TaskRunner {
                 cancellation: cancellation,
                 externalCancellationURL: cancellationURL,
                 terminationGraceSeconds: terminationGraceSeconds,
+                monotonicNow: monotonicNow,
                 onProcessStarted: { processGroupID in
                     try claimLease.update(processGroupID: processGroupID)
                     runningRecord.processGroupID = processGroupID
@@ -296,6 +302,7 @@ private extension TaskRunner {
         cancellation: TaskRunCancellation?,
         externalCancellationURL: URL?,
         terminationGraceSeconds: TimeInterval,
+        monotonicNow: MonotonicClock,
         onProcessStarted: ((pid_t) throws -> Void)? = nil
     ) throws -> ExecutionResult {
         let pid = try spawnProcessGroup(
@@ -321,8 +328,9 @@ private extension TaskRunner {
         var didTimeout = false
         var wasCancelled = false
         var sentKill = false
-        var terminationRequestedAt: Date?
-        let deadline = timeoutSeconds > 0 ? Date().addingTimeInterval(TimeInterval(timeoutSeconds)) : nil
+        var terminationRequestedAt: TimeInterval?
+        let startedAt = monotonicNow()
+        let deadline = timeoutSeconds > 0 ? startedAt + TimeInterval(timeoutSeconds) : nil
         let graceSeconds = max(terminationGraceSeconds, 0)
 
         while true {
@@ -346,7 +354,7 @@ private extension TaskRunner {
                 throw TaskRunnerError.processDidNotStart(String(cString: strerror(errno)))
             }
 
-            let now = Date()
+            let now = monotonicNow()
             if !wasCancelled, cancellation?.isCancelled == true {
                 wasCancelled = true
                 terminationRequestedAt = now
@@ -368,7 +376,7 @@ private extension TaskRunner {
                 terminateProcessGroup(pid: pid, signal: SIGTERM)
             }
 
-            if let terminationRequestedAt, !sentKill, now.timeIntervalSince(terminationRequestedAt) >= graceSeconds {
+            if let terminationRequestedAt, !sentKill, now - terminationRequestedAt >= graceSeconds {
                 sentKill = true
                 writeLine("Run Shelf：进程组收到终止信号后仍未退出，已强制结束。", to: stderrHandle)
                 terminateProcessGroup(pid: pid, signal: SIGKILL)

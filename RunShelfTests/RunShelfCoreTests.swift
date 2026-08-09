@@ -221,6 +221,26 @@ final class RunShelfCoreTests: XCTestCase {
         XCTAssertFalse(isProcessAlive(childPID), "timeout should terminate the whole child process group")
     }
 
+    func testTaskRunnerTimeoutUsesInjectedMonotonicClock() throws {
+        let root = try makeTemporaryDirectory()
+        let task = try makeTask(
+            root: root,
+            id: "monotonic-timeout-task",
+            script: "#!/bin/zsh\nsleep 1.4\n",
+            timeoutSeconds: 1
+        )
+
+        let record = try TaskRunner.run(
+            task: task,
+            trigger: .manual,
+            monotonicNow: { 100 }
+        )
+
+        XCTAssertEqual(record.status, .success)
+        XCTAssertNil(record.message)
+        XCTAssertGreaterThanOrEqual(record.durationMs ?? 0, 1_000)
+    }
+
     func testTaskRunnerCancellationWritesCancelledRun() throws {
         let root = try makeTemporaryDirectory()
         let task = try makeTask(
