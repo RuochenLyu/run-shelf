@@ -10,6 +10,7 @@
 4. 选择任务优先用 `id` 或 `slug`，不要靠 `name` 猜。
 5. 修改已有任务时，把 `task show` 返回的 `revisionToken` 原样带回 `apply --expected-revision <token>`。
 6. 遇到 `conflict`、`not_found`、`validation`、`already_running` 这类错误，重新读取任务或等待运行结束后再决定下一步。
+7. slug 不能使用 CLI 保留字 `status`、`log`、`cancel`、`stop`。
 
 CLI、App、后台调度进程共用同一个任务目录。CLI 写入时会做一致性读取、乐观 CAS 和原子写；运行任务时会用 `.run-claim` 做跨进程去重，所以 App 和 CLI 同时操作同一批任务时不会靠“最后写入覆盖前一个写入”来赌运气。
 
@@ -136,7 +137,7 @@ runshelf run <id|slug> --allow-dangerous --wait --json
 
 ```text
 0  成功
-1  未分类错误
+1  未分类错误；或 doctor 发现任务读取问题（此时 result.loadIssues 非空）
 2  命令用法错误
 3  任务或运行记录不存在
 4  输入校验失败

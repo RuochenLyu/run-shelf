@@ -221,7 +221,9 @@ enum TaskRepositoryError: LocalizedError, Equatable {
     case ambiguous(String, [String])
     case conflict(String)
     case invalidSlug(String)
+    case reservedSlug(String)
     case invalidSchedule(String)
+    case invalidTimeoutSeconds(Int)
     case invalidTaskID(String)
     case invalidRevision(String)
     case missingRequiredField(String)
@@ -239,8 +241,12 @@ enum TaskRepositoryError: LocalizedError, Equatable {
             return message
         case .invalidSlug(let slug):
             return "slug 不合法：\(slug)。只能使用小写字母、数字、点、短横线和下划线，且必须以字母或数字开头。"
+        case .reservedSlug(let slug):
+            return "slug 是 CLI 保留字：\(slug)。请换一个 slug。"
         case .invalidSchedule(let message):
             return "执行计划不合法：\(message)"
+        case .invalidTimeoutSeconds(let value):
+            return "timeoutSeconds 不能小于 0：\(value)"
         case .invalidTaskID(let taskID):
             return "任务 id 不合法：\(taskID)"
         case .invalidRevision(let revision):
@@ -503,7 +509,7 @@ struct TaskRepository {
             _ = try validatedSchedule(schedule)
         }
         if let timeoutSeconds = spec.timeoutSeconds, timeoutSeconds < 0 {
-            throw TaskRepositoryError.conflict("timeoutSeconds 不能小于 0。")
+            throw TaskRepositoryError.invalidTimeoutSeconds(timeoutSeconds)
         }
         return DangerousCommandScanner.scan(spec.script ?? "")
     }
@@ -625,6 +631,9 @@ struct TaskRepository {
         let regex = try! NSRegularExpression(pattern: pattern)
         guard regex.firstMatch(in: trimmed, range: range) != nil else {
             throw TaskRepositoryError.invalidSlug(value)
+        }
+        if ["status", "log", "cancel", "stop"].contains(trimmed) {
+            throw TaskRepositoryError.reservedSlug(trimmed)
         }
         return trimmed
     }

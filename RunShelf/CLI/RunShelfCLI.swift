@@ -540,6 +540,9 @@ private struct CLIContext {
     }
 
     private func cancelRun(runID: String) throws -> CancelRunPayload {
+        guard TaskFileStore.isSafeRunID(runID) else {
+            throw CLIExitError.validation("run id 不合法：\(runID)")
+        }
         let tasks = try repository.loadTasks(includeRuns: false)
         for task in tasks {
             guard let claim = TaskRunClaimManager.activeClaim(for: task, runID: runID) else {
@@ -567,7 +570,7 @@ private struct CLIContext {
             }
             return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: nil)
         }
-        throw CLIExitError.notFound("找不到运行中的任务：\(runID)")
+        throw CLIExitError.notFound("找不到运行中的任务：\(runID)。运行可能已经结束；请用 run status 查看最终状态。")
     }
 
     private func readLog(
@@ -730,7 +733,14 @@ private struct CLIContext {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        let data = (try? encoder.encode(envelope)) ?? Data()
+        let data: Data
+        do {
+            data = try encoder.encode(envelope)
+        } catch {
+            let message = "runshelf: JSON envelope 编码失败：\(error.localizedDescription)\n"
+            FileHandle.standardError.write(Data(message.utf8))
+            exit(Int32(CLIExitError.unexpected(message).exitCode))
+        }
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
@@ -810,7 +820,7 @@ private enum CLIExitError: Error {
             return .notFound(error.localizedDescription)
         case .ambiguous(_, _), .conflict(_):
             return .conflict(error.localizedDescription)
-        case .invalidSlug(_), .invalidSchedule(_), .invalidTaskID(_), .invalidRevision(_), .missingRequiredField(_):
+        case .invalidSlug(_), .reservedSlug(_), .invalidSchedule(_), .invalidTimeoutSeconds(_), .invalidTaskID(_), .invalidRevision(_), .missingRequiredField(_):
             return .validation(error.localizedDescription)
         case .taskDirectoryMissing(_):
             return .notFound(error.localizedDescription)
@@ -1033,7 +1043,8 @@ Run Shelf 的 agent 操作约定：
 6. 脚本命中高风险命令时，apply/run 默认拒绝；确认要写入或运行时显式加 --allow-dangerous。
 7. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
 8. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
-9. 退出码契约：0=成功，1=未知错误，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
-10. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
-11. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
+9. slug 不能使用 CLI 保留字 status、log、cancel、stop。
+10. 退出码契约：0=成功，1=未知错误或 doctor 发现任务读取问题，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
+11. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
+12. 需要固定命令名时，先运行 runshelf install-cli --json；如果 PATH 未包含安装目录，按返回值调整 shell 配置。
 """

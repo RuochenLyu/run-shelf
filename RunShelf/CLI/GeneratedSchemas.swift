@@ -16,7 +16,15 @@ enum GeneratedSchemas {
     },
     "slug": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$"
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$",
+      "not": {
+        "enum": [
+          "status",
+          "log",
+          "cancel",
+          "stop"
+        ]
+      }
     },
     "name": {
       "type": "string"

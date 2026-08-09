@@ -222,6 +222,39 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertTrue(try string(showResult["script"]).contains("original"))
     }
 
+    func testValidationEdgesUseStableExitCodesAndMessages() throws {
+        let negativeTimeout = try invokeApply([
+            "slug": "negative-timeout",
+            "name": "Negative Timeout",
+            "timeoutSeconds": -1
+        ])
+        try assertError(negativeTimeout, exitCode: 4, code: "validation")
+
+        for slug in ["status", "log", "cancel", "stop"] {
+            let reserved = try invokeApply([
+                "slug": slug,
+                "name": "Reserved \(slug)"
+            ])
+            try assertError(reserved, exitCode: 4, code: "validation")
+            XCTAssertTrue(try errorMessage(reserved).contains("保留字"))
+        }
+
+        let unsafeCancel = try invoke(["run", "cancel", "../claim", "--json"])
+        try assertError(unsafeCancel, exitCode: 4, code: "validation")
+
+        let create = try invokeApply([
+            "slug": "ended-run",
+            "name": "Ended Run",
+            "script": "#!/bin/zsh\necho done\n"
+        ])
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+        let run = try invoke(["run", taskID, "--json"])
+        let runID = try string(dictionary(result(run.json)["run"])["runId"])
+        let cancelEnded = try invoke(["run", "cancel", runID, "--json"])
+        try assertError(cancelEnded, exitCode: 3, code: "not_found")
+        XCTAssertTrue(try errorMessage(cancelEnded).contains("run status"))
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",
