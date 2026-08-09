@@ -294,6 +294,57 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertTrue(try string(exampleJSON["script"]).contains("echo hello"))
     }
 
+    func testAgentSetupUsesHelpAgentAsSingleSourceOfTruth() throws {
+        let setup = try invoke(["agent-setup"])
+        let help = try invoke(["help", "agent"])
+
+        XCTAssertEqual(setup.exitCode, 0)
+        XCTAssertEqual(help.exitCode, 0)
+        XCTAssertEqual(setup.stdout, help.stdout)
+        let content = try XCTUnwrap(String(data: setup.stdout, encoding: .utf8))
+        XCTAssertTrue(content.contains(executableURL.resolvingSymlinksInPath().path))
+        XCTAssertTrue(content.contains("schema task-spec"))
+        XCTAssertTrue(content.contains("## 最小 TaskSpec"))
+        XCTAssertTrue(content.contains("## 退出码"))
+        XCTAssertTrue(content.contains("--allow-dangerous"))
+    }
+
+    func testAgentSetupWriteIsIdempotentAndPreservesExistingContent() throws {
+        let targetURL = rootURL.appendingPathComponent(".claude/CLAUDE.md")
+        try FileManager.default.createDirectory(
+            at: targetURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let existing = "# Existing instructions\n\nKeep this text byte-for-byte.\n"
+        try Data(existing.utf8).write(to: targetURL)
+
+        let first = try invoke(["agent-setup", "--write", "claude", "--json"])
+        XCTAssertEqual(first.exitCode, 0)
+        XCTAssertEqual(try result(first.json)["changed"] as? Bool, true)
+        XCTAssertEqual(try result(first.json)["path"] as? String, targetURL.path)
+        let firstData = try Data(contentsOf: targetURL)
+        let firstText = try XCTUnwrap(String(data: firstData, encoding: .utf8))
+        XCTAssertTrue(firstText.hasPrefix(existing))
+        XCTAssertEqual(firstText.components(separatedBy: RunShelfAgentGuide.beginMarker).count, 2)
+        XCTAssertEqual(firstText.components(separatedBy: RunShelfAgentGuide.endMarker).count, 2)
+
+        let second = try invoke(["agent-setup", "--write", "claude", "--json"])
+        XCTAssertEqual(second.exitCode, 0)
+        XCTAssertEqual(try result(second.json)["changed"] as? Bool, false)
+        XCTAssertEqual(try Data(contentsOf: targetURL), firstData)
+
+        let agentsURL = rootURL.appendingPathComponent("AGENTS.md")
+        let agentsExisting = "# Workspace rules\n"
+        try Data(agentsExisting.utf8).write(to: agentsURL)
+        let agents = try invoke(
+            ["agent-setup", "--write", "agents", "--json"],
+            currentDirectoryURL: rootURL
+        )
+        XCTAssertEqual(agents.exitCode, 0)
+        XCTAssertEqual(try result(agents.json)["changed"] as? Bool, true)
+        XCTAssertTrue(try String(contentsOf: agentsURL, encoding: .utf8).hasPrefix(agentsExisting))
+    }
+
     func testLegacyClaimCancelDoesNotSignalUnverifiedProcess() throws {
         let create = try invokeApply([
             "slug": "legacy-claim",
@@ -504,8 +555,9 @@ final class RunShelfCLIE2ETests: XCTestCase {
         return url
     }
 
-    private func invoke(_ arguments: [String]) throws -> Invocation {
+    private func invoke(_ arguments: [String], currentDirectoryURL: URL? = nil) throws -> Invocation {
         let process = makeProcess(arguments: arguments)
+        process.currentDirectoryURL = currentDirectoryURL
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
@@ -543,6 +595,7 @@ final class RunShelfCLIE2ETests: XCTestCase {
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
         environment["RUN_SHELF_APP_SUPPORT_DIR"] = appSupportURL.path
+        environment["HOME"] = rootURL.path
         process.environment = environment
         return process
     }

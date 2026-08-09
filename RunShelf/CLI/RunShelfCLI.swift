@@ -67,6 +67,8 @@ private struct CLIContext {
             return try runDoctor()
         case "install-cli":
             return try runInstallCLI()
+        case "agent-setup":
+            return try runAgentSetup()
         case "help":
             return try runHelp()
         case "schema":
@@ -381,11 +383,46 @@ private struct CLIContext {
         switch topic {
         case "agent":
             try rejectUnexpectedArguments()
-            print(agentHelpText)
+            print(RunShelfAgentGuide.markdown())
             return 0
         default:
             throw CLIExitError.usage("未知帮助主题：\(topic)")
         }
+    }
+
+    private mutating func runAgentSetup() throws -> Int32 {
+        let writeTarget = try takeOptionalFlagValue("--write")
+        try rejectUnexpectedArguments()
+        guard let writeTarget else {
+            let content = RunShelfAgentGuide.markdown()
+            if jsonOutput {
+                emit(AgentSetupContentPayload(content: content))
+            } else {
+                print(content)
+            }
+            return 0
+        }
+
+        let targetURL: URL
+        switch writeTarget {
+        case "claude":
+            let homePath = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
+            targetURL = URL(fileURLWithPath: homePath, isDirectory: true)
+                .appendingPathComponent(".claude", isDirectory: true)
+                .appendingPathComponent("CLAUDE.md")
+        case "agents":
+            targetURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+                .appendingPathComponent("AGENTS.md")
+        default:
+            throw CLIExitError.usage("--write 只支持 claude 或 agents。")
+        }
+
+        let changed = try RunShelfAgentSetupWriter.writeMarkedBlock(to: targetURL)
+        let payload = AgentSetupWritePayload(target: writeTarget, path: targetURL.path, changed: changed)
+        emitOrPrint(payload) {
+            changed ? "已写入：\(targetURL.path)" : "无需更改：\(targetURL.path)"
+        }
+        return 0
     }
 
     private mutating func runSchema() throws -> Int32 {
@@ -799,6 +836,7 @@ private struct CLIContext {
             runshelf run log <run-id> [--stdout|--stderr] [--bytes <n>|--full] [--json]
             runshelf doctor [--json]
             runshelf install-cli [--prefix ~/.local/bin] [--force] [--json]
+            runshelf agent-setup [--write claude|agents] [--json]
             runshelf help agent
             runshelf schema task-spec [--example]
             runshelf schema cli-result
@@ -1028,6 +1066,16 @@ private struct VersionPayload: Encodable {
     var envelopeSchemaVersion: Int
 }
 
+private struct AgentSetupContentPayload: Encodable {
+    var content: String
+}
+
+private struct AgentSetupWritePayload: Encodable {
+    var target: String
+    var path: String
+    var changed: Bool
+}
+
 private func formatTask(_ task: RunShelfTask, revision: TaskDefinitionRevision) -> String {
     """
     \(task.manifest.name)
@@ -1089,24 +1137,4 @@ private let taskSpecExample = """
   "name": "Example task",
   "script": "#!/bin/zsh\\nset -euo pipefail\\n\\necho hello\\n"
 }
-"""
-
-private let agentHelpText = """
-Run Shelf 的 agent 操作约定：
-
-1. 不要直接编辑 task.json、run.sh、notes.md。用 runshelf apply 写入，CLI 会做校验、CAS 冲突检测和原子写。
-2. 读取用 runshelf task list --json 和 runshelf task show <id|slug> --json；优先使用 id 或 slug，不要靠 name 选择任务。
-3. 创建先运行 runshelf apply spec.json --dry-run --json，再运行 runshelf apply spec.json --json。
-4. 更新先 show 取得 revisionToken；dry-run 和真正 apply 都带 --expected-revision <token>。缺少 token 会返回 usage/2，并且不写盘。
-5. 前台运行用 runshelf run <id|slug> --wait --json；长任务用 --detach，拿到 runId 后用 run status 轮询。
-6. 日志用 runshelf run log <runId> --stdout|--stderr --json；默认返回最后 1 MiB，可用 --bytes 或 --full。停止用 run cancel（run stop 是别名）。
-7. 运行结束后先用 run status 查看最终状态，再用 runshelf task delete <id|slug> --json 删除任务；运行中的任务不能删除。
-8. 脚本命中高风险命令时，apply/run 默认拒绝；确认要写入或运行时显式加 --allow-dangerous。
-9. 看到 conflict/not_found/validation/already_running 错误时，重新 show、list 或等待运行结束，不要猜测磁盘状态。
-10. App、scheduler、CLI 共用同一个任务目录和 .run-claim；concurrency=skip 的任务不会被两边同时启动。
-11. slug 不能使用 CLI 保留字 status、log、cancel、stop。
-12. JSON envelope 必含 schemaVersion；用 runshelf version --json 查询 App 版本和 envelope schema 版本。也可设置 RUNSHELF_JSON=1 强制 JSON 输出。
-13. 前台 run 失败时退出码为 8，envelope 的 ok=false、error.code=run_failed，result 仍保留完整 run 记录与日志路径。
-14. 退出码：0=成功，1=未知错误或 doctor 发现任务读取问题，2=用法错误，3=未找到，4=校验失败，5=冲突，6=高风险命令，7=任务正在运行，8=任务运行失败。
-15. schema task-spec --example 输出最小示例；schema task-spec 和 schema cli-result 输出原始 schema，不包 envelope。需要固定命令名时使用 install-cli。
 """
