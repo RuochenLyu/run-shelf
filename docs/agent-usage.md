@@ -16,6 +16,10 @@ CLI、App、后台调度进程共用同一个任务目录。CLI 写入时会做�
 
 ## 复制给 Codex/Claude
 
+最快的集成方式是 `runshelf agent-setup --write claude`（写入 `~/.claude/CLAUDE.md`）或
+`runshelf agent-setup --write agents`（写入当前目录 `AGENTS.md`）：内容与 `help agent`
+同源，带标记块，重复执行幂等。以下手动粘贴方式仍然有效。
+
 用户可以把下面这段原样发给 Codex/Claude：
 
 ```text

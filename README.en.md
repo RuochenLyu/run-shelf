@@ -109,6 +109,8 @@ runshelf run log <run-id> --bytes 262144 --json
 runshelf run log <run-id> --full
 runshelf doctor --json
 runshelf help agent
+runshelf agent-setup                                      # print agent integration guide
+runshelf agent-setup --write claude --json                # write it into ~/.claude/CLAUDE.md
 runshelf schema task-spec --example
 runshelf schema cli-result
 runshelf version --json
@@ -142,7 +144,15 @@ Omitting `--expected-revision` from any existing-task update, including `--dry-r
 
 ## Letting Codex/Claude drive it
 
-Paste the following to Codex/Claude and it can operate tasks through the Run Shelf CLI contract:
+The fastest way is to let the CLI integrate itself:
+
+```zsh
+runshelf agent-setup --write claude
+```
+
+This idempotently writes an integration guide into `~/.claude/CLAUDE.md` (inside a marker block — re-running only updates the block); `--write agents` targets `AGENTS.md` in the current directory instead. The same actions are available in the app under Settings → Command Line & AI Agent.
+
+To do it manually, paste the following to Codex/Claude and it can operate tasks through the Run Shelf CLI contract:
 
 ```text
 Use Run Shelf to manage my local automation tasks.

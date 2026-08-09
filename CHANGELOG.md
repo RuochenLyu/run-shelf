@@ -2,14 +2,19 @@
 
 每个版本的完整说明见 [docs/releases/](docs/releases/)。
 
-## Unreleased
+## 1.4.0 - 2026-08-09
 
-### Fixes
+全面正确性修复 + AI agent 集成入口。完整说明见 [docs/releases/v1.4.0.md](docs/releases/v1.4.0.md)。
 
-- 修复新建任务 sheet 因缺少 SchedulePreferencesStore 环境对象而崩溃的问题。
+- 修复调度器与手动运行并发时任务被永久跳过、误记失败、成功记录被覆写为 stale 等一系列调度可靠性缺陷。
+- 修复超时误杀（睡眠唤醒）、夏令时跳变日漏跑、错过运行无声消失、损坏运行记录被连日志删除。
+- 修复新建任务 sheet 崩溃、多个长任务并发运行时 UI 冻结、切换任务时日志内容错位。
+- 新增 `runshelf agent-setup` 一键 agent 集成、设置页「命令行与 AI Agent」入口、任务创建来源标记。
+- 新增英文 README、应用截图与演示动图。
 
 ### Breaking changes
 
+- 未知 CLI 参数一律返回 `usage`/退出码 `2`，不再被静默忽略。
 - 前台 `runshelf run --json` 在脚本失败、超时或取消时改为返回 `ok: false` 和 `error.code: "run_failed"`；退出码仍为 `8`，完整运行记录继续保留在 `result`。
 - `runshelf apply` 更新已有任务（包括 `--dry-run`）时现在强制要求 `--expected-revision`；省略会返回 `usage`/退出码 `2`，创建任务不受影响。
 

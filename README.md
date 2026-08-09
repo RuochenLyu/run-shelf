@@ -109,6 +109,8 @@ runshelf run log <run-id> --bytes 262144 --json
 runshelf run log <run-id> --full
 runshelf doctor --json
 runshelf help agent
+runshelf agent-setup                                      # 输出 agent 集成说明
+runshelf agent-setup --write claude --json                # 写入 ~/.claude/CLAUDE.md
 runshelf schema task-spec --example
 runshelf schema cli-result
 runshelf version --json
@@ -142,7 +144,15 @@ runshelf version --json
 
 ## 让 Codex/Claude 操作
 
-把下面这段发给 Codex/Claude，它就能按 Run Shelf 的 CLI 契约操作任务：
+最快的方式是让 CLI 自己完成集成：
+
+```zsh
+runshelf agent-setup --write claude
+```
+
+这会把一段集成说明幂等写入 `~/.claude/CLAUDE.md`（带标记块，重复执行只更新块内内容）；`--write agents` 则写当前目录的 `AGENTS.md`。也可以在 App 设置页的「命令行与 AI Agent」里一键完成同样的事。
+
+如果想手动粘贴，把下面这段发给 Codex/Claude，它就能按 Run Shelf 的 CLI 契约操作任务：
 
 ```text
 请使用 Run Shelf 管理我的本地自动化任务。

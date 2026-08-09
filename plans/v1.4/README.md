@@ -26,6 +26,8 @@ v1.4.0 的主题：**修正确性，补 agent 桥，达到可公开状态**。�
 - 改动 `schemas/*.json` 后必须重新生成 `RunShelf/CLI/GeneratedSchemas.swift`（`scripts/generate_cli_schemas.rb`）。
 - 交付前跑 `scripts/check.sh`。提交遵循 Conventional Commits。
 - 不 tag、不 push、不发布。
+- 执行中发现任务范围外的缺陷（尤其是崩溃或数据问题）：必须在反馈中单独成节列出，
+  并停下等待裁决；只修补临时环境而不报告为阻塞项是不可接受的。
 
 ## 验收基线
 
