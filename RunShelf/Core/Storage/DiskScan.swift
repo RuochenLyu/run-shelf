@@ -73,11 +73,18 @@ struct TaskRunsCache: Sendable {
         capture(for: task.directoryURL, runs: task.runs, at: date)
     }
 
-    static func capture(for directoryURL: URL, runs: [RunRecord], at date: Date = Date()) -> TaskRunsCache {
-        TaskRunsCache(
+    static func capture(
+        for directoryURL: URL,
+        runs: [RunRecord],
+        monitoringRunIDs: [String] = [],
+        at date: Date = Date()
+    ) -> TaskRunsCache {
+        let runningRunIDs = Set(runs.filter { $0.status == .running }.map(\.runId))
+            .union(monitoringRunIDs)
+        return TaskRunsCache(
             signature: TaskRunsSignature.capture(
                 for: directoryURL,
-                runningRunIDs: runs.filter { $0.status == .running }.map(\.runId)
+                runningRunIDs: Array(runningRunIDs)
             ),
             lastFullReloadAt: date
         )
@@ -209,12 +216,14 @@ enum DiskScanner {
             let known = knownByID[id]
             let cachedSig = input.signatureCache[id]
 
+            var claimRunIDs: [String] = []
             if let activityTask = known?.task ?? (try? loader.loadTask(at: dirURL, includeRuns: false)) {
                 let claims = TaskRunClaimManager.activeClaims(
                     for: activityTask,
                     now: input.now,
                     fileManager: .default
                 )
+                claimRunIDs = claims.map(\.runId)
                 if !claims.isEmpty {
                     activities[id] = TaskLiveActivity(claims: claims)
                 }
@@ -222,13 +231,18 @@ enum DiskScanner {
 
             func loadRuns(generation: Int) {
                 let runs = loader.loadRuns(for: dirURL)
-                newRunsCache[id] = TaskRunsCache.capture(for: dirURL, runs: runs, at: input.now)
+                newRunsCache[id] = TaskRunsCache.capture(
+                    for: dirURL,
+                    runs: runs,
+                    monitoringRunIDs: claimRunIDs,
+                    at: input.now
+                )
                 resultEntries.append(.runsOnly(taskID: id, runs: runs, generation: generation))
             }
 
             let currentRunsSignature = TaskRunsSignature.capture(
                 for: dirURL,
-                runningRunIDs: known?.runningRunIDs ?? []
+                runningRunIDs: Array(Set(known?.runningRunIDs ?? []).union(claimRunIDs))
             )
             let cachedRuns = input.runsCache[id]
             let runsNeedFallbackReload = cachedRuns.map {
@@ -258,7 +272,12 @@ enum DiskScanner {
                 let task = try loader.loadTask(at: dirURL)
                 let generation = known?.generation ?? 0
                 newSignatures[id] = currentSig
-                newRunsCache[id] = TaskRunsCache.capture(for: task, at: input.now)
+                newRunsCache[id] = TaskRunsCache.capture(
+                    for: dirURL,
+                    runs: task.runs,
+                    monitoringRunIDs: claimRunIDs,
+                    at: input.now
+                )
                 resultEntries.append(.fullReload(task, generation: generation))
             } catch {
                 errors.append("无法读取任务 \(id)：\(error.localizedDescription)")

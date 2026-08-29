@@ -8,11 +8,11 @@ struct SettingsView: View {
     @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
     @State private var cliStatus: RunShelfCLIInstallationStatus?
     @State private var cliFeedback: String?
-    @State private var isShowingAgentWritePreview = false
+    @State private var cliFeedbackIsError = false
 
     var body: some View {
         Form {
-            Section("数据") {
+            Section("存储") {
                 LabeledContent("任务目录") {
                     HStack(spacing: 6) {
                         Text(RunShelfPaths.tasksDirectoryURL().path)
@@ -20,6 +20,7 @@ struct SettingsView: View {
                             .textSelection(.enabled)
                             .lineLimit(1)
                             .truncationMode(.middle)
+
                         Button {
                             NSWorkspace.shared.activateFileViewerSelecting([RunShelfPaths.tasksDirectoryURL()])
                         } label: {
@@ -32,119 +33,70 @@ struct SettingsView: View {
                 }
             }
 
-            Section("后台调度") {
-                HStack {
-                    Label(schedulerStateText, systemImage: schedulerStateSymbol)
-                        .foregroundStyle(schedulerStateColor)
-                    Spacer()
-                    Button(action: schedulerPrimaryAction) {
-                        Text(schedulerActionLabel)
-                    }
-                    .controlSize(.small)
-                    .disabled(!controller.embeddedSchedulerAvailable)
+            Section("系统") {
+                schedulerRow
+                if let warning = schedulerWarning {
+                    SettingsWarningRow(text: warning)
                 }
 
-                if controller.serviceStatus == .enabled, let heartbeat = controller.heartbeat {
-                    LabeledContent("最近活动", value: heartbeatDescription(heartbeat))
-                        .foregroundStyle(.secondary)
-                }
-
-                if let hint = schedulerHint {
-                    Text(hint)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                notificationRow
+                if let warning = notificationWarning {
+                    SettingsWarningRow(text: warning)
                 }
             }
 
-            Section("通知") {
-                HStack {
-                    Label(notificationStateText, systemImage: notificationSymbol)
-                        .foregroundStyle(notificationColor)
-                    Spacer()
-                    Button(action: notificationPrimaryAction) {
-                        Text(notificationActionLabel)
-                    }
-                    .controlSize(.small)
-                }
-
-                if let hint = notificationHint {
-                    Text(hint)
-                        .font(.callout)
+            Section("命令行") {
+                HStack(spacing: 10) {
+                    Label("runshelf", systemImage: "terminal")
+                    Spacer(minLength: 12)
+                    Text(cliStateText)
                         .foregroundStyle(.secondary)
-                }
-            }
 
-            Section("命令行与 AI Agent") {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(cliStatus?.isInstalled == true ? "runshelf 命令已安装" : "在终端中使用 runshelf")
-                        if let status = cliStatus, status.isInstalled {
-                            Text("\(status.path) · 版本 \(appVersion)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
+                    if cliStatus?.isInstalled != true {
+                        Button("安装…") {
+                            installCommandLineTool()
                         }
+                        .disabled(embeddedCLIURL == nil)
                     }
-                    Spacer()
-                    Button(cliStatus?.isInstalled == true ? "已安装" : "安装 runshelf 命令") {
-                        installCommandLineTool()
-                    }
-                    .controlSize(.small)
-                    .disabled(embeddedCLIURL == nil || cliStatus?.isInstalled == true)
                 }
 
                 if let status = cliStatus, status.isInstalled, !status.pathConfigured {
-                    Text("命令已安装，但当前 PATH 不包含 \(RunShelfCLIInstaller.defaultPrefixURL().path)。请把该目录加入 shell 配置。")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    SettingsWarningRow(text: "PATH 尚未包含 \(RunShelfCLIInstaller.defaultPrefixURL().path)")
                 }
 
-                Text("把 Run Shelf 的 CLI 契约交给 AI agent，让它安全地创建、运行和查询任务。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Button("复制集成说明") {
-                        copyAgentGuide()
-                    }
-                    Button("写入 ~/.claude/CLAUDE.md") {
-                        isShowingAgentWritePreview = true
-                    }
+                Button {
+                    copyAgentGuide()
+                } label: {
+                    Label("复制 Agent 集成说明", systemImage: "doc.on.doc")
                 }
-                .controlSize(.small)
                 .disabled(embeddedCLIURL == nil)
 
                 if let cliFeedback {
-                    Text(cliFeedback)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        cliFeedback,
+                        systemImage: cliFeedbackIsError ? "xmark.circle.fill" : "checkmark"
+                    )
+                        .font(.caption)
+                        .foregroundStyle(cliFeedbackIsError ? Color.red : Color.secondary)
                         .textSelection(.enabled)
                 }
             }
 
-            Section {
+            Section("新建任务的日志保留") {
                 LabeledContent("保留天数") {
                     RetentionNumberField(value: defaultRetentionDaysBinding, unit: "天", range: 1...365)
                 }
                 LabeledContent("最多保留") {
                     RetentionNumberField(value: defaultRetentionMaxRunsBinding, unit: "次", range: 1...5000)
                 }
-            } header: {
-                Text("日志保留")
-            } footer: {
-                Text("仅影响新建任务；每个任务可在右侧检查器中单独调整。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 720)
+        .frame(width: 500, height: 540)
+        .background(SettingsWindowAccessor())
         .onAppear {
             controller.refresh()
             refreshCLIStatus()
-        }
-        .sheet(isPresented: $isShowingAgentWritePreview) {
-            agentWritePreview
         }
         .alert("Run Shelf", isPresented: errorBinding) {
             Button("知道了", role: .cancel) {
@@ -155,7 +107,31 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Command line and agent section
+    private var schedulerRow: some View {
+        HStack(spacing: 10) {
+            Label("后台调度", systemImage: "clock.arrow.circlepath")
+            Spacer(minLength: 12)
+            Text(schedulerStateText)
+                .foregroundStyle(schedulerStateColor)
+            Button(schedulerActionLabel, action: schedulerPrimaryAction)
+                .disabled(!controller.embeddedSchedulerAvailable)
+        }
+    }
+
+    private var notificationRow: some View {
+        HStack(spacing: 10) {
+            Label("通知", systemImage: "bell")
+            Spacer(minLength: 12)
+            Text(notificationStateText)
+                .foregroundStyle(notificationColor)
+            Button(notificationActionLabel, action: notificationPrimaryAction)
+        }
+    }
+
+    private var cliStateText: String {
+        guard embeddedCLIURL != nil else { return "组件缺失" }
+        return cliStatus?.isInstalled == true ? "已安装 · \(appVersion)" : "未安装"
+    }
 
     private var embeddedCLIURL: URL? {
         let url = Bundle.main.bundleURL
@@ -171,43 +147,11 @@ struct SettingsView: View {
         RunShelfAgentGuide.markdown(executableURL: embeddedCLIURL)
     }
 
-    private var claudeInstructionsURL: URL {
-        RunShelfAgentSetupWriter.claudeInstructionsURL()
-    }
-
-    private var agentWritePreview: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("写入 ~/.claude/CLAUDE.md")
-                .font(.headline)
-            Text("Run Shelf 只会新增或更新下面的标记块，标记块外的内容保持不变。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            ScrollView {
-                Text(RunShelfAgentGuide.markedBlock(executableURL: embeddedCLIURL))
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(minHeight: 360)
-            HStack {
-                Spacer()
-                Button("取消", role: .cancel) {
-                    isShowingAgentWritePreview = false
-                }
-                Button("写入") {
-                    writeClaudeInstructions()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(20)
-        .frame(width: 640, height: 560)
-    }
-
     private func refreshCLIStatus() {
         guard let embeddedCLIURL else {
             cliStatus = nil
-            cliFeedback = "应用文件不完整，找不到内置 runshelf 命令。"
+            cliFeedback = "找不到内置 runshelf 命令"
+            cliFeedbackIsError = true
             return
         }
         cliStatus = RunShelfCLIInstaller.inspect(executableURL: embeddedCLIURL)
@@ -221,12 +165,12 @@ struct SettingsView: View {
                 prefixURL: RunShelfCLIInstaller.defaultPrefixURL(),
                 force: false
             )
-            cliFeedback = result.pathConfigured
-                ? "已安装：\(result.path)"
-                : "已安装：\(result.path)。当前 PATH 尚未包含安装目录。"
+            cliFeedback = result.pathConfigured ? "安装完成" : "已安装，PATH 尚未配置"
+            cliFeedbackIsError = false
             refreshCLIStatus()
         } catch {
             cliFeedback = error.localizedDescription
+            cliFeedbackIsError = true
             refreshCLIStatus()
         }
     }
@@ -234,76 +178,50 @@ struct SettingsView: View {
     private func copyAgentGuide() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(agentGuide, forType: .string)
-        cliFeedback = "已复制集成说明。"
+        cliFeedback = "已复制 Markdown"
+        cliFeedbackIsError = false
     }
-
-    private func writeClaudeInstructions() {
-        do {
-            let changed = try RunShelfAgentSetupWriter.writeMarkedBlock(
-                to: claudeInstructionsURL,
-                executableURL: embeddedCLIURL
-            )
-            cliFeedback = changed
-                ? "已写入：\(claudeInstructionsURL.path)"
-                : "无需更改：\(claudeInstructionsURL.path)"
-            isShowingAgentWritePreview = false
-        } catch {
-            cliFeedback = error.localizedDescription
-        }
-    }
-
-    // MARK: - Scheduler section
 
     private var schedulerStateText: String {
         if !controller.embeddedSchedulerAvailable {
             return "组件缺失"
         }
         switch controller.serviceStatus {
-        case .enabled: return "正在后台运行"
+        case .enabled: return "已启用"
         case .notRegistered, .notFound: return "未启用"
-        case .requiresApproval: return "等待授权"
+        case .requiresApproval: return "需要授权"
         @unknown default: return "未知"
         }
     }
 
-    private var schedulerStateSymbol: String {
-        switch controller.serviceStatus {
-        case .enabled: return "checkmark.circle.fill"
-        case .requiresApproval: return "exclamationmark.triangle.fill"
-        case .notRegistered, .notFound: return "pause.circle.fill"
-        @unknown default: return "questionmark.circle.fill"
-        }
-    }
-
     private var schedulerStateColor: Color {
+        if !controller.embeddedSchedulerAvailable { return .red }
         switch controller.serviceStatus {
-        case .enabled: return .green
         case .requiresApproval: return .orange
         default: return .secondary
         }
     }
 
-    private var schedulerHint: String? {
+    private var schedulerWarning: String? {
         if !controller.embeddedSchedulerAvailable {
-            return "应用文件不完整，请重新安装 Run Shelf。"
+            return "后台组件缺失，请重新安装 Run Shelf"
         }
-        switch controller.serviceStatus {
-        case .enabled:
-            return nil
-        case .notRegistered, .notFound:
-            return "点击启用后会注册后台调度组件。多数情况下会直接完成；如需确认，macOS 会要求你前往系统设置。"
-        case .requiresApproval:
-            return "请在系统设置中开启 Run Shelf 的登录项。"
-        @unknown default:
-            return nil
+        if controller.serviceStatus == .requiresApproval {
+            return "需要在系统设置中允许登录项"
         }
+        if controller.serviceStatus == .enabled,
+           let heartbeat = controller.heartbeat,
+           Date().timeIntervalSince(heartbeat.checkedAt) > 90 {
+            return "最近活动：\(RunShelfFormatters.dateTimeWithSeconds(heartbeat.checkedAt))"
+        }
+        return nil
     }
 
     private var schedulerActionLabel: String {
         switch controller.serviceStatus {
-        case .enabled: return "管理登录项"
-        case .requiresApproval: return "前往系统设置"
-        case .notRegistered, .notFound: return "启用后台运行"
+        case .enabled: return "登录项…"
+        case .requiresApproval: return "系统设置…"
+        case .notRegistered, .notFound: return "启用"
         @unknown default: return "重试"
         }
     }
@@ -319,51 +237,34 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Notification section
-
     private var notificationStateText: String {
         switch controller.notificationStatus {
         case .authorized: return "已允许"
-        case .provisional, .ephemeral: return "已临时允许"
+        case .provisional, .ephemeral: return "临时允许"
         case .denied: return "已拒绝"
         case .notDetermined: return "未授权"
         @unknown default: return "未知"
         }
     }
 
-    private var notificationSymbol: String {
-        switch controller.notificationStatus {
-        case .authorized, .provisional, .ephemeral: return "checkmark.circle.fill"
-        case .denied: return "xmark.circle.fill"
-        default: return "bell.slash"
-        }
-    }
-
     private var notificationColor: Color {
         switch controller.notificationStatus {
-        case .authorized, .provisional, .ephemeral: return .green
         case .denied: return .red
+        case .notDetermined: return .orange
         default: return .secondary
         }
     }
 
-    private var notificationHint: String? {
-        switch controller.notificationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return "任务失败时会发送系统通知。"
-        case .denied:
-            return "请在系统设置中重新允许 Run Shelf 的通知。"
-        case .notDetermined:
-            return "首次创建任务时会请求授权。"
-        @unknown default:
-            return nil
-        }
+    private var notificationWarning: String? {
+        controller.notificationStatus == .denied
+            ? "需要在系统设置中允许通知"
+            : nil
     }
 
     private var notificationActionLabel: String {
         switch controller.notificationStatus {
-        case .notDetermined: return "请求授权"
-        default: return "打开系统设置"
+        case .notDetermined: return "允许"
+        default: return "设置…"
         }
     }
 
@@ -375,8 +276,6 @@ struct SettingsView: View {
             controller.openNotificationSettings()
         }
     }
-
-    // MARK: - Bindings
 
     private var errorBinding: Binding<Bool> {
         Binding(
@@ -398,10 +297,37 @@ struct SettingsView: View {
             set: { defaultRetentionMaxRuns = min(max($0, 1), 5000) }
         )
     }
+}
 
-    private func heartbeatDescription(_ heartbeat: SchedulerHeartbeat) -> String {
-        let text = RunShelfFormatters.dateTimeWithSeconds(heartbeat.checkedAt)
-        let fresh = Date().timeIntervalSince(heartbeat.checkedAt) <= 90
-        return fresh ? text : "\(text)（已过期）"
+private struct SettingsWarningRow: View {
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .textSelection(.enabled)
+    }
+}
+
+private struct SettingsWindowAccessor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            configure(view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            configure(nsView.window)
+        }
+    }
+
+    private func configure(_ window: NSWindow?) {
+        window?.title = "Run Shelf 设置"
+        window?.standardWindowButton(.miniaturizeButton)?.isEnabled = false
+        window?.standardWindowButton(.zoomButton)?.isEnabled = false
     }
 }

@@ -8,14 +8,6 @@ struct TaskInspectorView: View {
 
     var body: some View {
         Form {
-            if task.manifest.origin == .cli {
-                Section {
-                    LabeledContent("来源") {
-                        TaskOriginBadge(origin: task.manifest.origin)
-                    }
-                }
-            }
-
             Section("计划") {
                 ScheduleEditorView(
                     expression: cronBinding,
@@ -91,8 +83,7 @@ struct TaskInspectorView: View {
                 Button {
                     store.openTaskDirectory(id: task.id)
                 } label: {
-                    Label("在 Finder 中显示任务目录", systemImage: "folder")
-                        .frame(maxWidth: .infinity)
+                    Label("在 Finder 中显示", systemImage: "folder")
                 }
             }
         }
@@ -218,9 +209,12 @@ struct RetentionNumberField: View {
                 .textFieldStyle(.roundedBorder)
                 .labelsHidden()
                 .multilineTextAlignment(.trailing)
-                .frame(width: 72)
+                .frame(width: 64)
             Text(unit)
                 .foregroundStyle(.secondary)
+            Stepper("", value: clampedValue, in: range)
+                .labelsHidden()
+                .fixedSize()
         }
     }
 

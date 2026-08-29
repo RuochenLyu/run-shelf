@@ -7,8 +7,9 @@ struct ContentView: View {
     @ObservedObject private var store: TaskStore
     @ObservedObject private var selection: TaskSelectionState
     @StateObject private var schedulePrefs = SchedulePreferencesStore()
+    @StateObject private var taskListPrefs = TaskListPreferencesStore()
     @State private var isShowingNewTask = false
-    @State private var isShowingDeleteConfirmation = false
+    @State private var pendingDeletionTaskID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     init(store: TaskStore) {
@@ -27,13 +28,16 @@ struct ContentView: View {
                 NewTaskSheet(store: store)
                     .environmentObject(schedulePrefs)
             }
-            .confirmationDialog("删除任务", isPresented: $isShowingDeleteConfirmation) {
+            .confirmationDialog("删除任务", isPresented: deleteConfirmationBinding) {
                 Button("删除", role: .destructive) {
-                    if let id = selection.selectedTaskID {
+                    if let id = pendingDeletionTaskID {
+                        pendingDeletionTaskID = nil
                         store.deleteTask(id: id)
                     }
                 }
-                Button("取消", role: .cancel) {}
+                Button("取消", role: .cancel) {
+                    pendingDeletionTaskID = nil
+                }
             } message: {
                 Text("任务目录会移入废纸篓。")
             }
@@ -56,10 +60,61 @@ struct ContentView: View {
             }
     }
 
+    private var sidebarTitlebarControls: some View {
+        taskSortMenu
+            .buttonStyle(.borderless)
+            .labelStyle(.iconOnly)
+            .controlSize(.large)
+            .padding(.top, 8)
+            .padding(.trailing, 52)
+            .ignoresSafeArea(.container, edges: .top)
+    }
+
+    private var windowActionBar: some View {
+        HStack(spacing: 8) {
+            newTaskButton
+            selectedTaskActions
+        }
+        .buttonStyle(.borderless)
+        .labelStyle(.iconOnly)
+        .controlSize(.large)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar, in: Capsule())
+        .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 4)
+        .padding(.top, 8)
+        .padding(.trailing, 12)
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    private var taskSortMenu: some View {
+        Menu {
+            ForEach(TaskListSortMode.allCases) { mode in
+                Button {
+                    taskListPrefs.setSortMode(mode)
+                } label: {
+                    if taskListPrefs.sortMode == mode {
+                        Label(mode.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(mode.displayName)
+                    }
+                }
+            }
+        } label: {
+            toolbarIcon("arrow.up.arrow.down")
+        }
+        .menuIndicator(.hidden)
+        .help("任务排序")
+        .accessibilityIdentifier("task-sort-menu")
+    }
+
     private var navigationContent: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            TaskSidebarView(store: store, selection: selection)
+            TaskSidebarView(store: store, selection: selection, preferences: taskListPrefs)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 320)
+                .overlay(alignment: .topTrailing) {
+                    sidebarTitlebarControls
+                }
         } detail: {
             HStack(spacing: 0) {
                 detailContent
@@ -77,61 +132,52 @@ struct ContentView: View {
         }
     }
 
-    private var windowActionBar: some View {
-        HStack(spacing: 8) {
-            Button {
-                isShowingNewTask = true
-            } label: {
-                toolbarIcon("plus")
-            }
-            .help("新建任务")
-            .accessibilityLabel("新建任务")
-            .accessibilityIdentifier("new-task")
-
-            Button {
-                if let id = selection.selectedTaskID {
-                    store.runTask(id: id)
-                }
-            } label: {
-                toolbarIcon("play.fill")
-            }
-            .help("立即运行（⌘R）")
-            .accessibilityLabel("立即运行")
-            .accessibilityIdentifier("run-task")
-            .disabled(!canRunSelectedTask)
-
-            Button {
-                if let id = selection.selectedTaskID {
-                    store.saveTask(id: id)
-                }
-            } label: {
-                toolbarIcon("square.and.arrow.down")
-            }
-            .help("保存改动（⌘S）")
-            .accessibilityLabel("保存改动")
-            .accessibilityIdentifier("save-task")
-            .disabled(!canSaveSelectedTask)
-
-            Button(role: .destructive) {
-                isShowingDeleteConfirmation = true
-            } label: {
-                toolbarIcon("trash")
-            }
-            .help("删除任务")
-            .accessibilityLabel("删除任务")
-            .accessibilityIdentifier("delete-task")
-            .disabled(selection.selectedTaskID == nil)
+    private var newTaskButton: some View {
+        Button {
+            isShowingNewTask = true
+        } label: {
+            toolbarIcon("plus")
         }
-        .buttonStyle(.borderless)
-        .labelStyle(.iconOnly)
-        .controlSize(.large)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.bar, in: Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 4)
-        .padding(.top, 8)
-        .padding(.trailing, 12)
-        .ignoresSafeArea(.container, edges: .top)
+        .accessibilityLabel("新建任务")
+        .help("新建任务")
+        .accessibilityIdentifier("new-task")
+    }
+
+    @ViewBuilder
+    private var selectedTaskActions: some View {
+        Button {
+            if let id = selection.selectedTaskID {
+                store.runTask(id: id)
+            }
+        } label: {
+            toolbarIcon("play.fill")
+        }
+        .accessibilityLabel("立即运行")
+        .help("立即运行（⌘R）")
+        .accessibilityIdentifier("run-task")
+        .disabled(!canRunSelectedTask)
+
+        Button {
+            if let id = selection.selectedTaskID {
+                store.saveTask(id: id)
+            }
+        } label: {
+            toolbarIcon("square.and.arrow.down")
+        }
+        .accessibilityLabel("保存改动")
+        .help("保存改动（⌘S）")
+        .accessibilityIdentifier("save-task")
+        .disabled(!canSaveSelectedTask)
+
+        Button(role: .destructive) {
+            pendingDeletionTaskID = selection.selectedTaskID
+        } label: {
+            toolbarIcon("trash")
+        }
+        .accessibilityLabel("删除任务")
+        .help("删除任务")
+        .accessibilityIdentifier("delete-task")
+        .disabled(selection.selectedTaskID == nil)
     }
 
     private func toolbarIcon(_ systemName: String) -> some View {
@@ -151,7 +197,6 @@ struct ContentView: View {
                 taskID: task.id,
                 titleLeadingInset: isSidebarCollapsed ? collapsedSidebarTitleInset : 0
             )
-            .ignoresSafeArea(.container, edges: .top)
         } else {
             emptyDetailPlaceholder
         }
@@ -160,7 +205,10 @@ struct ContentView: View {
     @ViewBuilder
     private var inspectorContent: some View {
         if let task = store.selectedTask {
+            // Inspector 内含任务专属的编辑草稿状态；任务切换时必须创建新 identity，
+            // 不能把上一任务的 ScheduleEditor @State 带到当前任务。
             TaskInspectorView(store: store, task: task)
+                .id(task.id)
         } else {
             InspectorEmptyView()
         }
@@ -186,6 +234,17 @@ struct ContentView: View {
         Binding(
             get: { store.lastErrorMessage != nil },
             set: { if !$0 { store.lastErrorMessage = nil } }
+        )
+    }
+
+    private var deleteConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeletionTaskID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDeletionTaskID = nil
+                }
+            }
         )
     }
 

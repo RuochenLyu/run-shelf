@@ -67,20 +67,30 @@ struct TaskHeaderView: View {
 
     private var statusRow: some View {
         HStack(spacing: 10) {
-            if let startedAt = store.runningStartedAt[task.id] {
-                runningChip(startedAt: startedAt)
+            if !task.manifest.enabled {
+                Label("未启用", systemImage: "pause.circle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 divider
-            } else if let chip = abnormalStatusChip {
-                chip
+                Label(scheduleSummary, systemImage: "calendar")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                if let startedAt = store.runningStartedAt[task.id] {
+                    runningChip(startedAt: startedAt)
+                    divider
+                } else if let chip = abnormalStatusChip {
+                    chip
+                    divider
+                }
+                Label(scheduleSummary, systemImage: "calendar")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 divider
+                Label(nextRunText, systemImage: "arrow.right.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            Label(scheduleSummary, systemImage: "calendar")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            divider
-            Label(nextRunText, systemImage: "arrow.right.circle")
-                .font(.callout)
-                .foregroundStyle(.secondary)
             Spacer()
         }
         .labelStyle(.titleAndIcon)
@@ -138,7 +148,10 @@ struct TaskHeaderView: View {
     }
 
     private var scheduleSummary: String {
-        (try? CronSchedule.parse(task.manifest.schedule.expression).summary) ?? task.manifest.schedule.expression
+        guard let summary = try? CronSchedule.parse(task.manifest.schedule.expression).summary else {
+            return "计划无效"
+        }
+        return summary == "高级 Cron 表达式" ? "自定义计划" : summary
     }
 
     private var nextRunText: String {
@@ -155,20 +168,13 @@ struct TaskHeaderView: View {
         if store.runningTaskIDs.contains(task.id) {
             return nil
         }
-        if !task.manifest.enabled {
-            return ("未启用", .secondary, "pause.circle.fill")
-        }
         if let latest = task.latestRun {
             switch latest.status {
             case .failed, .timeout:
                 return ("上次\(latest.status.displayName)", .red, latest.status.statusSymbol)
             case .stale:
                 return ("已过期", .orange, latest.status.statusSymbol)
-            case .skipped:
-                return ("上次跳过", .orange, latest.status.statusSymbol)
-            case .cancelled:
-                return ("上次已取消", .secondary, latest.status.statusSymbol)
-            case .success, .running, .pending:
+            case .success, .running, .pending, .skipped, .cancelled:
                 return nil
             }
         }

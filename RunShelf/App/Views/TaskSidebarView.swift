@@ -3,11 +3,25 @@ import SwiftUI
 struct TaskSidebarView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var selection: TaskSelectionState
+    @ObservedObject var preferences: TaskListPreferencesStore
     @State private var editingTaskID: String? = nil
 
     var body: some View {
+        taskList
+            .onAppear {
+                preferences.reconcile(taskIDs: store.sortedTasks.map(\.id))
+            }
+            .onChange(of: store.tasks.map(\.id)) { _, _ in
+                preferences.reconcile(taskIDs: store.sortedTasks.map(\.id))
+            }
+            .sheet(item: editingTaskBinding) { task in
+                TaskEditSheet(store: store, task: task)
+            }
+    }
+
+    private var taskList: some View {
         List(selection: $selection.selectedTaskID) {
-            ForEach(store.sortedTasks) { task in
+            ForEach(orderedTasks) { task in
                 TaskSidebarRow(
                     task: task,
                     isRunning: store.runningTaskIDs.contains(task.id),
@@ -16,12 +30,20 @@ struct TaskSidebarView: View {
                 .tag(task.id)
                 .contextMenu { contextMenu(for: task) }
             }
+            .onMove { offsets, destination in
+                preferences.move(
+                    taskIDs: orderedTasks.map(\.id),
+                    fromOffsets: offsets,
+                    toOffset: destination
+                )
+            }
+            .moveDisabled(preferences.sortMode != .manual)
         }
         .listStyle(.sidebar)
-        .navigationTitle("任务")
-        .sheet(item: editingTaskBinding) { task in
-            TaskEditSheet(store: store, task: task)
-        }
+    }
+
+    private var orderedTasks: [RunShelfTask] {
+        preferences.orderedTasks(store.sortedTasks)
     }
 
     @ViewBuilder
@@ -93,24 +115,29 @@ private struct TaskSidebarRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            if isRunning {
+            if status == .running {
                 ProgressView()
                     .controlSize(.small)
-                    .frame(width: 14)
+                    .frame(width: 16, height: 16)
+                    .accessibilityLabel("运行中")
+            } else if let symbol = status.symbol {
+                Image(systemName: symbol)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(status.color)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 16, height: 16)
+                    .accessibilityLabel(status.accessibilityLabel)
+                    .help(status.accessibilityLabel)
             } else {
-                Image(systemName: statusSymbol)
-                    .foregroundStyle(statusColor)
-                    .imageScale(.small)
-                    .frame(width: 14)
+                Color.clear
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(displayName)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                    TaskOriginBadge(origin: task.manifest.origin)
-                }
+                Text(displayName)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -119,8 +146,8 @@ private struct TaskSidebarRow: View {
 
             Spacer()
 
-            if let startedAt {
-                RunningDurationText(startedAt: startedAt)
+            if status == .running, let effectiveStartedAt {
+                RunningDurationText(startedAt: effectiveStartedAt)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.blue)
             }
@@ -134,53 +161,123 @@ private struct TaskSidebarRow: View {
     }
 
     private var subtitle: String {
-        guard task.manifest.enabled else {
+        switch status {
+        case .quiet:
+            return scheduleSubtitle
+        case .waiting:
+            return "等待中"
+        case .running:
+            return "运行中"
+        case .success:
+            return runStatusSubtitle("成功")
+        case .failed:
+            return runStatusSubtitle("失败")
+        case .timeout:
+            return runStatusSubtitle("超时")
+        case .skipped:
+            return runStatusSubtitle("已跳过")
+        case .cancelled:
+            return runStatusSubtitle("已取消")
+        case .attention:
+            if !task.hasValidSchedule { return "计划无效" }
+            return runStatusSubtitle("已过期")
+        case .disabled:
             return "未启用"
         }
+    }
+
+    private var scheduleSubtitle: String {
         guard let schedule = try? CronSchedule.parse(task.manifest.schedule.expression) else {
-            return task.manifest.schedule.expression
+            return "计划无效"
         }
 
         if let next = try? schedule.nextRuns(count: 1).first {
+            if schedule.summary == "高级 Cron 表达式" {
+                return "下次 \(RunShelfFormatters.scheduleDateTime(next))"
+            }
             return "\(schedule.summary) · \(RunShelfFormatters.scheduleDateTime(next))"
         }
         return schedule.summary
     }
 
-    // 状态优先级：
-    //   1. 运行中
-    //   2. 已停用（覆盖历史 run 状态，避免「已停用 + 绿色✓」歧义）
-    //   3. 上次失败/超时
-    //   4. 上次跳过/过期
-    //   5. 启用且正常
-    private var statusSymbol: String {
-        if isRunning { return "arrow.triangle.2.circlepath" }
-        if !task.manifest.enabled { return "pause.circle.fill" }
+    private var status: SidebarTaskStatus {
+        if isRunning { return .running }
+        if !task.manifest.enabled { return .disabled }
         if let latest = task.latestRun {
             switch latest.status {
-            case .failed, .timeout:    return "exclamationmark.circle.fill"
-            case .skipped, .stale:     return "exclamationmark.triangle.fill"
-            case .cancelled:           return "stop.circle.fill"
-            case .success, .running, .pending:
-                return "circle.fill"
+            case .pending: return .waiting
+            case .running: return .running
+            case .success: return .success
+            case .failed: return .failed
+            case .timeout: return .timeout
+            case .skipped: return .skipped
+            case .cancelled: return .cancelled
+            case .stale: return .attention
             }
         }
-        return "circle.fill"
+        if !task.hasValidSchedule { return .attention }
+        return .quiet
     }
 
-    private var statusColor: Color {
-        if isRunning { return .blue }
-        if !task.manifest.enabled { return .secondary }
-        if let latest = task.latestRun {
-            switch latest.status {
-            case .failed, .timeout:    return .red
-            case .skipped, .stale:     return .orange
-            case .cancelled:           return .secondary
-            case .success, .running, .pending:
-                return .green
-            }
+    private var effectiveStartedAt: Date? {
+        startedAt ?? task.latestRun.flatMap { $0.status == .running ? $0.startedAt : nil }
+    }
+
+    private func runStatusSubtitle(_ label: String) -> String {
+        guard let date = task.latestRun?.startedAt else { return label }
+        return "\(label) · \(RunShelfFormatters.scheduleDateTime(date))"
+    }
+}
+
+private enum SidebarTaskStatus: Equatable {
+    case quiet
+    case waiting
+    case running
+    case success
+    case failed
+    case timeout
+    case skipped
+    case cancelled
+    case attention
+    case disabled
+
+    var symbol: String? {
+        switch self {
+        case .running: return nil
+        case .quiet: return "calendar.badge.clock"
+        case .waiting: return "clock.fill"
+        case .success: return "checkmark.circle.fill"
+        case .failed: return "xmark.circle.fill"
+        case .timeout: return "clock.badge.exclamationmark.fill"
+        case .skipped: return "forward.end.circle.fill"
+        case .cancelled: return "stop.circle.fill"
+        case .attention: return "exclamationmark.triangle.fill"
+        case .disabled: return "pause.circle.fill"
         }
-        return .green
+    }
+
+    var color: Color {
+        switch self {
+        case .waiting, .running: return .blue
+        case .failed, .timeout: return .red
+        case .attention: return .orange
+        case .quiet, .success, .skipped, .cancelled, .disabled: return .secondary
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .quiet: return "已计划"
+        case .waiting: return "等待中"
+        case .running: return "运行中"
+        case .success: return "上次运行成功"
+        case .failed: return "上次运行失败"
+        case .timeout: return "上次运行超时"
+        case .skipped: return "上次运行已跳过"
+        case .cancelled: return "上次运行已取消"
+        case .attention: return "需要注意"
+        case .disabled: return "未启用"
+        }
     }
 }
 

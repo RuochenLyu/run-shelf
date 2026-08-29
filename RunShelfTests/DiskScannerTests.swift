@@ -93,6 +93,73 @@ final class DiskScannerTests: XCTestCase {
         XCTAssertEqual(result.activities[task.id]?.hosts, ["scheduler"])
     }
 
+    func testClaimedRunAppearsWhenMetaArrivesAfterRunsDirectoryWasScanned() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let task = try writeTask(root: root, id: UUID().uuidString)
+        let loadedAt = Date()
+        let initialInput = makeInput(task: task, loadedAt: loadedAt, now: loadedAt.addingTimeInterval(1))
+        let runID = "manual-run"
+        let lease = try TaskRunClaimManager.acquire(
+            task: task,
+            runID: runID,
+            host: "app",
+            now: loadedAt.addingTimeInterval(1)
+        )
+        defer { lease.release() }
+
+        let runURL = task.directoryURL
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+
+        let scanBeforeMeta = DiskScanner.scan(initialInput)
+        guard case let .runsOnly(_, runsBeforeMeta, _) = try XCTUnwrap(scanBeforeMeta.entries.first) else {
+            return XCTFail("expected claim change to reload runs")
+        }
+        XCTAssertTrue(runsBeforeMeta.isEmpty)
+
+        let running = RunRecord(
+            runId: runID,
+            taskId: task.id,
+            trigger: .manual,
+            status: .running,
+            exitCode: nil,
+            scheduledAt: nil,
+            startedAt: loadedAt.addingTimeInterval(1),
+            endedAt: nil,
+            durationMs: nil,
+            scriptSha256: "hash",
+            stdoutPath: "stdout.log",
+            stderrPath: "stderr.log",
+            message: nil
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(running).write(to: runURL.appendingPathComponent("meta.json"), options: [.atomic])
+
+        let scanAfterMeta = DiskScanner.scan(DiskScanInput(
+            tasksDirectoryURL: root,
+            knownTasks: [.init(
+                id: task.id,
+                directoryURL: task.directoryURL,
+                isDirty: false,
+                generation: 0,
+                runningRunIDs: [],
+                task: task
+            )],
+            signatureCache: [task.id: TaskFileSignature.capture(for: task.directoryURL)],
+            runsCache: scanBeforeMeta.newRunsCache,
+            now: loadedAt.addingTimeInterval(2)
+        ))
+
+        guard case let .runsOnly(_, runsAfterMeta, _) = try XCTUnwrap(scanAfterMeta.entries.first) else {
+            return XCTFail("expected new meta to reload runs")
+        }
+        XCTAssertEqual(runsAfterMeta.map(\.runId), [runID])
+        XCTAssertEqual(runsAfterMeta.first?.status, .running)
+    }
+
     private func makeInput(task: RunShelfTask, loadedAt: Date, now: Date) -> DiskScanInput {
         DiskScanInput(
             tasksDirectoryURL: task.directoryURL.deletingLastPathComponent(),

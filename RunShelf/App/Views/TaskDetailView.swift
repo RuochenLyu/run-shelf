@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 enum TaskDetailTab: String, Hashable, CaseIterable, Identifiable {
@@ -44,7 +43,9 @@ struct TaskDetailView: View {
     var body: some View {
         if let task = store.task(withID: taskID) {
             VStack(spacing: 0) {
+                // Header 的 sheet 展示状态属于当前任务；切换任务时不复用。
                 TaskHeaderView(store: store, task: task, titleLeadingInset: titleLeadingInset)
+                    .id(task.id)
                 Divider()
                 tabBar
                 Divider()
@@ -120,11 +121,7 @@ struct TaskDetailView: View {
     }
 
     private var scriptTab: some View {
-        VStack(spacing: 0) {
-            ScriptToolbarView(script: scriptBinding)
-            Divider()
-            ShellScriptEditor(text: scriptBinding)
-        }
+        ShellScriptEditor(text: scriptBinding)
     }
 
     private var notesTab: some View {
@@ -165,75 +162,5 @@ struct TaskDetailView: View {
                 }
             }
         )
-    }
-}
-
-private struct ScriptToolbarView: View {
-    @Binding var script: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Menu {
-                Button("严格模式") {
-                    insertSnippet("set -euo pipefail")
-                }
-                Button("进入项目目录") {
-                    insertSnippet(#"cd "$HOME/Projects/my-project""#)
-                }
-                Button("Homebrew 路径") {
-                    insertSnippet(#"export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH""#)
-                }
-                Button("Python 虚拟环境") {
-                    insertSnippet("source .venv/bin/activate")
-                }
-            } label: {
-                Label("插入片段", systemImage: "text.badge.plus")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-
-            Button {
-                chooseDirectoryAndInsertCD()
-            } label: {
-                Label("插入目录", systemImage: "folder.badge.plus")
-            }
-            .buttonStyle(.borderless)
-
-            Spacer()
-        }
-        .controlSize(.small)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 6)
-    }
-
-    private func chooseDirectoryAndInsertCD() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "插入"
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        insertSnippet("cd \(shellDoubleQuoted(url.path))")
-    }
-
-    private func insertSnippet(_ snippet: String) {
-        let trimmed = snippet.trimmingCharacters(in: .newlines)
-        guard !trimmed.isEmpty else { return }
-        if script.isEmpty || script.hasSuffix("\n") {
-            script += trimmed + "\n"
-        } else {
-            script += "\n" + trimmed + "\n"
-        }
-    }
-
-    private func shellDoubleQuoted(_ text: String) -> String {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "$", with: "\\$")
-            .replacingOccurrences(of: "`", with: "\\`")
-        return "\"\(escaped)\""
     }
 }
