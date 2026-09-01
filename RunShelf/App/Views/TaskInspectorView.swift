@@ -92,7 +92,7 @@ struct TaskInspectorView: View {
     }
 
     private var timeoutOptions: [Int] {
-        [0, 30, 60, 120, 300, 600, 1800, 3600]
+        [0, 30, 60, 300, 600, 1800, 3600, 7200]
     }
 
     private func timeoutLabel(_ seconds: Int) -> String {
