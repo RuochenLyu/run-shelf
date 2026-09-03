@@ -25,7 +25,8 @@ struct TaskSidebarView: View {
                 TaskSidebarRow(
                     task: task,
                     isRunning: store.runningTaskIDs.contains(task.id),
-                    startedAt: store.runningStartedAt[task.id]
+                    startedAt: store.runningStartedAt[task.id],
+                    showsNextRun: preferences.sortMode == .nextRun
                 )
                 .tag(task.id)
                 .contextMenu { contextMenu(for: task) }
@@ -112,6 +113,7 @@ private struct TaskSidebarRow: View {
     var task: RunShelfTask
     var isRunning: Bool
     var startedAt: Date?
+    var showsNextRun: Bool
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -161,6 +163,10 @@ private struct TaskSidebarRow: View {
     }
 
     private var subtitle: String {
+        if showsNextRun, status != .running, status != .waiting, status != .disabled {
+            return nextRunSubtitle
+        }
+
         switch status {
         case .scheduled:
             return nextRunSubtitle
@@ -321,17 +327,6 @@ struct RunningDurationText: View {
     }
 
     private func format(elapsed: TimeInterval) -> String {
-        let secs = max(0, Int(elapsed))
-        if secs < 60 {
-            return "\(secs)秒"
-        }
-        if secs < 3600 {
-            let m = secs / 60
-            let s = secs % 60
-            return s == 0 ? "\(m)分" : "\(m)分\(s)秒"
-        }
-        let h = secs / 3600
-        let m = (secs % 3600) / 60
-        return "\(h)时\(m)分"
+        RunShelfFormatters.elapsedTime(seconds: Int(elapsed))
     }
 }

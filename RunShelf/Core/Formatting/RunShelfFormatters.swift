@@ -34,7 +34,22 @@ enum RunShelfFormatters {
         if durationMs < 1000 {
             return "\(durationMs)毫秒"
         }
-        return String(format: "%.2f秒", Double(durationMs) / 1000.0)
+        return elapsedTime(seconds: durationMs / 1000)
+    }
+
+    static func elapsedTime(seconds: Int) -> String {
+        let seconds = max(0, seconds)
+        if seconds < 60 {
+            return "\(seconds)秒"
+        }
+        if seconds < 3600 {
+            let minutes = seconds / 60
+            let remainingSeconds = seconds % 60
+            return remainingSeconds == 0 ? "\(minutes)分" : "\(minutes)分\(remainingSeconds)秒"
+        }
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        return "\(hours)时\(minutes)分"
     }
 
     /// 相对未来时间,例如 "3 小时后" / "10 分钟后" / "现在"。

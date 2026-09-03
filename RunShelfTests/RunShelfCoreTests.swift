@@ -5,6 +5,13 @@ import Foundation
 import XCTest
 
 final class RunShelfCoreTests: XCTestCase {
+    func testDurationUsesReadableMinuteAndSecondUnits() {
+        XCTAssertEqual(RunShelfFormatters.duration(22_910), "22秒")
+        XCTAssertEqual(RunShelfFormatters.duration(60_000), "1分")
+        XCTAssertEqual(RunShelfFormatters.duration(1_954_270), "32分34秒")
+        XCTAssertEqual(RunShelfFormatters.duration(3_661_000), "1时1分")
+    }
+
     private var temporaryDirectories: [URL] = []
 
     override func tearDownWithError() throws {
