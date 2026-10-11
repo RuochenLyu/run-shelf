@@ -483,7 +483,9 @@ private struct CLIContext {
         let lease = try TaskRunClaimManager.acquire(task: task, runID: runID, host: "cli-detach-launcher")
         do {
             let pid = try spawnDetachedHost(taskID: task.id, runID: runID)
-            try lease.update(processID: pid, host: "cli-detach")
+            // 宿主启动后会自己写 processID；很快结束的运行可能已释放 claim。
+            // 这里失败不代表运行失败，不能再 release（会删掉宿主正在用的 claim）。
+            try? lease.update(processID: pid, host: "cli-detach")
             return DetachedRunPayload(taskId: task.id, runId: runID, hostProcessID: pid)
         } catch {
             lease.release()
@@ -496,86 +498,14 @@ private struct CLIContext {
             throw CLIExitError.unexpected("无法定位 runshelf 可执行文件。")
         }
 
-        var attributes: posix_spawnattr_t?
-        var fileActions: posix_spawn_file_actions_t?
-        guard posix_spawnattr_init(&attributes) == 0 else {
-            throw CLIExitError.unexpected("无法初始化后台进程属性。")
+        do {
+            return try DetachedProcessSpawner.spawn(
+                executableURL: executableURL,
+                arguments: ["__run-host", "--task-id", taskID, "--run-id", runID]
+            )
+        } catch {
+            throw CLIExitError.unexpected(error.localizedDescription)
         }
-        defer { posix_spawnattr_destroy(&attributes) }
-
-        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
-            throw CLIExitError.unexpected("无法初始化后台进程文件动作。")
-        }
-        defer { posix_spawn_file_actions_destroy(&fileActions) }
-
-        let flags = Int16(POSIX_SPAWN_SETSID)
-        guard posix_spawnattr_setflags(&attributes, flags) == 0 else {
-            throw CLIExitError.unexpected("无法设置后台进程组。")
-        }
-
-        let redirectResult = "/dev/null".withCString { devNull in
-            posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, devNull, O_RDONLY, 0) == 0 &&
-                posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, devNull, O_WRONLY, 0) == 0 &&
-                posix_spawn_file_actions_addopen(&fileActions, STDERR_FILENO, devNull, O_WRONLY, 0) == 0
-        }
-        guard redirectResult else {
-            throw CLIExitError.unexpected("无法重定向后台进程 stdio。")
-        }
-
-        let executablePath = strdup(executableURL.path)
-        let command = strdup("__run-host")
-        let taskFlag = strdup("--task-id")
-        let taskValue = strdup(taskID)
-        let runFlag = strdup("--run-id")
-        let runValue = strdup(runID)
-        guard let executablePath, let command, let taskFlag, let taskValue, let runFlag, let runValue else {
-            throw CLIExitError.unexpected("无法编码后台运行参数。")
-        }
-        defer {
-            free(executablePath)
-            free(command)
-            free(taskFlag)
-            free(taskValue)
-            free(runFlag)
-            free(runValue)
-        }
-
-        var argv: [UnsafeMutablePointer<CChar>?] = [
-            executablePath,
-            command,
-            taskFlag,
-            taskValue,
-            runFlag,
-            runValue,
-            nil
-        ]
-        var environment = ProcessInfo.processInfo.environment.map { key, value in
-            strdup("\(key)=\(value)")
-        }
-        environment.append(nil)
-        defer {
-            for entry in environment where entry != nil {
-                free(entry)
-            }
-        }
-
-        var pid = pid_t()
-        let result = argv.withUnsafeMutableBufferPointer { argvBuffer in
-            environment.withUnsafeMutableBufferPointer { environmentBuffer in
-                posix_spawn(
-                    &pid,
-                    executablePath,
-                    &fileActions,
-                    &attributes,
-                    argvBuffer.baseAddress,
-                    environmentBuffer.baseAddress
-                )
-            }
-        }
-        guard result == 0 else {
-            throw CLIExitError.unexpected("无法启动后台运行宿主：\(String(cString: strerror(result)))")
-        }
-        return pid
     }
 
     private func findRun(runID: String) throws -> RunStatusPayload {

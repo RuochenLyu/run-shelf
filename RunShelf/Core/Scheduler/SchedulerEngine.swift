@@ -37,6 +37,7 @@ final class SchedulerEngine {
     private let logURL: URL
     private let scheduledRun: ScheduledRun
     private let failureNotifier: FailureNotifier
+    private let scheduledRunReportsFailures: Bool
     private let resetSystemTimeZone: () -> Void
     private var runningRunIDsByTaskID: [String: Set<String>] = [:]
     private var lastError: String?
@@ -58,6 +59,7 @@ final class SchedulerEngine {
             )
         },
         failureNotifier: FailureNotifier? = nil,
+        scheduledRunReportsFailures: Bool = false,
         resetSystemTimeZone: @escaping () -> Void = { NSTimeZone.resetSystemTimeZone() }
     ) {
         self.taskFileStore = taskFileStore
@@ -76,6 +78,9 @@ final class SchedulerEngine {
             ),
             logURL: logURL
         )
+        // 独立宿主（SchedulerRunHost）自己写失败通知：调度进程中途重启时宿主仍能通知。
+        // 此时引擎不再为宿主返回的记录重复通知，只负责宿主没写出记录时的兜底记录。
+        self.scheduledRunReportsFailures = scheduledRunReportsFailures
         self.resetSystemTimeZone = resetSystemTimeZone
     }
 
@@ -204,7 +209,7 @@ final class SchedulerEngine {
                 }
                 switch result {
                 case .success(let run):
-                    if run.status == .failed || run.status == .timeout {
+                    if !self.scheduledRunReportsFailures, run.status == .failed || run.status == .timeout {
                         self.failureNotifier(task, run)
                     }
                 case .failure(let error):

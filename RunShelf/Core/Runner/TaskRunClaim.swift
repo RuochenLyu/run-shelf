@@ -54,20 +54,29 @@ struct TaskRunClaimLease {
         claimDirectoryURL.appendingPathComponent("claim.json")
     }
 
+    /// 读-改-写在 claim 锁内完成：启动方（CLI/调度进程）写宿主 pid 与宿主自己写
+    /// 进程组可能并发，不加锁时后写者会用旧快照覆盖掉对方的字段。
+    /// 调用方不能已持有同一 `.claim-lock`（flock 不可重入）。
     func update(processID: Int32? = nil, processGroupID: Int32? = nil, host: String? = nil) throws {
-        var claim = try readClaim()
-        if let processID {
-            claim.processID = processID
-            claim.processIdentity = TaskRunClaimManager.processIdentity(for: processID)
+        try TaskRunClaimManager.withClaimLock(rootURL: claimRootURL) {
+            var claim = try readClaim()
+            if let processID {
+                claim.processID = processID
+                claim.processIdentity = TaskRunClaimManager.processIdentity(for: processID)
+            }
+            if let processGroupID {
+                claim.processGroupID = processGroupID
+                claim.processGroupLeaderIdentity = TaskRunClaimManager.processIdentity(for: processGroupID)
+            }
+            if let host {
+                claim.host = host
+            }
+            try TaskRunClaimManager.write(claim: claim, to: claimURL)
         }
-        if let processGroupID {
-            claim.processGroupID = processGroupID
-            claim.processGroupLeaderIdentity = TaskRunClaimManager.processIdentity(for: processGroupID)
-        }
-        if let host {
-            claim.host = host
-        }
-        try TaskRunClaimManager.write(claim: claim, to: claimURL)
+    }
+
+    private var claimRootURL: URL {
+        isLegacy ? claimDirectoryURL : claimDirectoryURL.deletingLastPathComponent()
     }
 
     func release() {

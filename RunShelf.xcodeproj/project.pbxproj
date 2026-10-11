@@ -8,11 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		0265FE4C60AA475627FE8982 /* NotificationOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B091AF3CACB7197DA076BB02 /* NotificationOutboxTests.swift */; };
+		0415D602F2B2572A833F84A6 /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
 		0746F391CA689FB18FD7E9BB /* RunShelfNotificationOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56AD8103FDF47FDBF4736F9 /* RunShelfNotificationOutbox.swift */; };
 		0794E853D9EF0B26F8E6DDE6 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
 		099B302783A32D34DB9127FB /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
 		0D7A0B0E7A72DAE6F1E3A650 /* RunShelfApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1CF0D6068E0ABDB49AE133 /* RunShelfApp.swift */; };
 		0D7DB4FF2D41DF5688A507B2 /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
+		12885F2F55CAA408B03F06AC /* SchedulerRunHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */; };
 		1779E9B52FBD8CCEAFF70EE7 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F6F7DF7A9D39CA3FAC5056 /* LogContentLoader.swift */; };
 		1781D79A58D3391CE0557F22 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
 		1855EC1D4B55B878C6BFEA49 /* runshelf in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 9F99A4459B3E0CFC684DD0B3 /* runshelf */; };
@@ -23,6 +25,7 @@
 		1F9F4D6869EBD8DEE8E2D231 /* RetentionCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */; };
 		230DA6F66458D75F4905F781 /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
 		23B803B55F7FC460E19286FD /* TaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A6DCB5A15B2F884FACE501 /* TaskModels.swift */; };
+		258333E111790FD2AD87423A /* SchedulerRunHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */; };
 		266E8106D8193FB93A61A406 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AC9F5096A59E8E6DC907D3A /* Assets.xcassets */; };
 		26D77314F3337F1463F4115E /* RunShelfWindowMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE4947411DB009A669784D9 /* RunShelfWindowMetrics.swift */; };
 		2739D025A5E844E622BD8307 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
@@ -61,6 +64,7 @@
 		6645B779A08F3FE9B592A8B0 /* TaskRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D12AD932FCE359A0997A4B /* TaskRunCoordinator.swift */; };
 		6886CF7B6DDEEB61C6300810 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
 		6A3BD7297156A5E075AFF5BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		6BED7327761A8F15EB72D99E /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
 		6DA70FB9BFF8598D8F360183 /* TaskListPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6F61DA95A80C1D021AEED /* TaskListPreferencesStore.swift */; };
 		6E576C034BA4C64E3BE50618 /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		70DE7303B1DAE9D3A5D5E29F /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
@@ -86,6 +90,7 @@
 		8EEF06B1AE89AA5373238E4C /* DangerousCommandScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */; };
 		963F27FCD7D4DFB7BE23B96F /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C162136D8417BC1B1C2785CF /* TaskStore.swift */; };
 		98D8B9BD592C4786E8BF028B /* RunShelfFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98B1A7D08B4E2EA9F75DE /* RunShelfFormatters.swift */; };
+		9977EB0B4D305634BF8CFA3E /* SchedulerRunHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */; };
 		9C066BDA7D2B950D7E68FBF3 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
 		9C6C1F1EBBD5757C96869DB9 /* RunnerSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A731A8272691DB47B32A9C9 /* RunnerSchedulerTests.swift */; };
 		9D392B6FFB581C6894F07C99 /* TaskHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94817BF0B0F6D615D79BCDCF /* TaskHeaderView.swift */; };
@@ -101,6 +106,7 @@
 		A8E6BC302156C103B83509C3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5298CDA73E6C315157B13AC4 /* Localizable.xcstrings */; };
 		A991490F3D9AC14EE4F55825 /* TaskDiskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322A549506859D18118CA3F8 /* TaskDiskMonitor.swift */; };
 		AA160A015F7C7D6B72D9CCFA /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
+		AA7751A5C7A38A36B915E118 /* SchedulerRunHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE774AA83DE9506E80DBB40 /* SchedulerRunHostTests.swift */; };
 		AE139CCB18F8CBC2FE9A489C /* GeneratedSchemas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0781AA74CE27DD68B9BAD5E0 /* GeneratedSchemas.swift */; };
 		AE55F8E6B49AA992D8E3B12D /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
 		AFAC610790E9FD073D805A23 /* TaskListPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6F61DA95A80C1D021AEED /* TaskListPreferencesStore.swift */; };
@@ -113,6 +119,7 @@
 		BD625596363E7F13A6C9B103 /* RunShelfSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */; };
 		BEE45E7943C62DA61AAD4B45 /* TaskTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8232C07B77CA687B0C916 /* TaskTemplate.swift */; };
 		C316CE8D739BDACEA35DCB69 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
+		C7CC1A6228029DB5AC6F77A6 /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
 		CBC8CD1EBAE3A38AA832D2CE /* RunShelfAgentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF286006A4413E1700B2713 /* RunShelfAgentBridge.swift */; };
 		CBD9EA10B61D12EE407EBF86 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 984DC5B795E8535D98006C66 /* SettingsView.swift */; };
 		CD77A00ACBCA1BD608E6C472 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
@@ -134,11 +141,13 @@
 		EAE00F141F1DD4D7B28CE012 /* NewTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD46BB536AC778D3331E198 /* NewTaskSheet.swift */; };
 		F067AFCC0A6FA04D8BEF319C /* LogScrollState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB6E37CAC5A27FF4C862545 /* LogScrollState.swift */; };
 		F1A509EA4C9F181C84631E4B /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
+		F3478B5DADD00F819275E447 /* SchedulerRunHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */; };
 		F3DCF9E11D97B503E8A549DB /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
 		F5CF6B178334CBBD7E570F09 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F6F7DF7A9D39CA3FAC5056 /* LogContentLoader.swift */; };
 		F66174AAAC9032E1E918E4D0 /* PermissionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */; };
 		F6765F7C3A9969242BF33857 /* TaskFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC2F1733CE3B9E9E71214 /* TaskFileStore.swift */; };
 		F7366F26F68479ABEB42215F /* LogTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC2F271BBCF8915724E69A5 /* LogTextView.swift */; };
+		F757879FC9BEF297D00B339F /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
 		F78C125B5CF223A7E67A067E /* ShellScriptEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */; };
 		F7C6D55257F32446754ACB6F /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6452E5D8F27F04BD9200CF39 /* StatusBadge.swift */; };
 		FA219ACBEE9397481347B43E /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
@@ -219,6 +228,7 @@
 		05786979DB3D9C03DFAA713C /* RunShelfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunShelfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		067F767051595225FF9F76EB /* Run Shelf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Run Shelf.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0781AA74CE27DD68B9BAD5E0 /* GeneratedSchemas.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeneratedSchemas.swift; sourceTree = "<group>"; };
+		07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DetachedProcessSpawner.swift; sourceTree = "<group>"; };
 		0DC6A6A2D5489F7D9D4C9E22 /* RunShelfNotifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfNotifications.swift; sourceTree = "<group>"; };
 		15D6F61DA95A80C1D021AEED /* TaskListPreferencesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskListPreferencesStore.swift; sourceTree = "<group>"; };
 		19D12AD932FCE359A0997A4B /* TaskRunCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunCoordinator.swift; sourceTree = "<group>"; };
@@ -269,12 +279,14 @@
 		C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCLIInstaller.swift; sourceTree = "<group>"; };
 		C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
 		CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
+		CBE774AA83DE9506E80DBB40 /* SchedulerRunHostTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerRunHostTests.swift; sourceTree = "<group>"; };
 		D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSidebarView.swift; sourceTree = "<group>"; };
 		D39E4B391B2D92BD82F82CDB /* RepositoryConcurrencyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RepositoryConcurrencyTests.swift; sourceTree = "<group>"; };
 		D99ABBCA8007FED5EF01FF49 /* PermissionGateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionGateView.swift; sourceTree = "<group>"; };
 		DA6678FDD12531A11E80D5A0 /* ShellScriptEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShellScriptEditor.swift; sourceTree = "<group>"; };
 		DAB7E409904F13A101E8263D /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		DCD46BB536AC778D3331E198 /* NewTaskSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskSheet.swift; sourceTree = "<group>"; };
+		DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerRunHost.swift; sourceTree = "<group>"; };
 		E40FC34752E7412D02760C9B /* TaskRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskRunner.swift; sourceTree = "<group>"; };
 		EE4EB5D6D976C727538CC608 /* RunShelfSchedulerE2ETests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSchedulerE2ETests.swift; sourceTree = "<group>"; };
 		F3AD85FE666E21E1118A4A3F /* TaskSelectionState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSelectionState.swift; sourceTree = "<group>"; };
@@ -433,6 +445,7 @@
 				CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */,
 				7A5F7BA2A30E9E6F6EE450B3 /* TaskRunClaim.swift */,
 				E40FC34752E7412D02760C9B /* TaskRunner.swift */,
+				07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */,
 			);
 			name = Runner;
 			path = Runner;
@@ -451,6 +464,7 @@
 			isa = PBXGroup;
 			children = (
 				5E512CAC6415985DF1537634 /* SchedulerEngine.swift */,
+				DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */,
 			);
 			name = Scheduler;
 			path = Scheduler;
@@ -565,6 +579,7 @@
 				B6AB5EB35FF4E32EE3915899 /* TaskListPreferencesTests.swift */,
 				B091AF3CACB7197DA076BB02 /* NotificationOutboxTests.swift */,
 				EE4EB5D6D976C727538CC608 /* RunShelfSchedulerE2ETests.swift */,
+				CBE774AA83DE9506E80DBB40 /* SchedulerRunHostTests.swift */,
 			);
 			name = RunShelfTests;
 			path = RunShelfTests;
@@ -767,6 +782,8 @@
 				AA160A015F7C7D6B72D9CCFA /* RunShelfCLIInstaller.swift in Sources */,
 				6DA70FB9BFF8598D8F360183 /* TaskListPreferencesStore.swift in Sources */,
 				4AD8E12D603E83C7008F0D65 /* RunShelfNotificationOutbox.swift in Sources */,
+				6BED7327761A8F15EB72D99E /* DetachedProcessSpawner.swift in Sources */,
+				F3478B5DADD00F819275E447 /* SchedulerRunHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -820,6 +837,8 @@
 				31AF67312B62AB81DF0B3A20 /* TaskListPreferencesStore.swift in Sources */,
 				6014FF2E610BB387BA6D5F2A /* FailureNotificationRelay.swift in Sources */,
 				8AFDFE4E1AB7E6901D149CB5 /* RunShelfNotificationOutbox.swift in Sources */,
+				C7CC1A6228029DB5AC6F77A6 /* DetachedProcessSpawner.swift in Sources */,
+				9977EB0B4D305634BF8CFA3E /* SchedulerRunHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -850,6 +869,8 @@
 				6E576C034BA4C64E3BE50618 /* RunShelfCLIInstaller.swift in Sources */,
 				B94818DB5FD8DCE60080C0C0 /* TaskListPreferencesStore.swift in Sources */,
 				0746F391CA689FB18FD7E9BB /* RunShelfNotificationOutbox.swift in Sources */,
+				0415D602F2B2572A833F84A6 /* DetachedProcessSpawner.swift in Sources */,
+				258333E111790FD2AD87423A /* SchedulerRunHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -894,6 +915,9 @@
 				4FDBC9306D1C4FD53FE57E1F /* RunShelfNotificationOutbox.swift in Sources */,
 				0265FE4C60AA475627FE8982 /* NotificationOutboxTests.swift in Sources */,
 				4B30330B5C16807669FCE005 /* RunShelfSchedulerE2ETests.swift in Sources */,
+				F757879FC9BEF297D00B339F /* DetachedProcessSpawner.swift in Sources */,
+				12885F2F55CAA408B03F06AC /* SchedulerRunHost.swift in Sources */,
+				AA7751A5C7A38A36B915E118 /* SchedulerRunHostTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

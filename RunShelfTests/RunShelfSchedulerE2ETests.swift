@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 
@@ -7,6 +8,7 @@ final class RunShelfSchedulerE2ETests: XCTestCase {
     private var appSupportURL: URL!
     private var productsURL: URL!
     private var processes: [Process] = []
+    private var detachedPIDs: [pid_t] = []
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -30,6 +32,12 @@ final class RunShelfSchedulerE2ETests: XCTestCase {
             process.waitUntilExit()
         }
         processes = []
+        // 运行宿主和脚本在独立 session 里，测试失败时不能留下孤儿。
+        for pid in detachedPIDs {
+            killpg(pid, SIGKILL)
+            kill(pid, SIGKILL)
+        }
+        detachedPIDs = []
         try? FileManager.default.removeItem(at: rootURL)
         try super.tearDownWithError()
     }
@@ -75,7 +83,93 @@ final class RunShelfSchedulerE2ETests: XCTestCase {
         XCTAssertEqual(meta?["exitCode"] as? Int, 3)
     }
 
+    func testScheduledRunSurvivesSchedulerSIGKILLAndRecordsTrueTerminalStatus() throws {
+        let markerURL = rootURL.appendingPathComponent("release-marker")
+        let taskID = try applyTask([
+            "slug": "scheduler-crash-survivor",
+            "name": "Scheduler Crash Survivor",
+            "schedule": ["type": "cron", "expression": "* * * * *", "timezone": "local"],
+            "script": "#!/bin/zsh\necho started\nwhile [[ ! -e '\(markerURL.path)' ]]; do sleep 0.1; done\necho finished\nexit 0\n"
+        ])
+
+        let scheduler = try launch("RunShelfScheduler", arguments: [])
+        let running = try waitForMeta(taskID: taskID, timeout: 15) { meta in
+            meta["status"] as? String == "running" && meta["processGroupID"] is Int
+        }
+        let hostPID = try XCTUnwrap(running["processID"] as? Int)
+        let scriptGroup = try XCTUnwrap(running["processGroupID"] as? Int)
+        detachedPIDs += [pid_t(scriptGroup), pid_t(hostPID)]
+        XCTAssertNotEqual(Int32(hostPID), scheduler.processIdentifier, "scheduled runs must be supervised by a detached host")
+
+        // 模拟生产崩溃：调度进程直接死掉，不给任何清理机会。
+        kill(scheduler.processIdentifier, SIGKILL)
+        scheduler.waitUntilExit()
+        XCTAssertEqual(scheduler.terminationReason, .uncaughtSignal)
+        XCTAssertEqual(kill(pid_t(hostPID), 0), 0, "run host must outlive the scheduler")
+
+        try Data().write(to: markerURL)
+        let finished = try waitForMeta(taskID: taskID, timeout: 15) { meta in
+            meta["status"] as? String != "running"
+        }
+        XCTAssertEqual(finished["status"] as? String, "success")
+        XCTAssertEqual(finished["exitCode"] as? Int, 0)
+        XCTAssertEqual(finished["trigger"] as? String, "scheduled")
+        XCTAssertNotNil(finished["scheduledAt"])
+
+        let claimRoot = appSupportURL.appendingPathComponent("tasks/\(taskID)/.run-claim")
+        let claims = ((try? FileManager.default.contentsOfDirectory(atPath: claimRoot.path)) ?? [])
+            .filter { !$0.hasPrefix(".") }
+        XCTAssertEqual(claims, [], "host must release its claim after recording the terminal status")
+    }
+
+    func testScheduledTimeoutIsEnforcedByHostAndQueuedOnce() throws {
+        let taskID = try applyTask([
+            "slug": "scheduler-timeout",
+            "name": "Scheduler Timeout",
+            "schedule": ["type": "cron", "expression": "* * * * *", "timezone": "local"],
+            "timeoutSeconds": 1,
+            "script": "#!/bin/zsh\nsleep 30\n"
+        ])
+
+        let scheduler = try launch("RunShelfScheduler", arguments: [])
+        let finished = try waitForMeta(taskID: taskID, timeout: 20) { meta in
+            meta["status"] as? String != nil && meta["status"] as? String != "running"
+        }
+        XCTAssertEqual(finished["status"] as? String, "timeout")
+        XCTAssertTrue(scheduler.isRunning)
+
+        let outboxURL = appSupportURL.appendingPathComponent("notifications/outbox", isDirectory: true)
+        let queued = ((try? FileManager.default.contentsOfDirectory(atPath: outboxURL.path)) ?? [])
+            .filter { $0.hasSuffix(".json") && !$0.hasPrefix(".") }
+        XCTAssertEqual(queued, ["\(taskID)--\(try XCTUnwrap(finished["runId"] as? String)).json"])
+    }
+
     // MARK: - Helpers
+
+    private func waitForMeta(
+        taskID: String,
+        timeout: TimeInterval,
+        until predicate: ([String: Any]) -> Bool
+    ) throws -> [String: Any] {
+        let runsURL = appSupportURL.appendingPathComponent("tasks/\(taskID)/runs", isDirectory: true)
+        let deadline = Date().addingTimeInterval(timeout)
+        var last: [String: Any] = [:]
+        while Date() < deadline {
+            let runs = ((try? FileManager.default.contentsOfDirectory(atPath: runsURL.path)) ?? []).sorted()
+            if let runID = runs.last,
+               let data = try? Data(contentsOf: runsURL.appendingPathComponent("\(runID)/meta.json")),
+               let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                last = meta
+                if predicate(meta) { return meta }
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        throw NSError(
+            domain: "RunShelfSchedulerE2ETests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "timed out waiting for run meta; last=\(last)"]
+        )
+    }
 
     private func applyTask(_ spec: [String: Any]) throws -> String {
         let specURL = rootURL.appendingPathComponent("\(UUID().uuidString).json")
