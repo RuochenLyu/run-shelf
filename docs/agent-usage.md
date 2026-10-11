@@ -90,7 +90,7 @@ runshelf version --json
 
 前台 `run` 以非成功状态结束时，退出码是 `8`，JSON envelope 同时返回 `ok: false` 和 `error.code: "run_failed"`；`result.run` 仍保留完整运行记录，包括状态、脚本退出码和日志路径，便于 agent 诊断。
 
-如果 `run status` 显示后台运行仍在继续，但 agent 判断必须停止，用 `runshelf run cancel <run-id> --json`。CLI 会读取 `.run-claim` 里的进程组并发送 `SIGTERM`。
+如果 `run status` 显示后台运行仍在继续，但 agent 判断必须停止，用 `runshelf run cancel <run-id> --json`。CLI 会写入取消请求，并读取 `.run-claim` 里的进程组发送 `SIGTERM`；如果脚本还没启动（尚未记录进程组），只写取消请求、不发信号（返回 `signal: 0`），监督进程启动脚本后会立即按取消处理。
 
 `run stop` 是 `run cancel` 的别名。任务运行结束后可以用 `task delete` 删除；任务仍在运行时删除会返回 `already_running`/退出码 `7`。`run cancel` 对已经结束的 run 返回 `not_found`，应改用 `run status` 查看最终状态。
 

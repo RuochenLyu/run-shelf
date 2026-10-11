@@ -541,6 +541,8 @@ private struct CLIContext {
             let runURL = task.directoryURL
                 .appendingPathComponent("runs", isDirectory: true)
                 .appendingPathComponent(runID, isDirectory: true)
+            // claim 抢到后、运行目录建好前也可能收到取消；先建目录，保证取消请求不会静默丢失。
+            try? FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
             try? "cancelled by runshelf CLI\n".write(
                 to: runURL.appendingPathComponent("cancel-requested"),
                 atomically: true,
@@ -549,16 +551,16 @@ private struct CLIContext {
             guard TaskRunClaimManager.canSafelySignal(claim) else {
                 throw CLIExitError.conflict("无法验证运行进程身份；已写入取消请求，但为避免终止无关进程，未发送信号。")
             }
-            if let processGroupID = claim.processGroupID, processGroupID > 0 {
-                guard kill(-processGroupID, SIGTERM) == 0 || errno == ESRCH else {
-                    throw CLIExitError.unexpected("无法终止进程组 \(processGroupID)：\(String(cString: strerror(errno)))")
-                }
-                return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: processGroupID)
+            guard let processGroupID = claim.processGroupID, processGroupID > 0 else {
+                // 还没记录进程组说明脚本尚未启动；claim.processID 是监督进程（App、调度宿主、
+                // CLI 宿主），向它发 SIGTERM 会杀掉监督者、让脚本无人看管。监督者启动脚本后
+                // 每 0.2 秒检查 cancel-requested，只写请求即可，signal 为 0 表示未发信号。
+                return CancelRunPayload(taskId: task.id, runId: runID, signal: 0, processID: claim.processID, processGroupID: nil)
             }
-            guard kill(claim.processID, SIGTERM) == 0 || errno == ESRCH else {
-                throw CLIExitError.unexpected("无法终止进程 \(claim.processID)：\(String(cString: strerror(errno)))")
+            guard kill(-processGroupID, SIGTERM) == 0 || errno == ESRCH else {
+                throw CLIExitError.unexpected("无法终止进程组 \(processGroupID)：\(String(cString: strerror(errno)))")
             }
-            return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: nil)
+            return CancelRunPayload(taskId: task.id, runId: runID, signal: SIGTERM, processID: claim.processID, processGroupID: processGroupID)
         }
         throw CLIExitError.notFound("找不到运行中的任务：\(runID)。运行可能已经结束；请用 run status 查看最终状态。")
     }

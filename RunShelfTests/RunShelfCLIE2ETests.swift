@@ -380,6 +380,53 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertEqual(kill(getpid(), 0), 0)
     }
 
+    func testCancelBeforeProcessGroupIsRecordedDoesNotSignalSupervisor() throws {
+        let create = try invokeApply([
+            "slug": "early-cancel",
+            "name": "Early Cancel",
+            "script": "#!/bin/zsh\necho early\n"
+        ])
+        let taskID = try string(dictionary(result(create.json)["task"])["id"])
+        let taskURL = appSupportURL.appendingPathComponent("tasks/\(taskID)")
+        let runID = "early-cancel-run"
+        let runURL = taskURL.appendingPathComponent("runs/\(runID)")
+
+        // 模拟监督进程（App / 调度宿主）：claim 已抢到、身份可验证，但脚本还没启动。
+        let supervisor = Process()
+        supervisor.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        supervisor.arguments = ["30"]
+        try supervisor.run()
+        defer {
+            if supervisor.isRunning {
+                supervisor.terminate()
+                supervisor.waitUntilExit()
+            }
+        }
+        let claimDirectoryURL = taskURL.appendingPathComponent(".run-claim/\(runID)")
+        try FileManager.default.createDirectory(at: claimDirectoryURL, withIntermediateDirectories: true)
+        let claim = TaskRunClaim(
+            schemaVersion: 1,
+            runId: runID,
+            taskId: taskID,
+            processID: supervisor.processIdentifier,
+            processGroupID: nil,
+            processIdentity: TaskRunClaimManager.processIdentity(for: supervisor.processIdentifier),
+            host: "scheduler-launcher",
+            startedAt: Date()
+        )
+        try TaskRunClaimManager.write(claim: claim, to: claimDirectoryURL.appendingPathComponent("claim.json"))
+
+        let cancel = try invoke(["run", "cancel", runID, "--json"])
+
+        XCTAssertEqual(cancel.exitCode, 0, String(data: cancel.stdout, encoding: .utf8) ?? "")
+        let payload = try result(cancel.json)
+        XCTAssertEqual(payload["signal"] as? Int, 0)
+        XCTAssertNil(payload["processGroupID"] as? Int)
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertTrue(supervisor.isRunning, "取消请求不应向监督进程发信号")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: runURL.appendingPathComponent("cancel-requested").path))
+    }
+
     func testInstallCLIForceRejectsDirectory() throws {
         let prefixURL = rootURL.appendingPathComponent("bin", isDirectory: true)
         let destinationURL = prefixURL.appendingPathComponent("runshelf", isDirectory: true)

@@ -122,6 +122,30 @@ final class SchedulerRunHostTests: XCTestCase {
         XCTAssertTrue(fixture.outbox.pending().isEmpty)
     }
 
+    func testCancelRequestedBeforeScriptStartIsHonored() throws {
+        // CLI 在进程组记录前取消时只写 cancel-requested；监督方启动脚本后必须照办。
+        let fixture = try makeFixture(name: "early-cancel", script: "#!/bin/zsh\nsleep 30\n")
+        let runID = TaskRunner.makeRunID(from: Date())
+        _ = try TaskRunClaimManager.acquire(task: fixture.task, runID: runID, host: SchedulerRunHost.launcherHostName)
+        let runURL = fixture.task.directoryURL.appendingPathComponent("runs/\(runID)", isDirectory: true)
+        try FileManager.default.createDirectory(at: runURL, withIntermediateDirectories: true)
+        try "cancelled by test\n".write(to: runURL.appendingPathComponent("cancel-requested"), atomically: true, encoding: .utf8)
+
+        let started = Date()
+        let exitCode = SchedulerRunHost.runHost(
+            arguments: .init(taskID: fixture.task.id, runID: runID, scheduledAt: nil),
+            tasksDirectoryURL: fixture.tasksURL,
+            outbox: fixture.outbox,
+            errorOutput: { XCTFail($0) }
+        )
+
+        XCTAssertEqual(exitCode, 1)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 10)
+        let record = try XCTUnwrap(TaskFileStore(tasksDirectoryURL: fixture.tasksURL).loadRun(for: fixture.task.directoryURL, runID: runID))
+        XCTAssertEqual(record.status, .cancelled)
+        XCTAssertNil(TaskRunClaimManager.activeClaim(for: fixture.task))
+    }
+
     // MARK: - Helpers
 
     private struct Fixture {
