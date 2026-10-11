@@ -148,6 +148,7 @@ docs/                         需求、使用、开发、发布文档
 - `slug` 只是给人和 agent 使用的别名，可以为空，但不能作为目录名。
 - `TaskSpec` 是 agent 的稳定写入面，不要让它无脑追随 `TaskManifest` 的所有内部字段。
 - App、scheduler、CLI 都必须通过 `.run-claim/<run-id>/claim.json` 判断运行状态；`skip` 保持任务级互斥，`allow` 可同时存在多个 run claim。
+- `UNUserNotificationCenter` 只能在 Run Shelf.app 进程里调用；RunShelfScheduler 和 `runshelf` 是裸可执行文件，调用会断言 abort。调度进程的失败通知写入 `notifications/outbox/<taskId>--<runId>.json`，由 App 每 5 秒转投；App 未运行时通知会延迟到下次启动，超过 24 小时的条目丢弃。
 - CLI 写入已有任务时应使用 `revisionToken` 做 CAS，避免覆盖 App 或另一个 CLI 的改动。
 - 不要让 agent 或用户直接拼写 `task.json`；写入入口是 `runshelf apply`。
 

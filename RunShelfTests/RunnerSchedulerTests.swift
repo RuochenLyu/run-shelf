@@ -286,6 +286,65 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertEqual(lock.withLock { notificationCount }, 0)
     }
 
+    func testSchedulerDefaultFailureNotifierWritesOutboxInsteadOfUserNotifications() throws {
+        // 回归：调度进程是裸可执行文件，默认通知路径曾直达 UNUserNotificationCenter 并 abort。
+        let fixture = try schedulerFixture(id: "outbox-timeout", concurrency: "skip") { task, scheduledAt, _ in
+            try TaskRunner.writeSystemRecord(
+                task: task,
+                trigger: .scheduled,
+                status: .timeout,
+                message: "运行超过 30 秒，已终止。",
+                scheduledAt: scheduledAt
+            )
+        }
+
+        fixture.engine.runScheduled(task: fixture.task, scheduledAt: Date())
+
+        try waitUntil { fixture.outbox.pending().count == 1 }
+        let entry = try XCTUnwrap(fixture.outbox.pending().first)
+        XCTAssertEqual(entry.taskId, fixture.task.id)
+        XCTAssertEqual(entry.status, .timeout)
+        XCTAssertEqual(entry.body, "运行超过 30 秒，已终止。")
+        XCTAssertEqual(entry.taskName, "outbox-timeout")
+    }
+
+    func testSchedulerFallbackFailureUsesInjectedNotifier() throws {
+        let lock = NSLock()
+        var notified: [TaskRunStatus] = []
+        let fixture = try schedulerFixture(
+            id: "fallback-notifier",
+            concurrency: "skip",
+            scheduledRun: { _, _, _ in throw CocoaError(.fileWriteNoPermission) },
+            failureNotifier: { _, run in lock.withLock { notified.append(run.status) } }
+        )
+
+        fixture.engine.runScheduled(task: fixture.task, scheduledAt: Date())
+
+        try waitUntil { lock.withLock { notified == [.failed] } }
+        XCTAssertTrue(records(in: fixture.taskURL).contains { $0.status == .failed })
+        XCTAssertTrue(fixture.outbox.pending().isEmpty)
+    }
+
+    func testSchedulerOutboxRespectsOnFailureOptOut() throws {
+        let fixture = try schedulerFixture(id: "outbox-opt-out", concurrency: "skip") { task, scheduledAt, _ in
+            try TaskRunner.writeSystemRecord(
+                task: task,
+                trigger: .scheduled,
+                status: .failed,
+                message: "boom",
+                scheduledAt: scheduledAt
+            )
+        }
+        var task = fixture.task
+        task.manifest.notifications.onFailure = false
+
+        fixture.engine.runScheduled(task: task, scheduledAt: Date())
+
+        try waitUntil { self.records(in: fixture.taskURL).contains { $0.status == .failed } }
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertTrue(fixture.outbox.pending().isEmpty)
+    }
+
     func testSchedulerPersistsMinuteBeforeDispatch() throws {
         let lock = NSLock()
         var stateURL: URL?
@@ -483,9 +542,7 @@ final class RunnerSchedulerTests: XCTestCase {
                 host: "scheduler"
             )
         },
-        failureNotifier: @escaping SchedulerEngine.FailureNotifier = { task, run in
-            RunShelfNotifier.notifyFailure(task: task, run: run)
-        },
+        failureNotifier: SchedulerEngine.FailureNotifier? = nil,
         resetSystemTimeZone: @escaping () -> Void = { NSTimeZone.resetSystemTimeZone() }
     ) throws -> Fixture {
         let taskID = UUID().uuidString
@@ -520,7 +577,8 @@ final class RunnerSchedulerTests: XCTestCase {
             task: storedTask,
             taskURL: taskURL,
             stateURL: stateURL,
-            heartbeatURL: heartbeatURL
+            heartbeatURL: heartbeatURL,
+            appSupportURL: appSupport
         )
     }
 
@@ -568,6 +626,13 @@ private struct Fixture {
     let taskURL: URL
     let stateURL: URL
     let heartbeatURL: URL
+    let appSupportURL: URL
+
+    var outbox: RunShelfNotificationOutbox {
+        RunShelfNotificationOutbox(
+            directoryURL: RunShelfPaths.notificationOutboxURL(appSupportDirectoryURL: appSupportURL)
+        )
+    }
 
     func writeState(
         lastCheckAt: Date,

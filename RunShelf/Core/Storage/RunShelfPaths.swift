@@ -30,4 +30,14 @@ enum RunShelfPaths {
         appSupportDirectoryURL()
             .appendingPathComponent("scheduler.log")
     }
+
+    /// 调度进程等无 .app bundle 的进程不能调用 UserNotifications，
+    /// 失败通知先落到这里，由 App 进程转投系统通知中心。
+    static func notificationOutboxURL(
+        appSupportDirectoryURL: URL = RunShelfPaths.appSupportDirectoryURL()
+    ) -> URL {
+        appSupportDirectoryURL
+            .appendingPathComponent("notifications", isDirectory: true)
+            .appendingPathComponent("outbox", isDirectory: true)
+    }
 }

@@ -57,7 +57,7 @@ final class SchedulerEngine {
                 host: "scheduler"
             )
         },
-        failureNotifier: @escaping FailureNotifier = RunShelfNotifier.notifyFailure,
+        failureNotifier: FailureNotifier? = nil,
         resetSystemTimeZone: @escaping () -> Void = { NSTimeZone.resetSystemTimeZone() }
     ) {
         self.taskFileStore = taskFileStore
@@ -67,7 +67,15 @@ final class SchedulerEngine {
         self.logURL = logURL
         self.fileManager = fileManager
         self.scheduledRun = scheduledRun
-        self.failureNotifier = failureNotifier
+        // 调度进程是裸可执行文件，不能碰 UserNotifications（会断言 abort）。
+        // 默认把失败通知写进 outbox，由 App 进程转投。
+        self.failureNotifier = failureNotifier ?? Self.outboxFailureNotifier(
+            outbox: RunShelfNotificationOutbox(
+                directoryURL: RunShelfPaths.notificationOutboxURL(appSupportDirectoryURL: appSupportDirectoryURL),
+                fileManager: fileManager
+            ),
+            logURL: logURL
+        )
         self.resetSystemTimeZone = resetSystemTimeZone
     }
 
@@ -227,6 +235,21 @@ final class SchedulerEngine {
         }
     }
 
+    static func outboxFailureNotifier(outbox: RunShelfNotificationOutbox, logURL: URL) -> FailureNotifier {
+        { task, run in
+            do {
+                try RunShelfNotifier.enqueueFailure(task: task, run: run, outbox: outbox)
+            } catch {
+                let line = "[\(RunShelfFormatters.dateTimeWithSeconds(Date()))] failure notification enqueue failed for \(task.manifest.name): \(error.localizedDescription)\n"
+                if let handle = try? FileHandle(forWritingTo: logURL) {
+                    defer { try? handle.close() }
+                    _ = try? handle.seekToEnd()
+                    try? handle.write(contentsOf: Data(line.utf8))
+                }
+            }
+        }
+    }
+
     private static func isActiveRunError(_ error: Error) -> Bool {
         if case TaskRunnerError.runAlreadyActive = error {
             return true
@@ -247,7 +270,7 @@ final class SchedulerEngine {
                 scheduledAt: scheduledAt
             )
             if status == .failed || status == .timeout {
-                RunShelfNotifier.notifyFailure(task: task, run: record)
+                failureNotifier(task, record)
             }
         } catch {
             appendLog("failed to write \(status.rawValue) record for \(task.manifest.name): \(error.localizedDescription)")

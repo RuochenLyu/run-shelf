@@ -5,11 +5,14 @@ import AppKit
 struct RunShelfApp: App {
     @StateObject private var schedulerController: SchedulerServiceController
     @StateObject private var taskStore: TaskStore
+    private let failureNotificationRelay: FailureNotificationRelay
 
     init() {
         let controller = SchedulerServiceController()
         _schedulerController = StateObject(wrappedValue: controller)
         _taskStore = StateObject(wrappedValue: TaskStore())
+        failureNotificationRelay = FailureNotificationRelay()
+        failureNotificationRelay.start()
     }
 
     var body: some Scene {
