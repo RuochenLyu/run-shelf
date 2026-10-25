@@ -17,6 +17,9 @@ final class SchedulerServiceController: ObservableObject {
     private var isRequestingNotificationAuthorization = false
     private var isRepairingRegistration = false
     private var attemptedRegistrationRepairSignature: String?
+    /// 预览构建与正式版共用 bundle id；临时数据目录下注册会把正式版的后台调度指向预览构建。
+    private let registrationLocked = RunShelfPaths.isAppSupportOverridden
+    private let registrationLockedMessage = "预览模式（RUN_SHELF_APP_SUPPORT_DIR）不改动后台调度注册。"
 
     init() {
         let decoder = JSONDecoder()
@@ -68,6 +71,10 @@ final class SchedulerServiceController: ObservableObject {
     /// Gate 主按钮入口。失败按 SMError 码分流文案；只有当状态最终为
     /// `.requiresApproval` 时才主动跳登录项设置面板。
     func registerForGate() {
+        guard !registrationLocked else {
+            lastErrorMessage = registrationLockedMessage
+            return
+        }
         lastErrorMessage = nil
         var registrationErrorResponse: RegistrationErrorResponse = .stayOnGate
 
@@ -91,6 +98,10 @@ final class SchedulerServiceController: ObservableObject {
     }
 
     func register() {
+        guard !registrationLocked else {
+            lastErrorMessage = registrationLockedMessage
+            return
+        }
         lastErrorMessage = nil
         do {
             try service.register()
@@ -103,6 +114,10 @@ final class SchedulerServiceController: ObservableObject {
     }
 
     func unregister() {
+        guard !registrationLocked else {
+            lastErrorMessage = registrationLockedMessage
+            return
+        }
         lastErrorMessage = nil
         do {
             try service.unregister()
@@ -192,6 +207,7 @@ final class SchedulerServiceController: ObservableObject {
     }
 
     private func repairRegistrationIfNeeded() {
+        guard !registrationLocked else { return }
         guard serviceStatus == .enabled else { return }
         guard embeddedSchedulerAvailable else { return }
         guard !isRepairingRegistration else { return }

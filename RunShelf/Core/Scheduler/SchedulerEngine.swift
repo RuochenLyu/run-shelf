@@ -4,6 +4,9 @@ struct SchedulerState: Codable {
     var schemaVersion: Int
     var lastCheckAt: Date?
     var lastScheduledMinuteByTaskID: [String: String]
+    /// concurrency=queue 的任务在忙时被触发，记下最近一次计划时间；空闲后补跑一次。
+    /// 可选字段：旧版本写出的状态文件没有它，旧版本读到它也会忽略。
+    var pendingRunByTaskID: [String: Date]? = nil
 
     static let empty = SchedulerState(
         schemaVersion: 1,
@@ -104,6 +107,14 @@ final class SchedulerEngine {
             state.lastScheduledMinuteByTaskID = state.lastScheduledMinuteByTaskID.filter {
                 existingTaskIDs.contains($0.key)
             }
+            // 已删除、已停用或改成别的并发策略的任务，不再保留待补跑。
+            let queueableTaskIDs = Set(loadResult.tasks.filter {
+                $0.manifest.enabled && $0.manifest.runner.concurrency == TaskConcurrency.queue
+            }.map(\.id))
+            if let pending = state.pendingRunByTaskID {
+                let kept = pending.filter { queueableTaskIDs.contains($0.key) }
+                state.pendingRunByTaskID = kept.isEmpty ? nil : kept
+            }
 
             for task in loadResult.tasks where task.manifest.enabled {
                 try process(task: task, now: now, state: &state)
@@ -121,6 +132,11 @@ final class SchedulerEngine {
 
     private func process(task: RunShelfTask, now: Date, state: inout SchedulerState) throws {
         guard task.manifest.schedule.type == "cron" else { return }
+        try processScheduledTrigger(task: task, now: now, state: &state)
+        try runPendingIfIdle(task: task, state: &state)
+    }
+
+    private func processScheduledTrigger(task: RunShelfTask, now: Date, state: inout SchedulerState) throws {
 
         let schedule: CronSchedule
         do {
@@ -175,22 +191,54 @@ final class SchedulerEngine {
             return
         }
 
-        let allowsConcurrentRun = task.manifest.runner.concurrency == "allow"
-        if !allowsConcurrentRun,
-           (runningRunIDsByTaskID[task.id]?.isEmpty == false || TaskRunClaimManager.activeClaim(for: task) != nil) {
+        let concurrency = task.manifest.runner.concurrency
+        if concurrency != TaskConcurrency.allow, isBusy(task) {
+            state.lastScheduledMinuteByTaskID[task.id] = scheduledMinuteKey
+            if concurrency == TaskConcurrency.queue {
+                // 多次忙时触发合并成一次补跑，记最近的计划时间。
+                var pending = state.pendingRunByTaskID ?? [:]
+                pending[task.id] = scheduledAt
+                state.pendingRunByTaskID = pending
+                appendLog("queued \(task.manifest.name) at \(RunShelfFormatters.dateTimeWithSeconds(scheduledAt)): previous run still active")
+                return
+            }
             writeSystemRecord(
                 task: task,
                 status: .skipped,
                 message: "上一次运行仍未结束，本次计划运行已跳过。",
                 scheduledAt: scheduledAt
             )
-            state.lastScheduledMinuteByTaskID[task.id] = scheduledMinuteKey
             return
         }
 
         state.lastScheduledMinuteByTaskID[task.id] = scheduledMinuteKey
+        // 空闲时的新触发已经覆盖了待补跑，不再额外多跑一次。
+        removePendingRun(for: task.id, from: &state)
         try saveState(state)
         runScheduled(task: task, scheduledAt: scheduledAt)
+    }
+
+    /// 待补跑不受 missedRunPolicy 的迟到上限约束：它等的是上一次运行结束，而不是调度器停摆。
+    private func runPendingIfIdle(task: RunShelfTask, state: inout SchedulerState) throws {
+        guard let pendingAt = state.pendingRunByTaskID?[task.id] else { return }
+        guard !isBusy(task) else { return }
+
+        removePendingRun(for: task.id, from: &state)
+        appendLog("running queued \(task.manifest.name) scheduled at \(RunShelfFormatters.dateTimeWithSeconds(pendingAt))")
+        try saveState(state)
+        runScheduled(task: task, scheduledAt: pendingAt)
+    }
+
+    private func removePendingRun(for taskID: String, from state: inout SchedulerState) {
+        guard state.pendingRunByTaskID?[taskID] != nil else { return }
+        state.pendingRunByTaskID?.removeValue(forKey: taskID)
+        if state.pendingRunByTaskID?.isEmpty == true {
+            state.pendingRunByTaskID = nil
+        }
+    }
+
+    private func isBusy(_ task: RunShelfTask) -> Bool {
+        runningRunIDsByTaskID[task.id]?.isEmpty == false || TaskRunClaimManager.activeClaim(for: task) != nil
     }
 
     func runScheduled(task: RunShelfTask, scheduledAt: Date) {
@@ -211,6 +259,11 @@ final class SchedulerEngine {
                 case .success(let run):
                     if !self.scheduledRunReportsFailures, run.status == .failed || run.status == .timeout {
                         self.failureNotifier(task, run)
+                    }
+                    // 有排队的补跑就不等下一个 30 秒 tick。
+                    if self.loadState().pendingRunByTaskID?[task.id] != nil {
+                        self.performTick(now: Date())
+                        return
                     }
                 case .failure(let error):
                     if Self.isActiveRunError(error) {

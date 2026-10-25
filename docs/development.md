@@ -103,6 +103,8 @@ export RUN_SHELF_APP_SUPPORT_DIR="$ROOT"
 "$CLI" doctor --json
 ```
 
+`RUN_SHELF_APP_SUPPORT_DIR` 同样适用于 App 预览：直接执行 `.app/Contents/MacOS/Run Shelf`（不要用 `open`，否则会激活已安装的正式版）。此时 App 不会注册、注销或修复后台调度，避免把正式版的调度指向开发构建。
+
 最小创建和运行：
 
 ```zsh

@@ -655,6 +655,8 @@ private struct CLIContext {
         appendChange(&changes, field: "enabled", before: String(existing.manifest.enabled), after: spec.enabled.map(String.init))
         appendChange(&changes, field: "schedule", before: existing.manifest.schedule.expression, after: spec.schedule?.expression)
         appendChange(&changes, field: "timeoutSeconds", before: String(existing.manifest.runner.timeoutSeconds), after: spec.timeoutSeconds.map(String.init))
+        appendChange(&changes, field: "concurrency", before: existing.manifest.runner.concurrency, after: spec.concurrency)
+        appendChange(&changes, field: "priority", before: existing.manifest.runner.priority, after: spec.priority)
         appendChange(&changes, field: "script", before: hashSummary(existing.script), after: spec.script.map(hashSummary))
         appendChange(&changes, field: "notes", before: hashSummary(existing.notes), after: spec.notes.map(hashSummary))
         return changes
@@ -820,7 +822,7 @@ private enum CLIExitError: Error {
             return .notFound(error.localizedDescription)
         case .ambiguous(_, _), .conflict(_):
             return .conflict(error.localizedDescription)
-        case .invalidSlug(_), .reservedSlug(_), .invalidSchedule(_), .invalidTimeoutSeconds(_), .invalidTaskID(_), .invalidRevision(_), .missingRequiredField(_):
+        case .invalidSlug(_), .reservedSlug(_), .invalidSchedule(_), .invalidTimeoutSeconds(_), .invalidConcurrency(_), .invalidPriority(_), .invalidTaskID(_), .invalidRevision(_), .missingRequiredField(_):
             return .validation(error.localizedDescription)
         case .taskDirectoryMissing(_):
             return .notFound(error.localizedDescription)
@@ -864,6 +866,8 @@ private struct TaskPayload: Encodable {
     var enabled: Bool
     var schedule: TaskSchedule
     var timeoutSeconds: Int
+    var concurrency: String
+    var priority: String
     var updatedAt: Date
     var latestRun: RunRecord?
 
@@ -876,6 +880,8 @@ private struct TaskPayload: Encodable {
         self.enabled = task.manifest.enabled
         self.schedule = task.manifest.schedule
         self.timeoutSeconds = task.manifest.runner.timeoutSeconds
+        self.concurrency = task.manifest.runner.concurrency
+        self.priority = task.manifest.runner.priority
         self.updatedAt = task.manifest.updatedAt
         self.latestRun = task.latestRun
     }
@@ -1004,6 +1010,8 @@ private func formatTask(_ task: RunShelfTask, revision: TaskDefinitionRevision) 
     enabled: \(task.manifest.enabled)
     schedule: \(task.manifest.schedule.expression)
     timeoutSeconds: \(task.manifest.runner.timeoutSeconds)
+    concurrency: \(task.manifest.runner.concurrency)
+    priority: \(task.manifest.runner.priority)
     revision: \(revision.manifest?.size ?? 0)/\(revision.script?.size ?? 0)/\(revision.notes?.size ?? 0)
     revisionToken: \(revision.token)
     """

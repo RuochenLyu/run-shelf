@@ -132,7 +132,7 @@ enum TaskRunClaimManager {
                 try reclaimStaleClaims(task: task, rootURL: rootURL, now: now, fileManager: fileManager)
 
                 let active = activeClaims(for: task, now: now, fileManager: fileManager)
-                if task.manifest.runner.concurrency != "allow", let existing = active.first {
+                if task.manifest.runner.concurrency != TaskConcurrency.allow, let existing = active.first {
                     throw TaskRunClaimError.alreadyRunning(existing)
                 }
 

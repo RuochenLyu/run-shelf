@@ -52,7 +52,25 @@
     },
     "timeoutSeconds": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "运行超时秒数，0 表示不限制。脚本可从环境变量 RUNSHELF_TIMEOUT_AT（ISO 8601 墙钟截止时间）读取本次截止点。"
+    },
+    "concurrency": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "queue",
+        "allow"
+      ],
+      "description": "上一次运行未结束时如何处理计划触发：skip 跳过；queue 合并为一次，结束后立即补跑；allow 允许重叠。手动运行在 skip 和 queue 下都互斥。"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "background"
+      ],
+      "description": "运行优先级：standard 与前台应用同级；background 以 utility QoS 运行，CPU 紧张时让位。"
     },
     "script": {
       "type": "string"

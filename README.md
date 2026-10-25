@@ -17,6 +17,7 @@ Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Sh
 - 手动运行：记录 stdout、stderr、退出码、脚本快照、耗时和状态。
 - 定时调度：支持 5 段 cron，主窗口关闭后也能由后台辅助进程继续检查。
 - 停止运行：超时、取消或后台终止时会清理整组子进程。
+- 运行配置：上次未结束时可跳过、排队补跑或同时运行；耗时任务可设为后台优先级，在电脑繁忙时让出 CPU。
 - 安全提示：编辑和 CLI 写入时会识别高风险命令。
 - Agent/CLI 操作：内置 `runshelf`，Codex/Claude 可以用 JSON 契约创建、修改、运行和查询任务。
 
@@ -66,7 +67,7 @@ runs/<run-id>/run.sh.snapshot
 .run-claim/<run-id>/claim.json
 ```
 
-`.run-claim` 是跨进程运行登记目录：`concurrency=skip` 同时只允许一个活动 claim，`concurrency=allow` 则按 run id 保存多个 claim。App、后台调度进程和 CLI 共用这套登记来查询、取消和回收运行。
+`.run-claim` 是跨进程运行登记目录：`concurrency=skip` 和 `concurrency=queue` 同时只允许一个活动 claim，`concurrency=allow` 则按 run id 保存多个 claim。App、后台调度进程和 CLI 共用这套登记来查询、取消和回收运行。
 
 ## CLI 使用
 
@@ -181,6 +182,16 @@ Run Shelf.app/Contents/Library/LaunchServices/RunShelfScheduler
 ```
 
 启用后台运行后，辅助进程每 30 秒检查一次任务，按分钟粒度匹配 cron。超过补跑时间窗口的任务会记为 `stale`，主应用会读取心跳文件来显示后台状态。
+
+到点时上一次运行还没结束：`skip` 记一条 `skipped`；`queue` 不写记录，等上一次结束后立即补跑一次，期间多次触发合并为一次；`allow` 直接再启动一个。手动「运行」不排队，任务忙时仍会拒绝。
+
+脚本运行时可读取以下环境变量：
+
+| 变量 | 含义 |
+| --- | --- |
+| `RUNSHELF_TASK_ID` | 任务 id |
+| `RUNSHELF_RUN_ID` | 本次运行 id |
+| `RUNSHELF_TIMEOUT_AT` | 超时截止时间（ISO 8601，UTC），只在设置了超时时存在；长任务可据此提前收尾 |
 
 后台调度状态保存在：
 

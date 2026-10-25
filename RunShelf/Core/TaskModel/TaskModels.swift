@@ -119,13 +119,76 @@ struct MissedRunPolicy: Codable, Equatable, Sendable {
     static let defaultPolicy = MissedRunPolicy(type: "skipIfLate", maxDelaySeconds: 1800)
 }
 
+enum TaskConcurrency {
+    /// 上一次运行未结束时，本次计划触发记一条 skipped。
+    static let skip = "skip"
+    /// 允许多个运行同时存在。
+    static let allow = "allow"
+    /// 上一次运行未结束时，记住一次待补跑（多次触发合并为一次），结束后立即补跑。
+    /// 只影响计划运行；手动「立即运行」仍按 skip 互斥。
+    static let queue = "queue"
+
+    static let all = [skip, queue, allow]
+
+    static func isValid(_ value: String) -> Bool {
+        all.contains(value)
+    }
+}
+
+enum TaskPriority {
+    /// 不设置 QoS，继承调度进程的交互优先级。
+    static let standard = "standard"
+    /// 以 utility QoS 启动脚本进程组，CPU 紧张时让位给前台和标准任务。
+    static let background = "background"
+
+    static let all = [standard, background]
+
+    static func isValid(_ value: String) -> Bool {
+        all.contains(value)
+    }
+}
+
 struct TaskRunnerPolicy: Codable, Equatable, Sendable {
     var concurrency: String
+    var priority: String
     var timeoutSeconds: Int
     var missedRunPolicy: MissedRunPolicy
 
+    init(
+        concurrency: String,
+        priority: String = TaskPriority.standard,
+        timeoutSeconds: Int,
+        missedRunPolicy: MissedRunPolicy
+    ) {
+        self.concurrency = concurrency
+        self.priority = priority
+        self.timeoutSeconds = timeoutSeconds
+        self.missedRunPolicy = missedRunPolicy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case concurrency
+        case priority
+        case timeoutSeconds
+        case missedRunPolicy
+    }
+
+    /// `priority` 是 1.6.0 新增字段；旧 task.json 没有它，按 standard 读取。
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        concurrency = try container.decode(String.self, forKey: .concurrency)
+        priority = try container.decodeIfPresent(String.self, forKey: .priority) ?? TaskPriority.standard
+        timeoutSeconds = try container.decode(Int.self, forKey: .timeoutSeconds)
+        missedRunPolicy = try container.decode(MissedRunPolicy.self, forKey: .missedRunPolicy)
+    }
+
+    var runsInBackground: Bool {
+        priority == TaskPriority.background
+    }
+
     static let defaultPolicy = TaskRunnerPolicy(
-        concurrency: "skip",
+        concurrency: TaskConcurrency.skip,
+        priority: TaskPriority.standard,
         timeoutSeconds: 0,
         missedRunPolicy: .defaultPolicy
     )

@@ -150,6 +150,11 @@ enum TaskRunner {
                 stdoutHandle: stdoutHandle,
                 stderrHandle: stderrHandle,
                 timeoutSeconds: task.manifest.runner.timeoutSeconds,
+                runsInBackground: task.manifest.runner.runsInBackground,
+                environment: [
+                    "RUNSHELF_TASK_ID": task.id,
+                    "RUNSHELF_RUN_ID": runId
+                ],
                 cancellation: cancellation,
                 externalCancellationURL: cancellationURL,
                 terminationGraceSeconds: terminationGraceSeconds,
@@ -299,17 +304,29 @@ extension TaskRunner {
         stdoutHandle: FileHandle,
         stderrHandle: FileHandle,
         timeoutSeconds: Int,
+        runsInBackground: Bool = false,
+        environment extraEnvironment: [String: String] = [:],
         cancellation: TaskRunCancellation?,
         externalCancellationURL: URL?,
         terminationGraceSeconds: TimeInterval,
         monotonicNow: MonotonicClock,
         onProcessStarted: ((pid_t) throws -> Void)? = nil
     ) throws -> ExecutionResult {
+        var extraEnvironment = extraEnvironment
+        if timeoutSeconds > 0 {
+            // 超时本身按单调时钟计；这里给脚本一个墙钟截止点，便于按剩余时间收尾。
+            // 在 spawn 前取值，比真实截止点略早，脚本据此判断只会更保守。
+            extraEnvironment["RUNSHELF_TIMEOUT_AT"] = Date()
+                .addingTimeInterval(TimeInterval(timeoutSeconds))
+                .formatted(.iso8601)
+        }
         let pid = try spawnProcessGroup(
             executableURL: snapshotURL,
             workingDirectoryURL: workingDirectoryURL,
             stdoutHandle: stdoutHandle,
-            stderrHandle: stderrHandle
+            stderrHandle: stderrHandle,
+            runsInBackground: runsInBackground,
+            environment: extraEnvironment
         )
         do {
             try onProcessStarted?(pid)
@@ -438,7 +455,9 @@ extension TaskRunner {
         executableURL: URL,
         workingDirectoryURL: URL,
         stdoutHandle: FileHandle,
-        stderrHandle: FileHandle
+        stderrHandle: FileHandle,
+        runsInBackground: Bool = false,
+        environment extraEnvironment: [String: String] = [:]
     ) throws -> pid_t {
         var attributes: posix_spawnattr_t?
         var fileActions: posix_spawn_file_actions_t?
@@ -457,6 +476,14 @@ extension TaskRunner {
         let flags = Int16(POSIX_SPAWN_SETSID)
         guard posix_spawnattr_setflags(&attributes, flags) == 0 else {
             throw TaskRunnerError.processDidNotStart("无法设置进程组")
+        }
+
+        // 后台任务用 utility 而不是 background：background 还会节流磁盘和网络 I/O。
+        // QoS 会被脚本派生的子孙进程继承。
+        if runsInBackground {
+            guard posix_spawnattr_set_qos_class_np(&attributes, QOS_CLASS_UTILITY) == 0 else {
+                throw TaskRunnerError.processDidNotStart("无法设置后台优先级")
+            }
         }
 
         let chdirResult = workingDirectoryURL.path.withCString {
@@ -479,7 +506,7 @@ extension TaskRunner {
         defer { free(executablePath) }
 
         var argv: [UnsafeMutablePointer<CChar>?] = [executablePath, nil]
-        var environment = makeEnvironment()
+        var environment = makeEnvironment(overrides: extraEnvironment)
         defer {
             for entry in environment where entry != nil {
                 free(entry)
@@ -524,8 +551,14 @@ extension TaskRunner {
         return 128 + terminationSignal
     }
 
-    static func makeEnvironment() -> [UnsafeMutablePointer<CChar>?] {
-        var entries = ProcessInfo.processInfo.environment.map { key, value in
+    static func makeEnvironment(overrides: [String: String] = [:]) -> [UnsafeMutablePointer<CChar>?] {
+        var values = ProcessInfo.processInfo.environment
+        // 不让上层进程遗留的 RUNSHELF_* 串到本次运行。
+        for key in values.keys where key.hasPrefix("RUNSHELF_") {
+            values.removeValue(forKey: key)
+        }
+        values.merge(overrides) { _, override in override }
+        var entries = values.map { key, value in
             strdup("\(key)=\(value)")
         }
         entries.append(nil)

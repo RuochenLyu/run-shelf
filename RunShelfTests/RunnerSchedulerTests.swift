@@ -264,6 +264,52 @@ final class RunnerSchedulerTests: XCTestCase {
         XCTAssertNotNil(TaskRunClaimManager.activeClaim(for: allow.task, runID: "allow-existing"))
     }
 
+    func testQueuePolicyDefersBusyTriggerUntilPreviousRunEnds() throws {
+        let fixture = try schedulerFixture(id: "queue", concurrency: TaskConcurrency.queue)
+        let now = try date(2026, 1, 2, 10, 0)
+        var lease: TaskRunClaimLease? = try TaskRunClaimManager.acquire(task: fixture.task, runID: "long-run", host: "test")
+        defer { lease?.release() }
+        try fixture.writeState(lastCheckAt: now.addingTimeInterval(-60))
+
+        fixture.engine.tick(now: now)
+        fixture.engine.tick(now: now.addingTimeInterval(60))
+        try waitUntil { (try? fixture.readState().pendingRunByTaskID?[fixture.task.id]) == now.addingTimeInterval(60) }
+        XCTAssertTrue(records(in: fixture.taskURL).isEmpty, "busy triggers are queued, not recorded as skipped")
+
+        lease?.release()
+        lease = nil
+        fixture.engine.tick(now: now.addingTimeInterval(90))
+        try waitUntil { self.records(in: fixture.taskURL).contains { $0.status == .success } }
+        Thread.sleep(forTimeInterval: 0.2)
+        let runs = records(in: fixture.taskURL)
+        XCTAssertEqual(runs.count, 1, "coalesced triggers run once")
+        XCTAssertEqual(runs.first?.scheduledAt, now.addingTimeInterval(60))
+        XCTAssertNil(try fixture.readState().pendingRunByTaskID)
+    }
+
+    func testQueuedRunIsDroppedWhenTaskLeavesQueuePolicy() throws {
+        let fixture = try schedulerFixture(id: "queue-dropped", concurrency: TaskConcurrency.queue)
+        let now = try date(2026, 1, 2, 10, 0)
+        var lease: TaskRunClaimLease? = try TaskRunClaimManager.acquire(task: fixture.task, runID: "long-run", host: "test")
+        defer { lease?.release() }
+        try fixture.writeState(lastCheckAt: now.addingTimeInterval(-60))
+        fixture.engine.tick(now: now)
+        try waitUntil { (try? fixture.readState().pendingRunByTaskID?[fixture.task.id]) != nil }
+
+        var manifest = fixture.task.manifest
+        manifest.runner.concurrency = TaskConcurrency.skip
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: fixture.taskURL.appendingPathComponent("task.json"))
+        lease?.release()
+        lease = nil
+
+        fixture.engine.tick(now: now.addingTimeInterval(30))
+        try waitUntil { (try? fixture.readState()).map { $0.pendingRunByTaskID == nil } == true }
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertTrue(records(in: fixture.taskURL).isEmpty)
+    }
+
     func testScheduledClaimRaceWritesSkippedWithoutFailureNotification() throws {
         let lock = NSLock()
         var notificationCount = 0

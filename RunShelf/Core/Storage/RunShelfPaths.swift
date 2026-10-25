@@ -1,6 +1,12 @@
 import Foundation
 
 enum RunShelfPaths {
+    /// 开发预览/测试用临时数据目录时为 true；此时 App 不得改动系统里的后台调度注册。
+    static var isAppSupportOverridden: Bool {
+        guard let override = ProcessInfo.processInfo.environment["RUN_SHELF_APP_SUPPORT_DIR"] else { return false }
+        return !override.isEmpty
+    }
+
     static func appSupportDirectoryURL() -> URL {
         if let override = ProcessInfo.processInfo.environment["RUN_SHELF_APP_SUPPORT_DIR"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)

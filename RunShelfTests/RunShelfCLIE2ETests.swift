@@ -222,6 +222,34 @@ final class RunShelfCLIE2ETests: XCTestCase {
         XCTAssertTrue(try string(showResult["script"]).contains("original"))
     }
 
+    func testApplyRoundTripsConcurrencyAndPriority() throws {
+        let create = try invokeApply([
+            "slug": "queued-background",
+            "name": "Queued Background",
+            "concurrency": "queue",
+            "priority": "background",
+            "timeoutSeconds": 4500
+        ])
+        let task = try dictionary(result(create.json)["task"])
+        XCTAssertEqual(task["concurrency"] as? String, "queue")
+        XCTAssertEqual(task["priority"] as? String, "background")
+        XCTAssertEqual(task["timeoutSeconds"] as? Int, 4500)
+
+        let invalidPriority = try invokeApply([
+            "slug": "invalid-priority",
+            "name": "Invalid Priority",
+            "priority": "low"
+        ])
+        try assertError(invalidPriority, exitCode: 4, code: "validation")
+
+        let invalidConcurrency = try invokeApply([
+            "slug": "invalid-concurrency",
+            "name": "Invalid Concurrency",
+            "concurrency": "parallel"
+        ])
+        try assertError(invalidConcurrency, exitCode: 4, code: "validation")
+    }
+
     func testValidationEdgesUseStableExitCodesAndMessages() throws {
         let negativeTimeout = try invokeApply([
             "slug": "negative-timeout",

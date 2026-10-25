@@ -645,6 +645,102 @@ final class RunShelfCoreTests: XCTestCase {
         )))
     }
 
+    func testTaskRepositoryAppliesAndValidatesConcurrencyAndPriority() throws {
+        let root = try makeTemporaryDirectory()
+        let repository = TaskRepository(tasksDirectoryURL: root)
+        let created = try repository.createTask(from: TaskSpec(
+            slug: "queued-task",
+            name: "Queued Task",
+            concurrency: TaskConcurrency.queue,
+            priority: TaskPriority.background,
+            script: "#!/bin/zsh\necho ok\n"
+        ))
+        XCTAssertEqual(created.task.manifest.runner.concurrency, TaskConcurrency.queue)
+        XCTAssertTrue(created.task.manifest.runner.runsInBackground)
+
+        let updated = try repository.updateTask(
+            selector: .slug("queued-task"),
+            with: TaskSpec(priority: TaskPriority.standard)
+        )
+        XCTAssertEqual(updated.task.manifest.runner.concurrency, TaskConcurrency.queue)
+        XCTAssertEqual(updated.task.manifest.runner.priority, TaskPriority.standard)
+
+        XCTAssertThrowsError(try repository.updateTask(
+            selector: .slug("queued-task"),
+            with: TaskSpec(concurrency: "parallel")
+        ))
+        XCTAssertThrowsError(try repository.updateTask(
+            selector: .slug("queued-task"),
+            with: TaskSpec(priority: "low")
+        ))
+    }
+
+    func testRunnerPolicyWithoutPriorityDecodesAsStandard() throws {
+        let json = #"{"concurrency":"skip","timeoutSeconds":0,"missedRunPolicy":{"type":"skipIfLate","maxDelaySeconds":1800}}"#
+        let policy = try JSONDecoder().decode(TaskRunnerPolicy.self, from: Data(json.utf8))
+        XCTAssertEqual(policy.priority, TaskPriority.standard)
+        XCTAssertFalse(policy.runsInBackground)
+    }
+
+    func testTaskRunnerExportsRunIdentityAndDeadline() throws {
+        let root = try makeTemporaryDirectory()
+        let script = """
+        #!/bin/zsh
+        print "task=$RUNSHELF_TASK_ID"
+        print "run=$RUNSHELF_RUN_ID"
+        print "deadline=${RUNSHELF_TIMEOUT_AT:-none}"
+        """
+        let task = try makeTask(root: root, id: "env-task", script: script, timeoutSeconds: 600)
+        let before = Date()
+
+        let record = try TaskRunner.run(task: task, trigger: .manual, runId: "env-run")
+
+        XCTAssertEqual(record.status, .success)
+        let output = try String(
+            contentsOf: task.directoryURL.appendingPathComponent("runs/env-run/stdout.log"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(output.contains("task=\(task.id)\n"))
+        XCTAssertTrue(output.contains("run=env-run\n"))
+        let deadlineText = try XCTUnwrap(output.components(separatedBy: "\n")
+            .first { $0.hasPrefix("deadline=") }?
+            .dropFirst("deadline=".count))
+        let deadline = try Date(String(deadlineText), strategy: .iso8601)
+        XCTAssertEqual(deadline.timeIntervalSince(before), 600, accuracy: 5)
+
+        let unlimited = try makeTask(root: root, id: "env-unlimited", script: script, timeoutSeconds: 0)
+        _ = try TaskRunner.run(task: unlimited, trigger: .manual, runId: "env-unlimited-run")
+        let unlimitedOutput = try String(
+            contentsOf: unlimited.directoryURL.appendingPathComponent("runs/env-unlimited-run/stdout.log"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(unlimitedOutput.contains("deadline=none\n"))
+    }
+
+    func testBackgroundPriorityRunsBelowStandard() throws {
+        let root = try makeTemporaryDirectory()
+        let script = "#!/bin/zsh\nps -o pri= -p $$\n"
+        var standard = try makeTask(root: root, id: "standard-priority", script: script, timeoutSeconds: 0)
+        standard.manifest.runner.priority = TaskPriority.standard
+        var background = try makeTask(root: root, id: "background-priority", script: script, timeoutSeconds: 0)
+        background.manifest.runner.priority = TaskPriority.background
+
+        _ = try TaskRunner.run(task: standard, trigger: .manual, runId: "standard")
+        _ = try TaskRunner.run(task: background, trigger: .manual, runId: "background")
+
+        func priority(of task: RunShelfTask, runID: String) throws -> Int {
+            let text = try String(
+                contentsOf: task.directoryURL.appendingPathComponent("runs/\(runID)/stdout.log"),
+                encoding: .utf8
+            )
+            return try XCTUnwrap(Int(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        XCTAssertLessThan(
+            try priority(of: background, runID: "background"),
+            try priority(of: standard, runID: "standard")
+        )
+    }
+
     func testCLIInstallerSharesInstallAndStatusDetection() throws {
         let root = try makeTemporaryDirectory()
         let executableURL = root.appendingPathComponent("embedded/runshelf")

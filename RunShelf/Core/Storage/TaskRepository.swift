@@ -147,6 +147,8 @@ struct TaskSpec: Codable, Equatable, Sendable {
     var enabled: Bool? = nil
     var schedule: TaskSchedule? = nil
     var timeoutSeconds: Int? = nil
+    var concurrency: String? = nil
+    var priority: String? = nil
     var script: String? = nil
     var notes: String? = nil
 
@@ -158,6 +160,8 @@ struct TaskSpec: Codable, Equatable, Sendable {
         enabled: Bool? = nil,
         schedule: TaskSchedule? = nil,
         timeoutSeconds: Int? = nil,
+        concurrency: String? = nil,
+        priority: String? = nil,
         script: String? = nil,
         notes: String? = nil
     ) {
@@ -168,6 +172,8 @@ struct TaskSpec: Codable, Equatable, Sendable {
         self.enabled = enabled
         self.schedule = schedule
         self.timeoutSeconds = timeoutSeconds
+        self.concurrency = concurrency
+        self.priority = priority
         self.script = script
         self.notes = notes
     }
@@ -180,6 +186,8 @@ struct TaskSpec: Codable, Equatable, Sendable {
         case enabled
         case schedule
         case timeoutSeconds
+        case concurrency
+        case priority
         case script
         case notes
     }
@@ -194,6 +202,8 @@ struct TaskSpec: Codable, Equatable, Sendable {
         enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
         schedule = try container.decodeIfPresent(TaskSchedule.self, forKey: .schedule)
         timeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .timeoutSeconds)
+        concurrency = try container.decodeIfPresent(String.self, forKey: .concurrency)
+        priority = try container.decodeIfPresent(String.self, forKey: .priority)
         script = try container.decodeIfPresent(String.self, forKey: .script)
         notes = try container.decodeIfPresent(String.self, forKey: .notes)
     }
@@ -224,6 +234,8 @@ enum TaskRepositoryError: LocalizedError, Equatable {
     case reservedSlug(String)
     case invalidSchedule(String)
     case invalidTimeoutSeconds(Int)
+    case invalidConcurrency(String)
+    case invalidPriority(String)
     case invalidTaskID(String)
     case invalidRevision(String)
     case missingRequiredField(String)
@@ -247,6 +259,10 @@ enum TaskRepositoryError: LocalizedError, Equatable {
             return "执行计划不合法：\(message)"
         case .invalidTimeoutSeconds(let value):
             return "timeoutSeconds 不能小于 0：\(value)"
+        case .invalidConcurrency(let value):
+            return "concurrency 不合法：\(value)。可选 \(TaskConcurrency.all.joined(separator: " / "))。"
+        case .invalidPriority(let value):
+            return "priority 不合法：\(value)。可选 \(TaskPriority.all.joined(separator: " / "))。"
         case .invalidTaskID(let taskID):
             return "任务 id 不合法：\(taskID)"
         case .invalidRevision(let revision):
@@ -353,6 +369,8 @@ struct TaskRepository {
                 schedule: schedule
             )
             manifest.runner.timeoutSeconds = max(spec.timeoutSeconds ?? manifest.runner.timeoutSeconds, 0)
+            manifest.runner.concurrency = try validatedConcurrency(spec.concurrency) ?? manifest.runner.concurrency
+            manifest.runner.priority = try validatedPriority(spec.priority) ?? manifest.runner.priority
 
             let task = RunShelfTask(
                 manifest: manifest,
@@ -409,6 +427,12 @@ struct TaskRepository {
         }
         if let timeoutSeconds = spec.timeoutSeconds {
             task.manifest.runner.timeoutSeconds = max(timeoutSeconds, 0)
+        }
+        if let concurrency = try validatedConcurrency(spec.concurrency) {
+            task.manifest.runner.concurrency = concurrency
+        }
+        if let priority = try validatedPriority(spec.priority) {
+            task.manifest.runner.priority = priority
         }
         if let script = spec.script {
             task.script = TaskFileStore.normalizedTemplateScript(script)
@@ -512,7 +536,25 @@ struct TaskRepository {
         if let timeoutSeconds = spec.timeoutSeconds, timeoutSeconds < 0 {
             throw TaskRepositoryError.invalidTimeoutSeconds(timeoutSeconds)
         }
+        _ = try validatedConcurrency(spec.concurrency)
+        _ = try validatedPriority(spec.priority)
         return DangerousCommandScanner.scan(spec.script ?? "")
+    }
+
+    private func validatedConcurrency(_ value: String?) throws -> String? {
+        guard let value else { return nil }
+        guard TaskConcurrency.isValid(value) else {
+            throw TaskRepositoryError.invalidConcurrency(value)
+        }
+        return value
+    }
+
+    private func validatedPriority(_ value: String?) throws -> String? {
+        guard let value else { return nil }
+        guard TaskPriority.isValid(value) else {
+            throw TaskRepositoryError.invalidPriority(value)
+        }
+        return value
     }
 
     private func uniqueTask(

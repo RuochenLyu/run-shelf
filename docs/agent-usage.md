@@ -140,6 +140,8 @@ runshelf apply spec.json --expected-revision "$revisionToken" --json
     "timezone": "local"
   },
   "timeoutSeconds": 600,
+  "concurrency": "skip",
+  "priority": "standard",
   "script": "#!/bin/zsh\nset -euo pipefail\n\nprintf 'ok\\n'\n",
   "notes": "由 agent 管理。"
 }

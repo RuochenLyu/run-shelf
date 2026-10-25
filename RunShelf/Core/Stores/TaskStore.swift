@@ -449,7 +449,7 @@ final class TaskStore: ObservableObject {
     }
 
     func canRunTask(_ task: RunShelfTask) -> Bool {
-        let allowsConcurrentRun = task.manifest.runner.concurrency == "allow"
+        let allowsConcurrentRun = task.manifest.runner.concurrency == TaskConcurrency.allow
         return (allowsConcurrentRun || !runningTaskIDs.contains(task.id)) &&
             canPersistTask(task)
     }
