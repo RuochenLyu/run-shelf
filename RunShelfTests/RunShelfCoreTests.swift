@@ -725,6 +725,16 @@ final class RunShelfCoreTests: XCTestCase {
         var background = try makeTask(root: root, id: "background-priority", script: script, timeoutSeconds: 0)
         background.manifest.runner.priority = TaskPriority.background
 
+        // standard 继承测试进程的 QoS。CI runner 可能把测试进程置于 darwinbg，
+        // 此时两个子进程都被压到同一档，先把本进程移出 darwinbg 再比较。
+        let wasDarwinBackground = getpriority(PRIO_DARWIN_PROCESS, 0) != 0
+        XCTAssertEqual(setpriority(PRIO_DARWIN_PROCESS, 0, 0), 0)
+        defer {
+            if wasDarwinBackground {
+                setpriority(PRIO_DARWIN_PROCESS, 0, PRIO_DARWIN_BG)
+            }
+        }
+
         _ = try TaskRunner.run(task: standard, trigger: .manual, runId: "standard")
         _ = try TaskRunner.run(task: background, trigger: .manual, runId: "background")
 
