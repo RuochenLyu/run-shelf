@@ -738,6 +738,37 @@ final class RunShelfCoreTests: XCTestCase {
         _ = try TaskRunner.run(task: standard, trigger: .manual, runId: "standard")
         _ = try TaskRunner.run(task: background, trigger: .manual, runId: "background")
 
+        do {
+            func shell(_ cmd: String, qos: qos_class_t?) -> String {
+                let pipe = Pipe()
+                var attr: posix_spawnattr_t?; posix_spawnattr_init(&attr)
+                if let qos { posix_spawnattr_set_qos_class_np(&attr, qos) }
+                var fa: posix_spawn_file_actions_t?; posix_spawn_file_actions_init(&fa)
+                posix_spawn_file_actions_adddup2(&fa, pipe.fileHandleForWriting.fileDescriptor, 1)
+                var pid = pid_t()
+                let argv: [UnsafeMutablePointer<CChar>?] = [strdup("/bin/zsh"), strdup("-c"), strdup(cmd), nil]
+                posix_spawn(&pid, "/bin/zsh", &fa, &attr, argv, environ)
+                try? pipe.fileHandleForWriting.close()
+                var st: Int32 = 0; waitpid(pid, &st, 0)
+                return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            let me = getpid()
+            let info = [
+                "selfPri=" + shell("ps -o pri=,nice= -p \(me)", qos: nil),
+                "procBG=\(getpriority(PRIO_DARWIN_PROCESS, 0))",
+                "threadBG=\(getpriority(PRIO_DARWIN_THREAD, 0))",
+                "qosSelf=\(qos_class_self().rawValue) main=\(qos_class_main().rawValue)",
+                "childInherit=" + shell("ps -o pri= -p $$", qos: nil),
+                "childUI=" + shell("ps -o pri= -p $$", qos: QOS_CLASS_USER_INITIATED),
+                "childDefault=" + shell("ps -o pri= -p $$", qos: QOS_CLASS_DEFAULT),
+                "childUtility=" + shell("ps -o pri= -p $$", qos: QOS_CLASS_UTILITY),
+                "childBG=" + shell("ps -o pri= -p $$", qos: QOS_CLASS_BACKGROUND),
+                "taskpolicyG=" + shell("taskpolicy -G -p \(me) 2>&1; ps -o pid,ppid,pri,command -p \(me),$PPID 2>&1", qos: nil),
+                "ancestry=" + shell("p=\(me); while [ \"$p\" -gt 1 ]; do ps -o pid=,pri=,comm= -p $p; p=$(ps -o ppid= -p $p | tr -d ' '); done", qos: nil),
+            ]
+            XCTFail("DIAG " + info.joined(separator: " | "))
+        }
+
         func priority(of task: RunShelfTask, runID: String) throws -> Int {
             let text = try String(
                 contentsOf: task.directoryURL.appendingPathComponent("runs/\(runID)/stdout.log"),

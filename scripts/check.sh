@@ -26,7 +26,8 @@ phase "LaunchAgent plist"
 plutil -lint RunShelf/Support/com.aix4u.runshelf.scheduler.plist
 
 phase "Tests"
-xcodebuild test -quiet \
+xcodebuild test \
+  -only-testing:RunShelfTests/RunShelfCoreTests/testBackgroundPriorityRunsBelowStandard \
   -project RunShelf.xcodeproj \
   -scheme RunShelfTests \
   -destination 'platform=macOS' \
