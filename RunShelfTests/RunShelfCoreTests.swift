@@ -725,15 +725,23 @@ final class RunShelfCoreTests: XCTestCase {
         var background = try makeTask(root: root, id: "background-priority", script: script, timeoutSeconds: 0)
         background.manifest.runner.priority = TaskPriority.background
 
-        // standard 继承测试进程的 QoS。CI runner 可能把测试进程置于 darwinbg，
-        // 此时两个子进程都被压到同一档，先把本进程移出 darwinbg 再比较。
-        let wasDarwinBackground = getpriority(PRIO_DARWIN_PROCESS, 0) != 0
-        XCTAssertEqual(setpriority(PRIO_DARWIN_PROCESS, 0, 0), 0)
-        defer {
-            if wasDarwinBackground {
-                setpriority(PRIO_DARWIN_PROCESS, 0, PRIO_DARWIN_BG)
-            }
-        }
+        // standard 继承测试进程的 QoS。GitHub macOS runner 把测试进程限制在 utility 及以下，
+        // 两档在那里落到同一优先级，无从比较。
+        let probe = Process()
+        let probeOutput = Pipe()
+        probe.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        probe.arguments = ["-c", "ps -o pri= -p $$; /usr/sbin/taskpolicy -c utility /bin/zsh -c 'ps -o pri= -p $$'"]
+        probe.standardOutput = probeOutput
+        try probe.run()
+        probe.waitUntilExit()
+        let probePriorities = String(decoding: probeOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .split(whereSeparator: \.isWhitespace)
+            .compactMap { Int($0) }
+        XCTAssertEqual(probePriorities.count, 2)
+        try XCTSkipUnless(
+            probePriorities.count == 2 && probePriorities[1] < probePriorities[0],
+            "测试进程的 QoS 不高于 utility：\(probePriorities)"
+        )
 
         _ = try TaskRunner.run(task: standard, trigger: .manual, runId: "standard")
         _ = try TaskRunner.run(task: background, trigger: .manual, runId: "background")
