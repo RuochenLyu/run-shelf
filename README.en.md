@@ -5,6 +5,8 @@
 
 [简体中文](README.md) | English
 
+> **This is a fork.** Based on [RuochenLyu/run-shelf](https://github.com/RuochenLyu/run-shelf) `main` (post-v1.6.0), adding **import from a local file**: when creating a task you can point at an existing `.sh` / `.zsh` / `.py` / `.js` / `.rb` / `.pl` / `.txt`, or any extension-less text file, and Run Shelf detects the language from the **content** instead of the suffix. See [Importing local scripts](#importing-local-scripts).
+
 Run Shelf is a local script manager for macOS. Put your everyday shell scripts in it, run them manually or on a cron schedule, and see each run's output, exit code, and failure reason.
 
 It is not a cloud automation platform and needs no account. Tasks, scripts, notes, and run history live in plain files on your Mac and are never uploaded.
@@ -19,6 +21,7 @@ It is not a cloud automation platform and needs no account. Tasks, scripts, note
 - Stop running tasks: timeouts, cancellation, and background termination clean up the whole process group.
 - Safety hints: high-risk commands are flagged when editing and on CLI writes.
 - Agent/CLI access: the bundled `runshelf` CLI lets Codex/Claude create, modify, run, and query tasks through a JSON contract.
+- Script import: bring in any local text file regardless of extension; the language is detected from content (shebang → syntax sniffing → extension fallback) and a shebang is added when one is missing.
 
 ## Requirements
 
@@ -67,6 +70,32 @@ runs/<run-id>/run.sh.snapshot
 ```
 
 `.run-claim` is the cross-process run registry: with `concurrency=skip` only one active claim is allowed at a time, while `concurrency=allow` keeps one claim per run id. The app, the background scheduler, and the CLI share this registry to query, cancel, and reclaim runs.
+
+### Importing local scripts
+
+The eighth card in the new-task sheet is **Import Script**. It opens a file picker with **no type restriction**: `.sh`, `.txt`, and extension-less files are all selectable. The suffix is not consulted first — the content is read.
+
+Detection order:
+
+1. **Read the file.** A NUL byte means it is not text, so it is rejected; anything over 512 KiB is rejected too (`run.sh` is a plain-text definition, so that size is not a hand-written script).
+2. **Normalize.** Strip a UTF-8 BOM and convert CRLF to LF.
+3. **Shebang.** The interpreter is parsed, including the parameterized `#!/usr/bin/env -S node --enable-source-maps` form.
+4. **Syntax sniffing** (first 4000 characters):
+
+   | Match | Detected as |
+   | --- | --- |
+   | `import x` / `from x import` / `def f(` / `if __name__ ==` / `print(` | python |
+   | `require(` / `module.exports` / `process.argv` / `const x =` / `=>` | node |
+   | `puts ` / both `def x` and a bare `end` | ruby |
+   | `use strict` / `my $` | perl |
+   | `$(` / `set -e` / `fi`, `done`, `esac` / `[[` / `export X=` / `if [` | zsh |
+
+5. **Extension fallback.** The suffix is only used when the steps above miss, and it comes with an amber warning.
+6. **Still unknown.** The file is imported as zsh, also with a warning. Plain prose is not rejected — killing a real script by mistake is worse than ending up with a task you delete.
+
+When the source has no shebang, one is prepended. `run.sh` is `exec`'d directly, so without a shebang it cannot run at all.
+
+After import the card shows the file name, and the description line reports the source file, the detected language, and the line count; the task name defaults to the file name without its extension, and `notes.md` records the original path for provenance. Click the card again to pick a different file.
 
 ## Using the CLI
 

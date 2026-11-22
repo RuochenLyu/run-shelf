@@ -180,6 +180,28 @@ extension TaskTemplate {
         .rsyncBackup
     ]
 
+    // MARK: - 导入
+
+    /// 「从本地文件导入」生成的临时模板，不进 builtIns，只在当前 sheet 里可选中。
+    static let importedTemplateID = "imported-script"
+
+    static func imported(
+        script: String,
+        name: String,
+        summary: String,
+        notes: String = ""
+    ) -> TaskTemplate {
+        TaskTemplate(
+            id: importedTemplateID,
+            name: name,
+            description: summary,
+            defaultSchedule: .defaultDaily,
+            script: script,
+            notes: notes,
+            enabledByDefault: true
+        )
+    }
+
     static let examples: [TaskTemplate] = [
         .exampleHealthCheck,
         .exampleDiskUsage

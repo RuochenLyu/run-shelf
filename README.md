@@ -5,6 +5,8 @@
 
 简体中文 | [English](README.en.md)
 
+> **This is a fork.** 基于 [RuochenLyu/run-shelf](https://github.com/RuochenLyu/run-shelf) 的 main（v1.6.0 之后），新增**从本地文件导入脚本**：新建任务时可以直接挑一个已有的 `.sh` / `.zsh` / `.py` / `.js` / `.rb` / `.pl` / `.txt`，或者任意没有扩展名的文本文件，Run Shelf 会按**内容**判断语言而不是看后缀。详见 [导入本地脚本](#导入本地脚本)。
+
 Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Shell 脚本放进来，手动运行，按 cron 表达式定时运行，并查看每次运行的输出、退出码和失败原因。
 
 它不是云端自动化平台，也不需要账号。任务、脚本、备注和运行历史都保存在本机文件里，不会上传。
@@ -20,6 +22,7 @@ Run Shelf 是一个 macOS 上的本地脚本管理工具。你可以把常用 Sh
 - 运行配置：上次未结束时可跳过、排队补跑或同时运行；耗时任务可设为后台优先级，在电脑繁忙时让出 CPU。
 - 安全提示：编辑和 CLI 写入时会识别高风险命令。
 - Agent/CLI 操作：内置 `runshelf`，Codex/Claude 可以用 JSON 契约创建、修改、运行和查询任务。
+- 导入脚本：从本地任意文本文件导入，不限扩展名，按内容识别语言（shebang → 语法特征 → 扩展名兜底），必要时自动补 shebang。
 
 ## 系统要求
 
@@ -68,6 +71,32 @@ runs/<run-id>/run.sh.snapshot
 ```
 
 `.run-claim` 是跨进程运行登记目录：`concurrency=skip` 和 `concurrency=queue` 同时只允许一个活动 claim，`concurrency=allow` 则按 run id 保存多个 claim。App、后台调度进程和 CLI 共用这套登记来查询、取消和回收运行。
+
+### 导入本地脚本
+
+新建任务时第 8 张卡片是「导入脚本」。点开是**不限制类型**的文件选择框：`.sh`、`.txt`、没有扩展名的文件都能选，它不看后缀，先读内容。
+
+判定顺序：
+
+1. **读文件**。含 NUL 字节 → 不是文本，拒绝；超过 512 KiB 也拒绝（`run.sh` 是纯文本定义，这个量级不会是好脚本）。
+2. **归一化**。去掉 UTF-8 BOM，CRLF 转 LF。
+3. **shebang**。解析解释器，支持 `#!/usr/bin/env -S node --enable-source-maps` 这种带参数的形式。
+4. **语法特征**（取前 4000 字符嗅探）：
+
+   | 命中 | 判为 |
+   | --- | --- |
+   | `import x` / `from x import` / `def f(` / `if __name__ ==` / `print(` | python |
+   | `require(` / `module.exports` / `process.argv` / `const x =` / `=>` | node |
+   | `puts ` / 同时出现 `def x` 与单独的 `end` | ruby |
+   | `use strict` / `my $` | perl |
+   | `$(` / `set -e` / `fi`·`done`·`esac` / `[[` / `export X=` / `if [` | zsh |
+
+5. **扩展名兜底**。前四步都没中才看后缀，并给一条橙色警告。
+6. **仍然识别不出**。按 zsh 导入，同样带警告。纯文字文件不会被拒——误杀真脚本比放进来一个废任务更烦。
+
+原文件没有 shebang 时会自动补一行解释器。`run.sh` 是被直接 `exec` 的，缺 shebang 跑不起来，这一步不能省。
+
+导入后卡片显示文件名，描述区显示 `来自 backup.sh · 检测为 zsh · 12 行`，任务名默认取文件名去扩展名，`notes.md` 里记下原始路径方便溯源。已导入过就再点一次卡片换文件。
 
 ## CLI 使用
 
