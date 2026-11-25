@@ -8,6 +8,7 @@
 - **Category:** feature, App + Core
 - **Planned at:** `main` @ `6f739df`, 2026-11-25
 - **Supersedes:** external PR RuochenLyu/run-shelf#3 (rejected design, see "Why not the PR")
+- **Credit:** feature proposed and first implemented by @zrtnb6 in RuochenLyu/run-shelf#3
 
 ## Why this matters
 
