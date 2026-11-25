@@ -9,12 +9,15 @@
 /* Begin PBXBuildFile section */
 		0265FE4C60AA475627FE8982 /* NotificationOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B091AF3CACB7197DA076BB02 /* NotificationOutboxTests.swift */; };
 		0415D602F2B2572A833F84A6 /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
+		06EA38D4E71CF83F72B37B7C /* ScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */; };
+		0710D16B2D64DAA0AA7F1D2F /* ScriptImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9F002AE73821DC48F268C2B /* ScriptImportTests.swift */; };
 		0746F391CA689FB18FD7E9BB /* RunShelfNotificationOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56AD8103FDF47FDBF4736F9 /* RunShelfNotificationOutbox.swift */; };
 		0794E853D9EF0B26F8E6DDE6 /* RunShelfNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475AA5F1A1F47766106E95A1 /* RunShelfNotifier.swift */; };
 		099B302783A32D34DB9127FB /* DiskScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D77868507607C464331F5 /* DiskScan.swift */; };
 		0D7A0B0E7A72DAE6F1E3A650 /* RunShelfApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1CF0D6068E0ABDB49AE133 /* RunShelfApp.swift */; };
 		0D7DB4FF2D41DF5688A507B2 /* TaskRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C3A343F84517F7482F4D0E /* TaskRepository.swift */; };
 		12885F2F55CAA408B03F06AC /* SchedulerRunHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3AD82103D25A0F4B40BE63 /* SchedulerRunHost.swift */; };
+		172595EA856D11E63F91420B /* ScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */; };
 		1779E9B52FBD8CCEAFF70EE7 /* LogContentLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F6F7DF7A9D39CA3FAC5056 /* LogContentLoader.swift */; };
 		1781D79A58D3391CE0557F22 /* TaskRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40FC34752E7412D02760C9B /* TaskRunner.swift */; };
 		1855EC1D4B55B878C6BFEA49 /* runshelf in Embed Helpers */ = {isa = PBXBuildFile; fileRef = 9F99A4459B3E0CFC684DD0B3 /* runshelf */; };
@@ -63,9 +66,11 @@
 		6014FF2E610BB387BA6D5F2A /* FailureNotificationRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737C9B30ACD91C08A11F6E91 /* FailureNotificationRelay.swift */; };
 		6645B779A08F3FE9B592A8B0 /* TaskRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D12AD932FCE359A0997A4B /* TaskRunCoordinator.swift */; };
 		6886CF7B6DDEEB61C6300810 /* SchedulerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512CAC6415985DF1537634 /* SchedulerEngine.swift */; };
+		6A0E18714018C41BFD04D2E0 /* ScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */; };
 		6A3BD7297156A5E075AFF5BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A2C65AFBF104A3791C7403 /* Cocoa.framework */; };
 		6BED7327761A8F15EB72D99E /* DetachedProcessSpawner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A70995018BD23D2D1D59CA /* DetachedProcessSpawner.swift */; };
 		6DA70FB9BFF8598D8F360183 /* TaskListPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6F61DA95A80C1D021AEED /* TaskListPreferencesStore.swift */; };
+		6DE444DA4519CC2134FDC1C3 /* ScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */; };
 		6E576C034BA4C64E3BE50618 /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		70DE7303B1DAE9D3A5D5E29F /* RunShelfCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */; };
 		73E28AAC36DEDF1231CB0922 /* LogScrollState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB6E37CAC5A27FF4C862545 /* LogScrollState.swift */; };
@@ -272,12 +277,14 @@
 		984DC5B795E8535D98006C66 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		9AC71386EBF1FD28BB9636D6 /* RunShelfSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfSettings.swift; sourceTree = "<group>"; };
 		9F99A4459B3E0CFC684DD0B3 /* runshelf */ = {isa = PBXFileReference; includeInIndex = 0; path = runshelf; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScriptImport.swift; sourceTree = "<group>"; };
 		AE656CA65686562CB8B3F686 /* CronSchedule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CronSchedule.swift; sourceTree = "<group>"; };
 		B091AF3CACB7197DA076BB02 /* NotificationOutboxTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationOutboxTests.swift; sourceTree = "<group>"; };
 		B6AB5EB35FF4E32EE3915899 /* TaskListPreferencesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskListPreferencesTests.swift; sourceTree = "<group>"; };
 		C162136D8417BC1B1C2785CF /* TaskStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
 		C28F7C7199EB4CF5FEEF5F11 /* RunShelfCLIInstaller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunShelfCLIInstaller.swift; sourceTree = "<group>"; };
 		C4123ED40E75AE7F9B3E2632 /* DangerousCommandScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DangerousCommandScanner.swift; sourceTree = "<group>"; };
+		C9F002AE73821DC48F268C2B /* ScriptImportTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScriptImportTests.swift; sourceTree = "<group>"; };
 		CBAD063AB7129AC232C2F710 /* RetentionCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetentionCleaner.swift; sourceTree = "<group>"; };
 		CBE774AA83DE9506E80DBB40 /* SchedulerRunHostTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SchedulerRunHostTests.swift; sourceTree = "<group>"; };
 		D131F1D02499FC9AD53D59A2 /* TaskSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskSidebarView.swift; sourceTree = "<group>"; };
@@ -496,6 +503,7 @@
 			isa = PBXGroup;
 			children = (
 				92D8232C07B77CA687B0C916 /* TaskTemplate.swift */,
+				A6008BD9D49756C9CAF970C8 /* ScriptImport.swift */,
 			);
 			name = Templates;
 			path = Templates;
@@ -580,6 +588,7 @@
 				B091AF3CACB7197DA076BB02 /* NotificationOutboxTests.swift */,
 				EE4EB5D6D976C727538CC608 /* RunShelfSchedulerE2ETests.swift */,
 				CBE774AA83DE9506E80DBB40 /* SchedulerRunHostTests.swift */,
+				C9F002AE73821DC48F268C2B /* ScriptImportTests.swift */,
 			);
 			name = RunShelfTests;
 			path = RunShelfTests;
@@ -784,6 +793,7 @@
 				4AD8E12D603E83C7008F0D65 /* RunShelfNotificationOutbox.swift in Sources */,
 				6BED7327761A8F15EB72D99E /* DetachedProcessSpawner.swift in Sources */,
 				F3478B5DADD00F819275E447 /* SchedulerRunHost.swift in Sources */,
+				6DE444DA4519CC2134FDC1C3 /* ScriptImport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -839,6 +849,7 @@
 				8AFDFE4E1AB7E6901D149CB5 /* RunShelfNotificationOutbox.swift in Sources */,
 				C7CC1A6228029DB5AC6F77A6 /* DetachedProcessSpawner.swift in Sources */,
 				9977EB0B4D305634BF8CFA3E /* SchedulerRunHost.swift in Sources */,
+				6A0E18714018C41BFD04D2E0 /* ScriptImport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -871,6 +882,7 @@
 				0746F391CA689FB18FD7E9BB /* RunShelfNotificationOutbox.swift in Sources */,
 				0415D602F2B2572A833F84A6 /* DetachedProcessSpawner.swift in Sources */,
 				258333E111790FD2AD87423A /* SchedulerRunHost.swift in Sources */,
+				06EA38D4E71CF83F72B37B7C /* ScriptImport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -918,6 +930,8 @@
 				F757879FC9BEF297D00B339F /* DetachedProcessSpawner.swift in Sources */,
 				12885F2F55CAA408B03F06AC /* SchedulerRunHost.swift in Sources */,
 				AA7751A5C7A38A36B915E118 /* SchedulerRunHostTests.swift in Sources */,
+				172595EA856D11E63F91420B /* ScriptImport.swift in Sources */,
+				0710D16B2D64DAA0AA7F1D2F /* ScriptImportTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

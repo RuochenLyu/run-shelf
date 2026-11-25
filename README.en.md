@@ -14,6 +14,7 @@ It is not a cloud automation platform and needs no account. Tasks, scripts, note
 ## Features
 
 - File-native tasks: each task is a directory containing `task.json`, `run.sh`, `notes.md`, and its run history.
+- Script import: create a task from a local file (or drop one in); the interpreter comes from its shebang or extension.
 - Manual runs: records stdout, stderr, exit code, a script snapshot, duration, and status.
 - Scheduling: 5-field cron; a background helper process keeps checking even after the main window is closed.
 - Stop running tasks: timeouts, cancellation, and background termination clean up the whole process group.
@@ -40,6 +41,14 @@ After the first launch you can enable background running in Settings. It is opti
 2. Run it manually and confirm stdout, stderr, and the exit code look right.
 3. When you want it scheduled, enable the task and turn on background running in Settings.
 4. When a run fails, open its history entry and inspect stdout/stderr.
+
+### Importing an existing script
+
+Choose "导入文件" (Import file) when creating a task, or drop a file onto the new-task window. Run Shelf copies its content into the task's `run.sh`; the original file is never modified, and later edits to it do not affect the task.
+
+- A shebang on the first line is kept verbatim. Without one, a line is added based on the extension (`.sh` → bash, `.py` → python3, `.js` → node, anything else → zsh), and the window says what was added.
+- The background scheduler and an app opened from the Dock only get the system PATH (`/usr/bin:/bin:/usr/sbin:/sbin`). When adding python3, node, and similar interpreters, Run Shelf prefers Homebrew's absolute path; if a script's own `#!/usr/bin/env node` cannot be resolved on that PATH, you get a hint.
+- After copying, the script's `$0` and working directory are the task directory. Scripts that depend on their own location, sibling files, or your shell profile should use the "项目脚本" (Project script) template to call the original file instead.
 
 ![Creating a Run Shelf task and running it immediately](docs/assets/demo.gif)
 
