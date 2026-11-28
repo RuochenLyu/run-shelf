@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     private let inspectorWidth: CGFloat = 300
     private let collapsedSidebarTitleInset: CGFloat = 128
+    private let titlebarHeight: CGFloat = 52
 
     @ObservedObject private var store: TaskStore
     @ObservedObject private var selection: TaskSelectionState
@@ -65,7 +66,8 @@ struct ContentView: View {
             .buttonStyle(.borderless)
             .labelStyle(.iconOnly)
             .controlSize(.large)
-            .padding(.top, 8)
+            // Menu 会把图标标签压矮，按标题栏整高居中才能和红绿灯、侧栏开关对齐。
+            .frame(height: titlebarHeight)
             .padding(.trailing, 52)
             .ignoresSafeArea(.container, edges: .top)
     }
