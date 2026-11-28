@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject private var controller: SchedulerServiceController
     @AppStorage(RunShelfSettings.defaultRetentionDaysKey) private var defaultRetentionDays = RunShelfSettings.defaultRetentionDays
     @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
+    @AppStorage(RunShelfSettings.showsMenuBarIconKey) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
     @State private var cliStatus: RunShelfCLIInstallationStatus?
     @State private var cliFeedback: String?
     @State private var cliFeedbackIsError = false
@@ -42,6 +43,10 @@ struct SettingsView: View {
                 notificationRow
                 if let warning = notificationWarning {
                     SettingsWarningRow(text: warning)
+                }
+
+                Toggle(isOn: $showsMenuBarIcon) {
+                    Label("在菜单栏显示图标", systemImage: "menubar.rectangle")
                 }
             }
 
@@ -92,7 +97,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 540)
+        .frame(width: 500, height: 580)
         .background(SettingsWindowAccessor())
         .onAppear {
             controller.refresh()

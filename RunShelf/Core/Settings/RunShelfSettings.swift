@@ -3,6 +3,9 @@ import Foundation
 enum RunShelfSettings {
     static let defaultRetentionDaysKey = "defaultRetentionDays"
     static let defaultRetentionMaxRunsKey = "defaultRetentionMaxRuns"
+    /// 菜单栏图标只是快捷入口；隐藏后 Dock 图标和主窗口仍可用，后台调度不受影响。
+    static let showsMenuBarIconKey = "showsMenuBarIcon"
+    static let showsMenuBarIconDefault = true
 
     static var defaultRetentionDays: Int {
         let value = UserDefaults.standard.integer(forKey: defaultRetentionDaysKey)

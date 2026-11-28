@@ -5,6 +5,7 @@ import AppKit
 struct RunShelfApp: App {
     @StateObject private var schedulerController: SchedulerServiceController
     @StateObject private var taskStore: TaskStore
+    @AppStorage(RunShelfSettings.showsMenuBarIconKey) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
     private let failureNotificationRelay: FailureNotificationRelay
 
     init() {
@@ -51,7 +52,8 @@ struct RunShelfApp: App {
             }
         }
 
-        MenuBarExtra {
+        // isInserted 双向绑定：设置里关掉会移除图标；用户按住 ⌘ 把图标拖出菜单栏也会写回 false。
+        MenuBarExtra(isInserted: $showsMenuBarIcon) {
             MenuBarContent(
                 taskStore: taskStore,
                 schedulerController: schedulerController
