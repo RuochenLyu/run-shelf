@@ -138,10 +138,17 @@ final class RunShelfSchedulerE2ETests: XCTestCase {
         XCTAssertEqual(finished["status"] as? String, "timeout")
         XCTAssertTrue(scheduler.isRunning)
 
+        // 宿主先写终态 meta 再写 outbox，看到 timeout 时通知可能还没落盘。
         let outboxURL = appSupportURL.appendingPathComponent("notifications/outbox", isDirectory: true)
-        let queued = ((try? FileManager.default.contentsOfDirectory(atPath: outboxURL.path)) ?? [])
-            .filter { $0.hasSuffix(".json") && !$0.hasPrefix(".") }
-        XCTAssertEqual(queued, ["\(taskID)--\(try XCTUnwrap(finished["runId"] as? String)).json"])
+        func queuedFiles() -> [String] {
+            ((try? FileManager.default.contentsOfDirectory(atPath: outboxURL.path)) ?? [])
+                .filter { $0.hasSuffix(".json") && !$0.hasPrefix(".") }
+        }
+        let deadline = Date().addingTimeInterval(10)
+        while queuedFiles().isEmpty && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        XCTAssertEqual(queuedFiles(), ["\(taskID)--\(try XCTUnwrap(finished["runId"] as? String)).json"])
     }
 
     // MARK: - Helpers
