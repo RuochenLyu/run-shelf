@@ -26,7 +26,7 @@ final class TaskListPreferencesStore: ObservableObject {
     private var observer: NSObjectProtocol?
 
     init(
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults = RunShelfSettings.defaults,
         sortModeKey: String = "TaskListSortMode",
         manualOrderKey: String = "TaskListManualOrder"
     ) {
@@ -61,12 +61,15 @@ final class TaskListPreferencesStore: ObservableObject {
         defaults.set(mode.rawValue, forKey: sortModeKey)
     }
 
+    /// 只追加新出现的任务，不删除当前列表里缺席的 ID：任务尚未加载完、某个
+    /// task.json 暂时读不出来、或预览进程指向另一份数据目录时，传进来的列表都
+    /// 不完整，据此裁剪会永久丢掉用户的手动顺序。删除走 `forget(taskID:)`。
     func reconcile(taskIDs: [String]) {
-        let available = Set(taskIDs)
         let known = Set(manualOrder)
-        let nextOrder = manualOrder.filter(available.contains) + taskIDs.filter { !known.contains($0) }
-        guard nextOrder != manualOrder else { return }
-        manualOrder = nextOrder
+        var seen = Set<String>()
+        let newIDs = taskIDs.filter { !known.contains($0) && seen.insert($0).inserted }
+        guard !newIDs.isEmpty else { return }
+        manualOrder += newIDs
         persistManualOrder()
     }
 
@@ -79,8 +82,16 @@ final class TaskListPreferencesStore: ObservableObject {
         }
         let adjustedDestination = toOffset - fromOffsets.filter { $0 < toOffset }.count
         reordered.insert(contentsOf: moving, at: adjustedDestination)
-        guard reordered != manualOrder else { return }
-        manualOrder = reordered
+
+        // 只在可见任务原本占据的槽位里重排，不在列表里的 ID 留在原位。
+        let visible = Set(reordered)
+        var nextOrder = manualOrder + reordered.filter { !manualOrder.contains($0) }
+        var replacements = reordered.makeIterator()
+        for index in nextOrder.indices where visible.contains(nextOrder[index]) {
+            nextOrder[index] = replacements.next()!
+        }
+        guard nextOrder != manualOrder else { return }
+        manualOrder = nextOrder
         persistManualOrder()
     }
 

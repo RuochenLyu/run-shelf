@@ -6,7 +6,7 @@ struct RunShelfApp: App {
     @NSApplicationDelegateAdaptor(RunShelfAppDelegate.self) private var appDelegate
     @StateObject private var schedulerController: SchedulerServiceController
     @StateObject private var taskStore: TaskStore
-    @AppStorage(RunShelfSettings.showsMenuBarIconKey) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
+    @AppStorage(RunShelfSettings.showsMenuBarIconKey, store: RunShelfSettings.defaults) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
     private let failureNotificationRelay: FailureNotificationRelay
 
     init() {

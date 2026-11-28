@@ -11,7 +11,7 @@ final class SchedulePreferencesStore: ObservableObject {
     private var observer: NSObjectProtocol?
 
     init() {
-        if let dict = UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] {
+        if let dict = RunShelfSettings.defaults.dictionary(forKey: defaultsKey) as? [String: String] {
             modes = dict
         }
         observer = NotificationCenter.default.addObserver(
@@ -39,12 +39,12 @@ final class SchedulePreferencesStore: ObservableObject {
     func setMode(_ rawValue: String, for taskID: String) {
         guard modes[taskID] != rawValue else { return }
         modes[taskID] = rawValue
-        UserDefaults.standard.set(modes, forKey: defaultsKey)
+        RunShelfSettings.defaults.set(modes, forKey: defaultsKey)
     }
 
     func forget(taskID: String) {
         guard modes.removeValue(forKey: taskID) != nil else { return }
-        UserDefaults.standard.set(modes, forKey: defaultsKey)
+        RunShelfSettings.defaults.set(modes, forKey: defaultsKey)
     }
 }
 

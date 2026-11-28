@@ -121,7 +121,7 @@ final class SchedulerServiceController: ObservableObject {
         lastErrorMessage = nil
         do {
             try service.unregister()
-            UserDefaults.standard.removeObject(forKey: registrationSignatureKey)
+            RunShelfSettings.defaults.removeObject(forKey: registrationSignatureKey)
             refresh()
         } catch {
             _ = handleServiceRegistrationError(error)
@@ -212,7 +212,7 @@ final class SchedulerServiceController: ObservableObject {
         guard embeddedSchedulerAvailable else { return }
         guard !isRepairingRegistration else { return }
         guard let signature = currentRegistrationSignature() else { return }
-        guard UserDefaults.standard.string(forKey: registrationSignatureKey) != signature else { return }
+        guard RunShelfSettings.defaults.string(forKey: registrationSignatureKey) != signature else { return }
         guard attemptedRegistrationRepairSignature != signature else { return }
 
         isRepairingRegistration = true
@@ -229,7 +229,7 @@ final class SchedulerServiceController: ObservableObject {
 
                 do {
                     try self.service.register()
-                    UserDefaults.standard.set(signature, forKey: self.registrationSignatureKey)
+                    RunShelfSettings.defaults.set(signature, forKey: self.registrationSignatureKey)
                     self.lastErrorMessage = nil
                 } catch {
                     _ = self.handleServiceRegistrationError(error)
@@ -243,7 +243,7 @@ final class SchedulerServiceController: ObservableObject {
 
     private func markCurrentRegistrationSignature() {
         guard let signature = currentRegistrationSignature() else { return }
-        UserDefaults.standard.set(signature, forKey: registrationSignatureKey)
+        RunShelfSettings.defaults.set(signature, forKey: registrationSignatureKey)
     }
 
     private func currentRegistrationSignature() -> String? {

@@ -4,9 +4,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var controller: SchedulerServiceController
-    @AppStorage(RunShelfSettings.defaultRetentionDaysKey) private var defaultRetentionDays = RunShelfSettings.defaultRetentionDays
-    @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
-    @AppStorage(RunShelfSettings.showsMenuBarIconKey) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
+    @AppStorage(RunShelfSettings.defaultRetentionDaysKey, store: RunShelfSettings.defaults) private var defaultRetentionDays = RunShelfSettings.defaultRetentionDays
+    @AppStorage(RunShelfSettings.defaultRetentionMaxRunsKey, store: RunShelfSettings.defaults) private var defaultRetentionMaxRuns = RunShelfSettings.defaultRetentionMaxRuns
+    @AppStorage(RunShelfSettings.showsMenuBarIconKey, store: RunShelfSettings.defaults) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
     @State private var cliStatus: RunShelfCLIInstallationStatus?
     @State private var cliFeedback: String?
     @State private var cliFeedbackIsError = false

@@ -63,12 +63,37 @@ final class TaskListPreferencesTests: XCTestCase {
         )
     }
 
-    func testReconcileRemovesDeletedIDsAndAppendsNewIDs() {
+    func testReconcileKeepsMissingIDsAndAppendsNewIDs() {
         let store = makeStore()
         store.reconcile(taskIDs: ["a", "b"])
-        store.reconcile(taskIDs: ["b", "c"])
+        // 任务还没加载、或预览进程看的是另一份数据目录：列表不完整不能裁剪顺序。
+        store.reconcile(taskIDs: [])
+        store.reconcile(taskIDs: ["b", "c", "c"])
 
-        XCTAssertEqual(store.manualOrder, ["b", "c"])
+        XCTAssertEqual(store.manualOrder, ["a", "b", "c"])
+        XCTAssertEqual(makeStore().manualOrder, ["a", "b", "c"])
+    }
+
+    func testForgetRemovesDeletedID() {
+        let store = makeStore()
+        store.reconcile(taskIDs: ["a", "b", "c"])
+        store.forget(taskID: "b")
+
+        XCTAssertEqual(store.manualOrder, ["a", "c"])
+    }
+
+    func testMoveKeepsIDsThatAreNotVisible() {
+        let store = makeStore()
+        store.reconcile(taskIDs: ["a", "hidden", "b", "c"])
+
+        // "hidden" 此刻不在列表里（例如 task.json 暂时读不出来）。
+        store.move(taskIDs: ["a", "b", "c"], fromOffsets: IndexSet(integer: 2), toOffset: 0)
+
+        XCTAssertEqual(store.manualOrder, ["c", "hidden", "a", "b"])
+        XCTAssertEqual(
+            store.orderedTasks([task(id: "a"), task(id: "b"), task(id: "c")]).map(\.id),
+            ["c", "a", "b"]
+        )
     }
 
     private func makeStore() -> TaskListPreferencesStore {
