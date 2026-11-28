@@ -3,6 +3,7 @@ import AppKit
 
 @main
 struct RunShelfApp: App {
+    @NSApplicationDelegateAdaptor(RunShelfAppDelegate.self) private var appDelegate
     @StateObject private var schedulerController: SchedulerServiceController
     @StateObject private var taskStore: TaskStore
     @AppStorage(RunShelfSettings.showsMenuBarIconKey) private var showsMenuBarIcon = RunShelfSettings.showsMenuBarIconDefault
@@ -44,7 +45,7 @@ struct RunShelfApp: App {
                 Divider()
 
                 // Window scene 默认不提供 Close；手动接回 Cmd+W。
-                // 关掉后从菜单栏「打开 Run Shelf」可以再开。
+                // 关掉后从菜单栏「打开 Run Shelf」或点 Dock 图标可以再开。
                 Button("关闭窗口") {
                     NSApp.keyWindow?.performClose(nil)
                 }
@@ -69,6 +70,14 @@ struct RunShelfApp: App {
             SettingsView()
                 .environmentObject(schedulerController)
         }
+    }
+}
+
+/// 关掉主窗口不退出：失败通知由主 App 转投，菜单栏入口也要继续可用；
+/// 菜单栏图标被隐藏时，靠 Dock 图标重新打开主窗口。
+final class RunShelfAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
 
